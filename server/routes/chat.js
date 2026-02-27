@@ -1,35 +1,71 @@
 import { Router } from "express";
-import redis from "../redis.js";
 
 export const chatRouter = Router();
-const CHAT_STREAM = "agent:chat";
 
+const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
+const CHANNEL_ID = process.env.DISCORD_CHANNEL_ID || "1476656995221111027"; // #dante-agents
+const NEO_BOT_ID = "1471821951663214737";
+const BASE = "https://discord.com/api/v10";
+
+const headers = {
+  Authorization: `Bot ${DISCORD_TOKEN}`,
+  "Content-Type": "application/json",
+};
+
+// Send a message to Discord channel, tagging Neo
 chatRouter.post("/", async (req, res) => {
   try {
-    const { text, sender = "user", name = "Dante" } = req.body;
+    const { text } = req.body;
     if (!text?.trim()) return res.status(400).json({ error: "text required" });
-    const id = await redis.xadd(CHAT_STREAM, "*",
-      "sender", sender, "name", name,
-      "text", text.trim(), "timestamp", new Date().toISOString()
-    );
-    res.json({ ok: true, id });
+
+    const content = `<@${NEO_BOT_ID}> [Dashboard Chat] ${text.trim()}`;
+    const resp = await fetch(`${BASE}/channels/${CHANNEL_ID}/messages`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ content }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.text();
+      return res.status(resp.status).json({ error: err });
+    }
+
+    const msg = await resp.json();
+    res.json({ ok: true, id: msg.id });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
+// Get recent messages from Discord channel
 chatRouter.get("/", async (req, res) => {
   try {
-    const after = req.query.after || "-";
-    const limit = parseInt(req.query.limit) || 50;
-    const raw = after === "-"
-      ? await redis.xrevrange(CHAT_STREAM, "+", "-", "COUNT", limit)
-      : await redis.xrange(CHAT_STREAM, `(${after}`, "+", "COUNT", limit);
-    const messages = (after === "-" ? raw.reverse() : raw).map(([id, fields]) => {
-      const obj = { id };
-      for (let i = 0; i < fields.length; i += 2) obj[fields[i]] = fields[i + 1];
-      return obj;
-    });
+    const limit = parseInt(req.query.limit) || 30;
+    const after = req.query.after || "";
+    const url = after
+      ? `${BASE}/channels/${CHANNEL_ID}/messages?limit=${limit}&after=${after}`
+      : `${BASE}/channels/${CHANNEL_ID}/messages?limit=${limit}`;
+
+    const resp = await fetch(url, { headers });
+    if (!resp.ok) {
+      const err = await resp.text();
+      return res.status(resp.status).json({ error: err });
+    }
+
+    const raw = await resp.json();
+    // Discord returns newest first, reverse for chronological
+    const messages = raw.reverse().map((msg) => ({
+      id: msg.id,
+      sender: msg.author.bot ? "agent" : "user",
+      name: msg.author.global_name || msg.author.username,
+      text: msg.content,
+      timestamp: msg.timestamp,
+      avatar: msg.author.avatar
+        ? `https://cdn.discordapp.com/avatars/${msg.author.id}/${msg.author.avatar}.png?size=32`
+        : null,
+      botId: msg.author.id,
+    }));
+
     res.json(messages);
   } catch (e) {
     res.status(500).json({ error: e.message });
