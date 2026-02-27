@@ -1,120 +1,101 @@
+const AGENT_ICONS = { neo: "🕶️", mu: "🔧", beta: "⚡", alpha: "🧠", flow: "🌊" };
+const STATUS_COLORS = {
+  todo: "#666", assigned: "#3388ff", in_progress: "#ffaa00", done: "#33ff00", failed: "#ff3333",
+};
+const PRIORITY_BADGES = { urgent: "🔴", high: "🟠", normal: "", low: "⚪" };
+
 function timeAgo(iso) {
   if (!iso) return "";
-  const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (seconds < 0) return "just now";
-  if (seconds < 60) return seconds + "s ago";
-  if (seconds < 3600) return Math.floor(seconds / 60) + "m ago";
-  if (seconds < 86400) return Math.floor(seconds / 3600) + "h ago";
-  return Math.floor(seconds / 86400) + "d ago";
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return "now";
+  if (s < 3600) return Math.floor(s / 60) + "m";
+  if (s < 86400) return Math.floor(s / 3600) + "h";
+  return Math.floor(s / 86400) + "d";
 }
 
-function formatDuration(ms) {
-  if (!ms && ms !== 0) return "";
-  if (ms < 1000) return ms + "ms";
-  if (ms < 60000) return (ms / 1000).toFixed(1) + "s";
-  return (ms / 60000).toFixed(1) + "m";
-}
-
-const typeBadgeColors = { code: "#aa55ff", exec: "#33ff00", query: "#3388ff", review: "#ffaa00" };
-const statusBorderColors = { pending: "#3388ff", processing: "#ffaa00", completed: "#33ff00", failed: "#ff3333" };
-const agentIcons = { neo: "🕶️", mu: "🔧", beta: "⚡", alpha: "🧠" };
-
-function getAgentIcon(name) {
-  if (!name) return "👤";
-  const key = name.toLowerCase().split(/[^a-z]/)[0];
-  return agentIcons[key] || "👤";
-}
-
-export default function TaskCard({ task, type, onRetry }) {
-  const id = (task.id || task.taskId || "").slice(0, 8);
-  const taskType = (task.type || "code").toLowerCase();
-  const badgeColor = typeBadgeColors[taskType] || "#888";
-  const leftBorder = statusBorderColors[type] || "#222";
-
-  const fullPrompt = task.prompt || task.payload?.prompt || task.description || "";
-  const taskName = task.name || fullPrompt.slice(0, 60) || "—";
-  const promptPreview = fullPrompt.length > 80 ? fullPrompt.slice(0, 80) + "…" : fullPrompt;
-
-  const agent = task.assignedTo || task.worker || task.consumer || task.dispatchedBy || "Unassigned";
-  const isUnassigned = agent === "Unassigned";
-
-  const timestamp = task.createdAt || task.dispatchedAt || task.startedAt || task.completedAt;
+export default function TaskCard({ task, onStatusChange, onDelete }) {
+  const agent = task.assigned_agent?.toLowerCase();
+  const icon = AGENT_ICONS[agent] || "🤖";
+  const borderColor = STATUS_COLORS[task.status] || "#333";
 
   return (
-    <div style={{
-      background: "#111",
-      border: "1px solid #222",
-      borderLeft: `3px solid ${leftBorder}`,
-      padding: "10px 12px",
-      fontSize: "12px",
-    }}>
-      {/* Row 1: Type badge + name + priority */}
-      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
-        <span style={{
-          background: badgeColor, color: "#000", padding: "1px 6px",
-          fontSize: "10px", fontWeight: 700, textTransform: "uppercase", flexShrink: 0,
-        }}>{taskType}</span>
-        <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-          {taskName}
-        </span>
-        {task.priority === "high" && (
+    <div
+      style={{
+        background: "#111", border: `1px solid ${borderColor}`, padding: 10,
+        marginBottom: 6, fontSize: 12, borderLeft: `3px solid ${borderColor}`,
+      }}
+    >
+      {/* Header: type badge + priority */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
           <span style={{
-            background: "#ff3333", color: "#000", padding: "1px 6px",
-            fontSize: "10px", fontWeight: 700, flexShrink: 0,
-          }}>HIGH</span>
-        )}
-      </div>
-
-      {/* Row 2: Agent · time · ID */}
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", opacity: 0.7, marginBottom: "4px" }}>
-        <span style={{ color: isUnassigned ? "#555" : "inherit" }}>
-          {getAgentIcon(isUnassigned ? null : agent)} {isUnassigned ? "Unassigned" : agent}
-        </span>
-        {timestamp && <span>⏱ {timeAgo(timestamp)}</span>}
-        {id && <span style={{ fontSize: "10px", opacity: 0.5 }}>#{id}</span>}
-      </div>
-
-      {/* Row 3: Prompt preview */}
-      {fullPrompt && (
-        <div style={{ opacity: 0.6, fontSize: "11px", marginBottom: "4px" }} title={fullPrompt}>
-          📝 {promptPreview || "—"}
-        </div>
-      )}
-
-      {/* Processing: consumer + idle */}
-      {type === "processing" && (
-        <div style={{ fontSize: "10px", opacity: 0.6 }}>
-          {task.consumer && <span>⚙ {task.consumer}</span>}
-          {task.idle != null && <span style={{ marginLeft: "8px" }}>idle {formatDuration(task.idle)}</span>}
-        </div>
-      )}
-
-      {/* Completed: worker + duration */}
-      {type === "completed" && task.duration != null && (
-        <div style={{ fontSize: "10px", opacity: 0.6 }}>
-          {(task.worker || task.consumer) && <span>{getAgentIcon(task.worker || task.consumer)} {task.worker || task.consumer} · </span>}
-          ✅ {formatDuration(task.duration)}
-        </div>
-      )}
-
-      {/* Failed: error + retry */}
-      {type === "failed" && (
-        <div style={{ marginTop: "4px" }}>
-          <div style={{ fontSize: "10px", color: "#ff3333" }}>
-            ❌ {(task.error || "Unknown error").slice(0, 120)}
-          </div>
-          {task.retryCount != null && (
-            <span style={{ fontSize: "10px", opacity: 0.5 }}>Retries: {task.retryCount}</span>
+            background: borderColor, color: "#000", padding: "1px 6px",
+            fontSize: 10, fontWeight: 700, textTransform: "uppercase",
+          }}>
+            {task.type}
+          </span>
+          {PRIORITY_BADGES[task.priority] && (
+            <span title={task.priority}>{PRIORITY_BADGES[task.priority]}</span>
           )}
-          {onRetry && (
+        </div>
+        <span style={{ opacity: 0.4, fontSize: 10 }}>{timeAgo(task.created_at)}</span>
+      </div>
+
+      {/* Title */}
+      <div style={{ fontWeight: 600, marginBottom: 4, color: "#eee" }}>
+        {task.title}
+      </div>
+
+      {/* Description/prompt preview */}
+      {(task.description || task.prompt) && (
+        <div style={{ opacity: 0.6, fontSize: 11, marginBottom: 4, lineHeight: 1.3 }}>
+          {(task.description || task.prompt).slice(0, 120)}
+          {(task.description || task.prompt).length > 120 ? "…" : ""}
+        </div>
+      )}
+
+      {/* Agent + actions */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+          {agent && (
+            <span style={{ fontSize: 11 }}>
+              {icon} <span style={{ opacity: 0.6 }}>{agent}</span>
+            </span>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {task.status === "todo" && (
             <button
-              onClick={() => onRetry(task.id || task.taskId)}
-              style={{
-                background: "#ff3333", color: "#000", border: "none", fontWeight: 700,
-                fontSize: "10px", padding: "2px 8px", marginTop: "4px", cursor: "pointer",
-              }}
-            >RETRY</button>
+              onClick={() => onStatusChange?.(task.id, { status: "assigned", assigned_agent: task.assigned_agent || "neo" })}
+              style={{ fontSize: 10, background: "#3388ff", color: "#fff", border: "none", padding: "2px 6px", cursor: "pointer" }}
+            >Assign</button>
           )}
+          {task.status === "failed" && (
+            <button
+              onClick={() => onStatusChange?.(task.id, { status: "assigned" })}
+              style={{ fontSize: 10, background: "#ffaa00", color: "#000", border: "none", padding: "2px 6px", cursor: "pointer" }}
+            >Retry</button>
+          )}
+          {(task.status === "done" || task.status === "failed") && (
+            <button
+              onClick={() => onDelete?.(task.id)}
+              style={{ fontSize: 10, background: "#333", color: "#888", border: "none", padding: "2px 6px", cursor: "pointer" }}
+            >×</button>
+          )}
+        </div>
+      </div>
+
+      {/* Result preview for done tasks */}
+      {task.status === "done" && task.result && (
+        <div style={{ marginTop: 4, fontSize: 10, opacity: 0.5, borderTop: "1px solid #222", paddingTop: 4 }}>
+          ✅ {typeof task.result === "string" ? task.result.slice(0, 80) : JSON.stringify(task.result).slice(0, 80)}
+        </div>
+      )}
+
+      {/* Error for failed tasks */}
+      {task.status === "failed" && task.error && (
+        <div style={{ marginTop: 4, fontSize: 10, color: "#ff6666", borderTop: "1px solid #222", paddingTop: 4 }}>
+          ❌ {task.error.slice(0, 80)}
         </div>
       )}
     </div>

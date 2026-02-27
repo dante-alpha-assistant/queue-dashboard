@@ -1,31 +1,19 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
 export default function useQueue() {
-  const [stats, setStats] = useState({ pending: 0, processing: 0, completed: 0, failed: 0, dlq: 0 });
+  const [stats, setStats] = useState({ todo: 0, assigned: 0, in_progress: 0, done: 0, failed: 0 });
   const [tasks, setTasks] = useState([]);
-  const [processing, setProcessing] = useState([]);
-  const [results, setResults] = useState([]);
-  const [dlq, setDlq] = useState([]);
   const [loading, setLoading] = useState(true);
   const initialLoad = useRef(true);
 
   const fetchAll = useCallback(async () => {
     try {
-      const [sRes, tRes, pRes, rRes, dRes] = await Promise.all([
+      const [sRes, tRes] = await Promise.all([
         fetch("/api/stats"),
         fetch("/api/tasks"),
-        fetch("/api/processing"),
-        fetch("/api/results?limit=20"),
-        fetch("/api/dlq"),
       ]);
-      const [s, t, p, r, d] = await Promise.all([
-        sRes.json(), tRes.json(), pRes.json(), rRes.json(), dRes.json(),
-      ]);
-      setStats(s);
-      setTasks(t);
-      setProcessing(p);
-      setResults(r);
-      setDlq(d);
+      setStats(await sRes.json());
+      setTasks(await tRes.json());
       if (initialLoad.current) {
         setLoading(false);
         initialLoad.current = false;
@@ -52,11 +40,28 @@ export default function useQueue() {
     return res.json();
   }, [fetchAll]);
 
-  const retryDlq = useCallback(async (taskId) => {
-    const res = await fetch("/api/dlq/" + taskId + "/retry", { method: "POST" });
-    if (!res.ok) throw new Error("Retry failed");
+  const updateTask = useCallback(async (id, updates) => {
+    const res = await fetch(`/api/tasks/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error("Update failed");
     await fetchAll();
   }, [fetchAll]);
 
-  return { stats, tasks, processing, results, dlq, loading, dispatch, retryDlq };
+  const deleteTask = useCallback(async (id) => {
+    const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error("Delete failed");
+    await fetchAll();
+  }, [fetchAll]);
+
+  // Group tasks by status
+  const todo = tasks.filter(t => t.status === "todo");
+  const assigned = tasks.filter(t => t.status === "assigned");
+  const inProgress = tasks.filter(t => t.status === "in_progress");
+  const done = tasks.filter(t => t.status === "done");
+  const failed = tasks.filter(t => t.status === "failed");
+
+  return { stats, tasks, todo, assigned, inProgress, done, failed, loading, dispatch, updateTask, deleteTask };
 }

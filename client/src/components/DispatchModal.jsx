@@ -1,63 +1,93 @@
 import { useState } from "react";
 
-const inputStyle = {
-  background: "#1a1a1a", border: "1px solid #333", color: "#e0e0e0",
-  padding: "8px", width: "100%", fontSize: "13px", fontFamily: "'JetBrains Mono', monospace",
-};
+const AGENTS = ["neo", "mu", "beta", "flow"];
+const TYPES = ["general", "coding", "research", "ops", "test"];
+const PRIORITIES = ["low", "normal", "high", "urgent"];
 
 export default function DispatchModal({ onClose, dispatch }) {
-  const [form, setForm] = useState({
-    type: "code", prompt: "", priority: "normal",
-    dispatchedBy: "manual", maxRetries: 3, timeoutMs: 300000,
-  });
-  const [submitting, setSubmitting] = useState(false);
-  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [type, setType] = useState("general");
+  const [priority, setPriority] = useState("normal");
+  const [agent, setAgent] = useState("");
+  const [status, setStatus] = useState("todo");
+  const [sending, setSending] = useState(false);
 
-  const submit = async (e) => {
-    e.preventDefault();
-    setSubmitting(true);
+  const submit = async () => {
+    if (!title.trim()) return;
+    setSending(true);
     try {
-      await dispatch({ ...form, maxRetries: Number(form.maxRetries), timeoutMs: Number(form.timeoutMs) });
+      await dispatch({
+        title: title.trim(),
+        description: description.trim() || null,
+        type,
+        priority,
+        assigned_agent: agent || null,
+        status: agent ? "assigned" : status,
+      });
       onClose();
-    } catch { setSubmitting(false); }
+    } catch {
+      setSending(false);
+    }
+  };
+
+  const inputStyle = {
+    background: "#111", border: "1px solid #333", color: "#eee",
+    padding: "8px 10px", fontSize: 13, width: "100%", fontFamily: "inherit",
+    outline: "none",
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.8)" }} onClick={onClose}>
-      <form onClick={(e) => e.stopPropagation()} onSubmit={submit} className="w-full max-w-md p-6 space-y-4" style={{ background: "#111", border: "1px solid #1a1a1a" }}>
-        <div className="text-sm font-bold" style={{ color: "#33ff00" }}>DISPATCH TASK</div>
-        <label className="block text-xs opacity-60">Type
-          <select value={form.type} onChange={set("type")} style={inputStyle}>
-            <option value="code">code</option><option value="exec">exec</option>
-            <option value="query">query</option><option value="review">review</option>
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)",
+      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100,
+    }} onClick={onClose}>
+      <div style={{
+        background: "#0a0a0a", border: "1px solid #333", padding: 20,
+        width: 420, maxHeight: "80vh", overflow: "auto",
+      }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontWeight: 700, marginBottom: 12, color: "#33ff00" }}>▓ NEW TASK</div>
+
+        <input
+          placeholder="Task title *"
+          value={title} onChange={e => setTitle(e.target.value)}
+          style={{ ...inputStyle, marginBottom: 8 }}
+          autoFocus
+        />
+
+        <textarea
+          placeholder="Description (optional)"
+          value={description} onChange={e => setDescription(e.target.value)}
+          rows={3}
+          style={{ ...inputStyle, marginBottom: 8, resize: "vertical" }}
+        />
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <select value={type} onChange={e => setType(e.target.value)} style={{ ...inputStyle, flex: 1 }}>
+            {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
-        </label>
-        <label className="block text-xs opacity-60">Prompt
-          <textarea value={form.prompt} onChange={set("prompt")} rows={3} required style={inputStyle} />
-        </label>
-        <label className="block text-xs opacity-60">Priority
-          <select value={form.priority} onChange={set("priority")} style={inputStyle}>
-            <option value="normal">normal</option><option value="high">high</option>
+          <select value={priority} onChange={e => setPriority(e.target.value)} style={{ ...inputStyle, flex: 1 }}>
+            {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
-        </label>
-        <label className="block text-xs opacity-60">Dispatched By
-          <input value={form.dispatchedBy} onChange={set("dispatchedBy")} style={inputStyle} />
-        </label>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block text-xs opacity-60">Max Retries
-            <input type="number" value={form.maxRetries} onChange={set("maxRetries")} style={inputStyle} />
-          </label>
-          <label className="block text-xs opacity-60">Timeout (ms)
-            <input type="number" value={form.timeoutMs} onChange={set("timeoutMs")} style={inputStyle} />
-          </label>
         </div>
-        <div className="flex gap-3 pt-2">
-          <button type="submit" disabled={submitting} className="flex-1 py-2 text-sm font-bold cursor-pointer" style={{ background: "#33ff00", color: "#000", border: "none" }}>
-            {submitting ? "..." : "DISPATCH"}
-          </button>
-          <button type="button" onClick={onClose} className="flex-1 py-2 text-sm cursor-pointer" style={{ background: "#1a1a1a", color: "#888", border: "1px solid #333" }}>CANCEL</button>
+
+        <select value={agent} onChange={e => setAgent(e.target.value)} style={{ ...inputStyle, marginBottom: 12 }}>
+          <option value="">Unassigned (todo)</option>
+          {AGENTS.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
+
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={onClose} style={{
+            flex: 1, background: "#222", color: "#888", border: "none",
+            padding: "10px", cursor: "pointer", fontFamily: "inherit",
+          }}>Cancel</button>
+          <button onClick={submit} disabled={!title.trim() || sending} style={{
+            flex: 1, background: title.trim() ? "#33ff00" : "#222", color: "#000",
+            border: "none", padding: "10px", fontWeight: 700, cursor: title.trim() ? "pointer" : "default",
+            fontFamily: "inherit",
+          }}>{sending ? "Creating..." : "Create Task"}</button>
         </div>
-      </form>
+      </div>
     </div>
   );
 }
