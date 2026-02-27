@@ -4,6 +4,7 @@ import StatsBar from "./components/StatsBar";
 import Column from "./components/Column";
 import TaskCard from "./components/TaskCard";
 import DispatchModal from "./components/DispatchModal";
+import ChatPanel from "./components/ChatPanel";
 
 export default function App() {
   const { stats, tasks, processing, results, dlq, loading, dispatch, retryDlq } = useQueue();
@@ -35,7 +36,8 @@ export default function App() {
           {dlq.map((t) => <TaskCard key={t.id || t.taskId} task={t} type="failed" onRetry={retryDlq} />)}
         </Column>
       </div>
-      <button onClick={() => setShowModal(true)} className="fixed bottom-6 right-6 w-14 h-14 text-2xl font-bold cursor-pointer z-40" style={{ background: "#33ff00", color: "#000", border: "none" }}>+</button>
+      <button onClick={() => setShowModal(true)} className="fixed bottom-6 left-6 w-14 h-14 text-2xl font-bold cursor-pointer z-40" style={{ background: "#33ff00", color: "#000", border: "none" }}>+</button>
+      <ChatPanel />
       {showModal && <DispatchModal onClose={() => setShowModal(false)} dispatch={dispatch} />}
     </div>
   );
