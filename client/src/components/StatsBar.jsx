@@ -1,19 +1,18 @@
-export default function StatsBar({ stats }) {
-  const items = [
-    { label: "Todo", value: stats.todo, color: "#666" },
-    { label: "Assigned", value: stats.assigned, color: "#3388ff" },
-    { label: "In Progress", value: stats.in_progress, color: "#ffaa00" },
-    { label: "Done", value: stats.done, color: "#33ff00" },
-    { label: "Failed", value: stats.failed, color: "#ff3333" },
-  ];
+const COLORS = {
+  todo: "#79747E", assigned: "#6750A4", in_progress: "#E8A317", done: "#386A20", failed: "#BA1A1A",
+};
+const LABELS = {
+  todo: "Todo", assigned: "Assigned", in_progress: "Active", done: "Done", failed: "Failed",
+};
 
+export default function StatsBar({ stats }) {
   return (
-    <div className="flex gap-2 px-2 pb-2 text-xs">
-      {items.map((s) => (
-        <div key={s.label} className="flex items-center gap-1">
-          <span style={{ color: s.color }}>●</span>
-          <span style={{ opacity: 0.6 }}>{s.label}:</span>
-          <span style={{ color: s.color, fontWeight: 700 }}>{s.value}</span>
+    <div style={{ display: "flex", gap: 16, fontSize: 12 }}>
+      {Object.entries(LABELS).map(([key, label]) => (
+        <div key={key} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: COLORS[key] }} />
+          <span style={{ color: "var(--md-on-surface-variant)" }}>{label}</span>
+          <span style={{ fontWeight: 600, color: COLORS[key] }}>{stats[key] || 0}</span>
         </div>
       ))}
     </div>

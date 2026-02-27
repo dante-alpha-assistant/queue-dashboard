@@ -10,7 +10,6 @@ export default function DispatchModal({ onClose, dispatch }) {
   const [type, setType] = useState("general");
   const [priority, setPriority] = useState("normal");
   const [agent, setAgent] = useState("");
-  const [status, setStatus] = useState("todo");
   const [sending, setSending] = useState(false);
 
   const submit = async () => {
@@ -23,7 +22,7 @@ export default function DispatchModal({ onClose, dispatch }) {
         type,
         priority,
         assigned_agent: agent || null,
-        status: agent ? "assigned" : status,
+        status: agent ? "assigned" : "todo",
       });
       onClose();
     } catch {
@@ -32,26 +31,29 @@ export default function DispatchModal({ onClose, dispatch }) {
   };
 
   const inputStyle = {
-    background: "#111", border: "1px solid #333", color: "#eee",
-    padding: "8px 10px", fontSize: 13, width: "100%", fontFamily: "inherit",
-    outline: "none",
+    width: "100%", padding: "12px 16px",
+    border: "1px solid var(--md-border)", background: "var(--md-background)",
+    color: "var(--md-on-background)", fontSize: 14, borderRadius: 12,
+    fontFamily: "'Roboto', system-ui, sans-serif", outline: "none",
   };
 
   return (
     <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)",
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)",
       display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100,
     }} onClick={onClose}>
       <div style={{
-        background: "#0a0a0a", border: "1px solid #333", padding: 20,
-        width: 420, maxHeight: "80vh", overflow: "auto",
+        background: "var(--md-background)", borderRadius: 24, padding: 24,
+        width: 440, maxHeight: "80vh", overflow: "auto",
+        border: "1px solid var(--md-surface-variant)",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
       }} onClick={e => e.stopPropagation()}>
-        <div style={{ fontWeight: 700, marginBottom: 12, color: "#33ff00" }}>▓ NEW TASK</div>
+        <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 16 }}>New Task</div>
 
         <input
-          placeholder="Task title *"
+          placeholder="Task title"
           value={title} onChange={e => setTitle(e.target.value)}
-          style={{ ...inputStyle, marginBottom: 8 }}
+          style={{ ...inputStyle, marginBottom: 12 }}
           autoFocus
         />
 
@@ -59,10 +61,10 @@ export default function DispatchModal({ onClose, dispatch }) {
           placeholder="Description (optional)"
           value={description} onChange={e => setDescription(e.target.value)}
           rows={3}
-          style={{ ...inputStyle, marginBottom: 8, resize: "vertical" }}
+          style={{ ...inputStyle, marginBottom: 12, resize: "vertical" }}
         />
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+        <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
           <select value={type} onChange={e => setType(e.target.value)} style={{ ...inputStyle, flex: 1 }}>
             {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
@@ -71,21 +73,23 @@ export default function DispatchModal({ onClose, dispatch }) {
           </select>
         </div>
 
-        <select value={agent} onChange={e => setAgent(e.target.value)} style={{ ...inputStyle, marginBottom: 12 }}>
+        <select value={agent} onChange={e => setAgent(e.target.value)} style={{ ...inputStyle, marginBottom: 20 }}>
           <option value="">Unassigned (todo)</option>
           {AGENTS.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
 
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 12 }}>
           <button onClick={onClose} style={{
-            flex: 1, background: "#222", color: "#888", border: "none",
-            padding: "10px", cursor: "pointer", fontFamily: "inherit",
+            flex: 1, background: "transparent", border: "1px solid var(--md-border)",
+            color: "var(--md-on-background)", padding: 12, borderRadius: 20,
+            cursor: "pointer", fontWeight: 500, fontSize: 14, fontFamily: "'Roboto', system-ui, sans-serif",
           }}>Cancel</button>
           <button onClick={submit} disabled={!title.trim() || sending} style={{
-            flex: 1, background: title.trim() ? "#33ff00" : "#222", color: "#000",
-            border: "none", padding: "10px", fontWeight: 700, cursor: title.trim() ? "pointer" : "default",
-            fontFamily: "inherit",
-          }}>{sending ? "Creating..." : "Create Task"}</button>
+            flex: 1, background: title.trim() ? "var(--md-primary)" : "var(--md-surface-variant)",
+            color: title.trim() ? "var(--md-on-primary)" : "var(--md-on-surface-variant)",
+            border: "none", padding: 12, borderRadius: 20, fontWeight: 500, fontSize: 14,
+            cursor: title.trim() ? "pointer" : "default", fontFamily: "'Roboto', system-ui, sans-serif",
+          }}>{sending ? "Creating..." : agent ? "Create & Assign" : "Create Task"}</button>
         </div>
       </div>
     </div>

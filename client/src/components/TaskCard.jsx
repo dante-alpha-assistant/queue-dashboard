@@ -1,8 +1,11 @@
 const AGENT_ICONS = { neo: "🕶️", mu: "🔧", beta: "⚡", alpha: "🧠", flow: "🌊" };
 const STATUS_COLORS = {
-  todo: "#666", assigned: "#3388ff", in_progress: "#ffaa00", done: "#33ff00", failed: "#ff3333",
+  todo: "#79747E", assigned: "#6750A4", in_progress: "#E8A317", done: "#386A20", failed: "#BA1A1A",
 };
 const PRIORITY_BADGES = { urgent: "🔴", high: "🟠", normal: "", low: "⚪" };
+const TYPE_COLORS = {
+  coding: "#6750A4", research: "#0061A4", ops: "#7D5260", general: "#79747E", test: "#386A20",
+};
 
 function timeAgo(iso) {
   if (!iso) return "";
@@ -16,85 +19,102 @@ function timeAgo(iso) {
 export default function TaskCard({ task, onStatusChange, onDelete }) {
   const agent = task.assigned_agent?.toLowerCase();
   const icon = AGENT_ICONS[agent] || "🤖";
-  const borderColor = STATUS_COLORS[task.status] || "#333";
 
   return (
-    <div
-      style={{
-        background: "#111", border: `1px solid ${borderColor}`, padding: 10,
-        marginBottom: 6, fontSize: 12, borderLeft: `3px solid ${borderColor}`,
-      }}
-    >
-      {/* Header: type badge + priority */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+    <div style={{
+      background: "var(--md-background)", borderRadius: 12,
+      border: "1px solid var(--md-surface-variant)", padding: 12,
+      marginBottom: 8, transition: "all 200ms ease",
+    }}>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <span style={{
-            background: borderColor, color: "#000", padding: "1px 6px",
-            fontSize: 10, fontWeight: 700, textTransform: "uppercase",
+            background: TYPE_COLORS[task.type] || "#79747E", color: "#fff",
+            padding: "2px 8px", borderRadius: 12, fontSize: 10, fontWeight: 600,
+            textTransform: "uppercase", letterSpacing: "0.5px",
           }}>
             {task.type}
           </span>
           {PRIORITY_BADGES[task.priority] && (
-            <span title={task.priority}>{PRIORITY_BADGES[task.priority]}</span>
+            <span title={task.priority} style={{ fontSize: 10 }}>{PRIORITY_BADGES[task.priority]}</span>
           )}
         </div>
-        <span style={{ opacity: 0.4, fontSize: 10 }}>{timeAgo(task.created_at)}</span>
+        <span style={{ color: "var(--md-border)", fontSize: 11 }}>{timeAgo(task.created_at)}</span>
       </div>
 
       {/* Title */}
-      <div style={{ fontWeight: 600, marginBottom: 4, color: "#eee" }}>
+      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4, color: "var(--md-on-background)" }}>
         {task.title}
       </div>
 
-      {/* Description/prompt preview */}
+      {/* Description */}
       {(task.description || task.prompt) && (
-        <div style={{ opacity: 0.6, fontSize: 11, marginBottom: 4, lineHeight: 1.3 }}>
+        <div style={{ color: "var(--md-on-surface-variant)", fontSize: 12, marginBottom: 8, lineHeight: 1.4 }}>
           {(task.description || task.prompt).slice(0, 120)}
           {(task.description || task.prompt).length > 120 ? "…" : ""}
         </div>
       )}
 
-      {/* Agent + actions */}
+      {/* Footer: agent + actions */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-          {agent && (
-            <span style={{ fontSize: 11 }}>
-              {icon} <span style={{ opacity: 0.6 }}>{agent}</span>
-            </span>
-          )}
-        </div>
+        {agent ? (
+          <span style={{
+            display: "inline-flex", alignItems: "center", gap: 4,
+            background: "var(--md-secondary-container)", padding: "2px 8px",
+            borderRadius: 12, fontSize: 11, fontWeight: 500,
+          }}>
+            {icon} {agent}
+          </span>
+        ) : <span />}
         <div style={{ display: "flex", gap: 4 }}>
           {task.status === "todo" && (
             <button
               onClick={() => onStatusChange?.(task.id, { status: "assigned", assigned_agent: task.assigned_agent || "neo" })}
-              style={{ fontSize: 10, background: "#3388ff", color: "#fff", border: "none", padding: "2px 6px", cursor: "pointer" }}
+              style={{
+                fontSize: 11, background: "var(--md-primary)", color: "var(--md-on-primary)",
+                border: "none", padding: "4px 10px", borderRadius: 12, cursor: "pointer",
+                fontWeight: 500,
+              }}
             >Assign</button>
           )}
           {task.status === "failed" && (
             <button
               onClick={() => onStatusChange?.(task.id, { status: "assigned" })}
-              style={{ fontSize: 10, background: "#ffaa00", color: "#000", border: "none", padding: "2px 6px", cursor: "pointer" }}
+              style={{
+                fontSize: 11, background: "#E8A317", color: "#fff",
+                border: "none", padding: "4px 10px", borderRadius: 12, cursor: "pointer",
+                fontWeight: 500,
+              }}
             >Retry</button>
           )}
           {(task.status === "done" || task.status === "failed") && (
             <button
               onClick={() => onDelete?.(task.id)}
-              style={{ fontSize: 10, background: "#333", color: "#888", border: "none", padding: "2px 6px", cursor: "pointer" }}
+              style={{
+                fontSize: 11, background: "var(--md-surface-variant)", color: "var(--md-on-surface-variant)",
+                border: "none", padding: "4px 8px", borderRadius: 12, cursor: "pointer",
+              }}
             >×</button>
           )}
         </div>
       </div>
 
-      {/* Result preview for done tasks */}
+      {/* Result */}
       {task.status === "done" && task.result && (
-        <div style={{ marginTop: 4, fontSize: 10, opacity: 0.5, borderTop: "1px solid #222", paddingTop: 4 }}>
+        <div style={{
+          marginTop: 8, fontSize: 11, color: "#386A20",
+          borderTop: "1px solid var(--md-surface-variant)", paddingTop: 6,
+        }}>
           ✅ {typeof task.result === "string" ? task.result.slice(0, 80) : JSON.stringify(task.result).slice(0, 80)}
         </div>
       )}
 
-      {/* Error for failed tasks */}
       {task.status === "failed" && task.error && (
-        <div style={{ marginTop: 4, fontSize: 10, color: "#ff6666", borderTop: "1px solid #222", paddingTop: 4 }}>
+        <div style={{
+          marginTop: 8, fontSize: 11, color: "#BA1A1A",
+          borderTop: "1px solid var(--md-surface-variant)", paddingTop: 6,
+        }}>
           ❌ {task.error.slice(0, 80)}
         </div>
       )}

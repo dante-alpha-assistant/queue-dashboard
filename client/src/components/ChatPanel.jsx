@@ -4,16 +4,15 @@ function timeAgo(iso) {
   if (!iso) return "";
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
   if (s < 60) return "now";
-  if (s < 3600) return Math.floor(s / 60) + "m ago";
-  if (s < 86400) return Math.floor(s / 3600) + "h ago";
-  return Math.floor(s / 86400) + "d ago";
+  if (s < 3600) return Math.floor(s / 60) + "m";
+  if (s < 86400) return Math.floor(s / 3600) + "h";
+  return Math.floor(s / 86400) + "d";
 }
 
-// Strip Discord mentions like <@12345> and [Dashboard Chat] prefix
 function cleanText(text) {
   return text
     .replace(/<@!?\d+>/g, "")
-    .replace(/\[Dashboard Chat\]\s*/g, "")
+    .replace(/\*\*\[Dante via Dashboard\]\*\*\s*/g, "")
     .trim();
 }
 
@@ -26,7 +25,6 @@ export default function ChatPanel() {
   const inputRef = useRef(null);
   const lastIdRef = useRef(null);
 
-  // Load messages
   const loadMessages = async (after) => {
     try {
       const url = after ? `/api/chat?limit=30&after=${after}` : "/api/chat?limit=30";
@@ -43,14 +41,12 @@ export default function ChatPanel() {
     } catch {}
   };
 
-  // Initial load
   useEffect(() => {
     if (!open) return;
     lastIdRef.current = null;
     loadMessages(null);
   }, [open]);
 
-  // Poll every 3s for new messages
   useEffect(() => {
     if (!open) return;
     const interval = setInterval(() => {
@@ -59,7 +55,6 @@ export default function ChatPanel() {
     return () => clearInterval(interval);
   }, [open]);
 
-  // Auto-scroll
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -79,7 +74,6 @@ export default function ChatPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
       });
-      // Immediately poll for the sent message
       setTimeout(() => {
         if (lastIdRef.current) loadMessages(lastIdRef.current);
       }, 500);
@@ -100,10 +94,10 @@ export default function ChatPanel() {
         onClick={() => setOpen(true)}
         style={{
           position: "fixed", bottom: 24, right: 24, width: 56, height: 56,
-          borderRadius: "50%", background: "#33ff00", border: "none",
-          fontSize: 24, cursor: "pointer", zIndex: 1000,
+          borderRadius: "50%", background: "var(--md-primary)", border: "none",
+          fontSize: 24, cursor: "pointer", zIndex: 1000, color: "var(--md-on-primary)",
           display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: "0 4px 12px rgba(51,255,0,0.3)",
+          boxShadow: "0 4px 12px rgba(103, 80, 164, 0.3)",
         }}
       >💬</button>
     );
@@ -111,26 +105,30 @@ export default function ChatPanel() {
 
   return (
     <div style={{
-      position: "fixed", bottom: 24, right: 24, width: 420, height: 520,
-      background: "#0a0a0a", border: "1px solid #222", zIndex: 1000,
-      display: "flex", flexDirection: "column", boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+      position: "fixed", bottom: 24, right: 24, width: 400, height: 500,
+      background: "var(--md-background)", borderRadius: 24,
+      border: "1px solid var(--md-surface-variant)", zIndex: 1000,
+      display: "flex", flexDirection: "column",
+      boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+      overflow: "hidden",
     }}>
       {/* Header */}
       <div style={{
-        padding: "12px 16px", borderBottom: "1px solid #222",
+        padding: "14px 20px", borderBottom: "1px solid var(--md-surface-variant)",
         display: "flex", justifyContent: "space-between", alignItems: "center",
       }}>
-        <span style={{ fontWeight: 700, fontSize: 14 }}>💬 #dante-agents</span>
+        <span style={{ fontWeight: 600, fontSize: 14 }}>💬 #dante-agents</span>
         <button onClick={() => setOpen(false)} style={{
-          background: "none", border: "none", color: "#666", fontSize: 18, cursor: "pointer",
+          background: "none", border: "none", color: "var(--md-border)",
+          fontSize: 18, cursor: "pointer",
         }}>✕</button>
       </div>
 
       {/* Messages */}
-      <div style={{ flex: 1, overflow: "auto", padding: "8px 12px" }}>
+      <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
         {messages.length === 0 && (
-          <div style={{ opacity: 0.3, textAlign: "center", marginTop: 40, fontSize: 13 }}>
-            Loading messages...
+          <div style={{ color: "var(--md-border)", textAlign: "center", marginTop: 40, fontSize: 13 }}>
+            No messages yet
           </div>
         )}
         {messages.map((msg) => {
@@ -138,21 +136,21 @@ export default function ChatPanel() {
           const cleaned = cleanText(msg.text);
           if (!cleaned) return null;
           return (
-            <div key={msg.id} style={{ marginBottom: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+            <div key={msg.id} style={{ marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
                 {msg.avatar && (
                   <img src={msg.avatar} alt="" style={{ width: 18, height: 18, borderRadius: "50%" }} />
                 )}
                 <span style={{
                   fontSize: 11, fontWeight: 600,
-                  color: isUser ? "#8888ff" : "#33ff00",
+                  color: isUser ? "var(--md-primary)" : "#386A20",
                 }}>{msg.name}</span>
-                <span style={{ fontSize: 10, opacity: 0.3 }}>{timeAgo(msg.timestamp)}</span>
+                <span style={{ fontSize: 10, color: "var(--md-border)" }}>{timeAgo(msg.timestamp)}</span>
               </div>
               <div style={{
                 fontSize: 13, lineHeight: 1.5, paddingLeft: 24,
                 whiteSpace: "pre-wrap", wordBreak: "break-word",
-                opacity: 0.9,
+                color: "var(--md-on-background)",
               }}>
                 {cleaned}
               </div>
@@ -164,7 +162,7 @@ export default function ChatPanel() {
 
       {/* Input */}
       <div style={{
-        padding: "12px", borderTop: "1px solid #222",
+        padding: 12, borderTop: "1px solid var(--md-surface-variant)",
         display: "flex", gap: 8,
       }}>
         <textarea
@@ -175,21 +173,24 @@ export default function ChatPanel() {
           placeholder="Message #dante-agents..."
           rows={1}
           style={{
-            flex: 1, background: "#111", border: "1px solid #333",
-            color: "#eee", padding: "8px 12px", fontSize: 13,
-            resize: "none", outline: "none", fontFamily: "inherit",
+            flex: 1, background: "var(--md-surface-container)",
+            border: "1px solid var(--md-surface-variant)",
+            color: "var(--md-on-background)", padding: "10px 14px", fontSize: 13,
+            resize: "none", outline: "none", borderRadius: 12,
+            fontFamily: "'Roboto', system-ui, sans-serif",
           }}
-          onFocus={e => e.target.style.borderColor = "#33ff00"}
-          onBlur={e => e.target.style.borderColor = "#333"}
+          onFocus={e => e.target.style.borderColor = "var(--md-primary)"}
+          onBlur={e => e.target.style.borderColor = "var(--md-surface-variant)"}
         />
         <button
           onClick={send}
           disabled={!input.trim() || sending}
           style={{
-            background: input.trim() ? "#33ff00" : "#222", color: "#000",
-            border: "none", padding: "8px 16px", fontWeight: 700,
-            fontSize: 13, cursor: input.trim() ? "pointer" : "default",
-            fontFamily: "inherit",
+            background: input.trim() ? "var(--md-primary)" : "var(--md-surface-variant)",
+            color: input.trim() ? "var(--md-on-primary)" : "var(--md-on-surface-variant)",
+            border: "none", padding: "10px 16px", borderRadius: 20,
+            fontWeight: 500, fontSize: 13, cursor: input.trim() ? "pointer" : "default",
+            fontFamily: "'Roboto', system-ui, sans-serif",
           }}
         >Send</button>
       </div>
