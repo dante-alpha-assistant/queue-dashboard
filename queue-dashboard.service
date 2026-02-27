@@ -1,0 +1,16 @@
+[Unit]
+Description=Queue Dashboard - Redis Streams Kanban
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/.openclaw/workspace/queue-dashboard
+ExecStart=/usr/bin/node server/index.js
+Environment=PORT=9092
+Environment=REDIS_URL=redis://redis.infra.svc.cluster.local:6379
+Environment=NODE_ENV=production
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
