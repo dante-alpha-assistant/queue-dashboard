@@ -18,7 +18,7 @@ chatRouter.post("/", async (req, res) => {
     const { text } = req.body;
     if (!text?.trim()) return res.status(400).json({ error: "text required" });
 
-    const content = `<@${NEO_BOT_ID}> [Dashboard Chat] ${text.trim()}`;
+    const content = `**[Dante via Dashboard]** <@${NEO_BOT_ID}> ${text.trim()}`;
     const resp = await fetch(`${BASE}/channels/${CHANNEL_ID}/messages`, {
       method: "POST",
       headers,
@@ -43,7 +43,7 @@ chatRouter.get("/", async (req, res) => {
     const limit = parseInt(req.query.limit) || 30;
     const after = req.query.after || "";
     const url = after
-      ? `${BASE}/channels/${CHANNEL_ID}/messages?limit=${limit}&after=${after}`
+      ? `${BASE}/channels/${CHANNEL_ID}/messages?limit=${limit}&after=${after}&sort=desc`
       : `${BASE}/channels/${CHANNEL_ID}/messages?limit=${limit}`;
 
     const resp = await fetch(url, { headers });
@@ -54,17 +54,19 @@ chatRouter.get("/", async (req, res) => {
 
     const raw = await resp.json();
     // Discord returns newest first, reverse for chronological
-    const messages = raw.reverse().map((msg) => ({
+    const messages = raw.reverse().map((msg) => {
+      const isDashboardMsg = msg.content.startsWith("**[Dante via Dashboard]**");
+      return {
       id: msg.id,
-      sender: msg.author.bot ? "agent" : "user",
-      name: msg.author.global_name || msg.author.username,
-      text: msg.content,
+      sender: isDashboardMsg ? "user" : (msg.author.bot ? "agent" : "user"),
+      name: isDashboardMsg ? "Dante" : (msg.author.global_name || msg.author.username),
+      text: isDashboardMsg ? msg.content.replace(/^\*\*\[Dante via Dashboard\]\*\*\s*/, "").replace(/<@!?\d+>\s*/g, "") : msg.content,
       timestamp: msg.timestamp,
       avatar: msg.author.avatar
         ? `https://cdn.discordapp.com/avatars/${msg.author.id}/${msg.author.avatar}.png?size=32`
         : null,
       botId: msg.author.id,
-    }));
+    }});
 
     res.json(messages);
   } catch (e) {
