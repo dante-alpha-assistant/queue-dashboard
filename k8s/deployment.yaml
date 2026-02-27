@@ -20,10 +20,10 @@ spec:
           image: queue-dashboard:latest
           imagePullPolicy: Never
           ports:
-            - containerPort: 3000
+            - containerPort: 9092
           env:
             - name: PORT
-              value: "3000"
+              value: "9092"
             - name: REDIS_URL
               value: "redis://redis.infra.svc.cluster.local:6379"
             - name: NODE_ENV
@@ -45,6 +45,6 @@ spec:
   selector:
     app: queue-dashboard
   ports:
-    - port: 3000
-      targetPort: 3000
+    - port: 9092
+      targetPort: 9092
   type: ClusterIP
