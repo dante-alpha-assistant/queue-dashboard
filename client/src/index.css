@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+* {
+  border-radius: 0px !important;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+body {
+  margin: 0;
+  background: #0a0a0a;
+  color: #e0e0e0;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #0a0a0a; }
+::-webkit-scrollbar-thumb { background: #333; }
