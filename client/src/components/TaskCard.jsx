@@ -59,7 +59,7 @@ export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, 
             }}>{task.project.name}</span>
           )}
         </div>
-        <span style={{ color: "var(--md-border)", fontSize: 11 }}>{timeAgo(task.created_at)}</span>
+        <span style={{ color: "var(--md-border)", fontSize: 11 }}>{timeAgo(task.updated_at || task.created_at)}</span>
       </div>
 
       <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4, color: "var(--md-on-background)" }}>
