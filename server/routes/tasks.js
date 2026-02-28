@@ -52,8 +52,7 @@ router.get("/tasks", async (req, res) => {
     let query = supabase
       .from("agent_tasks")
       .select("*, project:agent_projects(id, name, slug), repository:agent_repositories(id, name, url, provider)")
-      .order("created_at", { ascending: false })
-      .limit(500);
+      .order("created_at", { ascending: false });
     if (req.query.project_id) query = query.eq("project_id", req.query.project_id);
     if (req.query.repository_id) query = query.eq("repository_id", req.query.repository_id);
     const { data, error } = await query;
