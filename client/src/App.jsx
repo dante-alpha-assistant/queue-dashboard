@@ -4,8 +4,8 @@ import StatsBar from "./components/StatsBar";
 import Column from "./components/Column";
 import TaskCard from "./components/TaskCard";
 import DispatchModal from "./components/DispatchModal";
-import TaskDetailModal from "./components/TaskDetailModal";
 import ChatPanel from "./components/ChatPanel";
+import TaskDetailModal from "./components/TaskDetailModal";
 
 export default function App() {
   const {
@@ -28,12 +28,13 @@ export default function App() {
     );
   }
 
+  const qaAll = [...qa, ...done];
+
   return (
     <div style={{
       display: "flex", flexDirection: "column", height: "100vh",
       background: "var(--md-background)", fontFamily: "'Roboto', system-ui, sans-serif",
     }}>
-      {/* Navbar */}
       <div style={{
         height: 64, display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "0 24px", borderBottom: "1px solid var(--md-surface-variant)",
@@ -50,7 +51,6 @@ export default function App() {
           </span>
         </div>
 
-        {/* Project Filter */}
         <select
           value={selectedProject}
           onChange={e => setSelectedProject(e.target.value)}
@@ -77,7 +77,6 @@ export default function App() {
         }}>+ New Task</button>
       </div>
 
-      {/* Kanban */}
       <div style={{
         flex: 1, display: "flex", gap: 16, padding: 16,
         overflowX: "auto", minHeight: 0,
@@ -91,8 +90,8 @@ export default function App() {
         <Column title="In Progress" color="#E8A317" count={inProgress.length}>
           {inProgress.map((t) => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} onCardClick={setSelectedTask} />)}
         </Column>
-        <Column title="QA" color="#7B5EA7" count={done.length + qa.length}>
-          {[...qa, ...done].slice(0, 30).map((t) => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} onCardClick={setSelectedTask} />)}
+        <Column title="QA" color="#7B5EA7" count={qaAll.length}>
+          {qaAll.slice(0, 30).map((t) => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} onCardClick={setSelectedTask} />)}
         </Column>
         <Column title="Completed" color="#1B5E20" count={completed.length}>
           {completed.slice(0, 20).map((t) => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} onCardClick={setSelectedTask} />)}
@@ -108,8 +107,8 @@ export default function App() {
         <TaskDetailModal
           task={selectedTask}
           onClose={() => setSelectedTask(null)}
-          onStatusChange={updateTask}
-          onDelete={deleteTask}
+          onStatusChange={(id, updates) => { updateTask(id, updates); setSelectedTask(null); }}
+          onDelete={(id) => { deleteTask(id); setSelectedTask(null); }}
         />
       )}
     </div>
