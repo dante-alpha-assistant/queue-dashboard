@@ -1,16 +1,32 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const AGENTS = ["neo", "mu", "beta", "flow"];
 const TYPES = ["general", "coding", "research", "ops", "test"];
 const PRIORITIES = ["low", "normal", "high", "urgent"];
 
-export default function DispatchModal({ onClose, dispatch }) {
+export default function DispatchModal({ onClose, dispatch, projects = [] }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [acceptanceCriteria, setAcceptanceCriteria] = useState("");
   const [type, setType] = useState("general");
   const [priority, setPriority] = useState("normal");
   const [agent, setAgent] = useState("");
+  const [projectId, setProjectId] = useState("");
+  const [repositoryId, setRepositoryId] = useState("");
+  const [repos, setRepos] = useState([]);
   const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    if (projectId) {
+      fetch(`/api/repositories?project_id=${projectId}`)
+        .then(r => r.json())
+        .then(setRepos)
+        .catch(() => setRepos([]));
+    } else {
+      setRepos([]);
+      setRepositoryId("");
+    }
+  }, [projectId]);
 
   const submit = async () => {
     if (!title.trim()) return;
@@ -19,10 +35,13 @@ export default function DispatchModal({ onClose, dispatch }) {
       await dispatch({
         title: title.trim(),
         description: description.trim() || null,
+        acceptance_criteria: acceptanceCriteria.trim() || null,
         type,
         priority,
         assigned_agent: agent || null,
         status: agent ? "assigned" : "todo",
+        project_id: projectId || null,
+        repository_id: repositoryId || null,
       });
       onClose();
     } catch {
@@ -35,6 +54,7 @@ export default function DispatchModal({ onClose, dispatch }) {
     border: "1px solid var(--md-border)", background: "var(--md-background)",
     color: "var(--md-on-background)", fontSize: 14, borderRadius: 12,
     fontFamily: "'Roboto', system-ui, sans-serif", outline: "none",
+    boxSizing: "border-box",
   };
 
   return (
@@ -44,7 +64,7 @@ export default function DispatchModal({ onClose, dispatch }) {
     }} onClick={onClose}>
       <div style={{
         background: "var(--md-background)", borderRadius: 24, padding: 24,
-        width: 440, maxHeight: "80vh", overflow: "auto",
+        width: 480, maxHeight: "85vh", overflow: "auto",
         border: "1px solid var(--md-surface-variant)",
         boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
       }} onClick={e => e.stopPropagation()}>
@@ -64,6 +84,26 @@ export default function DispatchModal({ onClose, dispatch }) {
           style={{ ...inputStyle, marginBottom: 12, resize: "vertical" }}
         />
 
+        <textarea
+          placeholder="Acceptance criteria (optional) — what must be true for this to pass QA?"
+          value={acceptanceCriteria} onChange={e => setAcceptanceCriteria(e.target.value)}
+          rows={2}
+          style={{ ...inputStyle, marginBottom: 12, resize: "vertical" }}
+        />
+
+        {/* Project & Repo */}
+        <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
+          <select value={projectId} onChange={e => setProjectId(e.target.value)} style={{ ...inputStyle, flex: 1 }}>
+            <option value="">No project</option>
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <select value={repositoryId} onChange={e => setRepositoryId(e.target.value)} style={{ ...inputStyle, flex: 1 }} disabled={!projectId}>
+            <option value="">No repo</option>
+            {repos.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+          </select>
+        </div>
+
+        {/* Type & Priority */}
         <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
           <select value={type} onChange={e => setType(e.target.value)} style={{ ...inputStyle, flex: 1 }}>
             {TYPES.map(t => <option key={t} value={t}>{t}</option>)}

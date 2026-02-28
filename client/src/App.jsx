@@ -7,7 +7,11 @@ import DispatchModal from "./components/DispatchModal";
 import ChatPanel from "./components/ChatPanel";
 
 export default function App() {
-  const { stats, todo, assigned, inProgress, done, failed, loading, dispatch, updateTask, deleteTask } = useQueue();
+  const {
+    stats, todo, assigned, inProgress, done, qa, completed, failed,
+    loading, dispatch, updateTask, deleteTask,
+    projects, selectedProject, setSelectedProject,
+  } = useQueue();
   const [showModal, setShowModal] = useState(false);
 
   if (loading) {
@@ -43,6 +47,25 @@ export default function App() {
             tasks<span style={{ color: "var(--md-primary)" }}>.</span>
           </span>
         </div>
+
+        {/* Project Filter */}
+        <select
+          value={selectedProject}
+          onChange={e => setSelectedProject(e.target.value)}
+          style={{
+            padding: "8px 12px", borderRadius: 12,
+            border: "1px solid var(--md-border)", background: "var(--md-background)",
+            color: "var(--md-on-background)", fontSize: 14,
+            fontFamily: "'Roboto', system-ui, sans-serif", outline: "none",
+            minWidth: 180,
+          }}
+        >
+          <option value="">All Projects</option>
+          {projects.map(p => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+
         <StatsBar stats={stats} />
         <button onClick={() => setShowModal(true)} style={{
           background: "var(--md-primary)", color: "var(--md-on-primary)",
@@ -69,13 +92,19 @@ export default function App() {
         <Column title="Done" color="#386A20" count={done.length}>
           {done.slice(0, 20).map((t) => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} />)}
         </Column>
+        <Column title="QA" color="#7B5EA7" count={qa.length}>
+          {qa.map((t) => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} />)}
+        </Column>
+        <Column title="Completed" color="#1B5E20" count={completed.length}>
+          {completed.slice(0, 20).map((t) => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} />)}
+        </Column>
         <Column title="Failed" color="#BA1A1A" count={failed.length}>
           {failed.map((t) => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} />)}
         </Column>
       </div>
 
       <ChatPanel />
-      {showModal && <DispatchModal onClose={() => setShowModal(false)} dispatch={dispatch} />}
+      {showModal && <DispatchModal onClose={() => setShowModal(false)} dispatch={dispatch} projects={projects} />}
     </div>
   );
 }

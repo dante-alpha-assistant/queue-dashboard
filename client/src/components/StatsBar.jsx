@@ -1,8 +1,10 @@
 const COLORS = {
-  todo: "#79747E", assigned: "#6750A4", in_progress: "#E8A317", done: "#386A20", failed: "#BA1A1A",
+  todo: "#79747E", assigned: "#6750A4", in_progress: "#E8A317", done: "#386A20",
+  qa: "#7B5EA7", completed: "#1B5E20", failed: "#BA1A1A",
 };
 const LABELS = {
-  todo: "Todo", assigned: "Assigned", in_progress: "Active", done: "Done", failed: "Failed",
+  todo: "Todo", assigned: "Assigned", in_progress: "Active", done: "Done",
+  qa: "QA", completed: "Completed", failed: "Failed",
 };
 
 export default function StatsBar({ stats }) {

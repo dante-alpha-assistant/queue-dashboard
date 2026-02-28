@@ -39,6 +39,14 @@ export default function TaskCard({ task, onStatusChange, onDelete }) {
           {PRIORITY_BADGES[task.priority] && (
             <span title={task.priority} style={{ fontSize: 10 }}>{PRIORITY_BADGES[task.priority]}</span>
           )}
+          {task.project && (
+            <span style={{
+              fontSize: 11, padding: "2px 8px", borderRadius: 8,
+              background: "#E8DEF8", color: "#4F378B", fontWeight: 500,
+            }}>
+              {task.project.name}
+            </span>
+          )}
         </div>
         <span style={{ color: "var(--md-border)", fontSize: 11 }}>{timeAgo(task.created_at)}</span>
       </div>

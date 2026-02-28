@@ -1,19 +1,24 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
 export default function useQueue() {
-  const [stats, setStats] = useState({ todo: 0, assigned: 0, in_progress: 0, done: 0, failed: 0 });
+  const [stats, setStats] = useState({ todo: 0, assigned: 0, in_progress: 0, done: 0, qa: 0, completed: 0, failed: 0 });
   const [tasks, setTasks] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [selectedProject, setSelectedProject] = useState("");
   const [loading, setLoading] = useState(true);
   const initialLoad = useRef(true);
 
   const fetchAll = useCallback(async () => {
     try {
-      const [sRes, tRes] = await Promise.all([
-        fetch("/api/stats"),
-        fetch("/api/tasks"),
+      const params = selectedProject ? `?project_id=${selectedProject}` : "";
+      const [sRes, tRes, pRes] = await Promise.all([
+        fetch(`/api/stats${params}`),
+        fetch(`/api/tasks${params}`),
+        fetch("/api/projects"),
       ]);
       setStats(await sRes.json());
       setTasks(await tRes.json());
+      setProjects(await pRes.json());
       if (initialLoad.current) {
         setLoading(false);
         initialLoad.current = false;
@@ -21,7 +26,7 @@ export default function useQueue() {
     } catch (e) {
       console.error("Poll error:", e);
     }
-  }, []);
+  }, [selectedProject]);
 
   useEffect(() => {
     fetchAll();
@@ -56,12 +61,17 @@ export default function useQueue() {
     await fetchAll();
   }, [fetchAll]);
 
-  // Group tasks by status
   const todo = tasks.filter(t => t.status === "todo");
   const assigned = tasks.filter(t => t.status === "assigned");
   const inProgress = tasks.filter(t => t.status === "in_progress");
   const done = tasks.filter(t => t.status === "done");
+  const qa = tasks.filter(t => t.status === "qa");
+  const completed = tasks.filter(t => t.status === "completed");
   const failed = tasks.filter(t => t.status === "failed");
 
-  return { stats, tasks, todo, assigned, inProgress, done, failed, loading, dispatch, updateTask, deleteTask };
+  return {
+    stats, tasks, todo, assigned, inProgress, done, qa, completed, failed,
+    loading, dispatch, updateTask, deleteTask,
+    projects, selectedProject, setSelectedProject,
+  };
 }
