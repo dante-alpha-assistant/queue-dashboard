@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
 
 const GHERKIN_KEYWORDS = [
   { pattern: /^(\s*)(Feature:)(.*)/, style: { color: "#6A1B9A", fontWeight: 700, fontSize: 15 } },
@@ -39,18 +40,108 @@ const TIMELINE_STEPS = [
   { key: 'completed', label: 'Completed', statuses: ['completed'] },
 ];
 
-const PULSE_STYLE_ID = 'task-modal-pulse-style';
-function ensurePulseStyle() {
+const MODAL_STYLE_ID = 'task-modal-styles';
+function ensureModalStyles() {
   if (typeof document === 'undefined') return;
-  if (document.getElementById(PULSE_STYLE_ID)) return;
+  if (document.getElementById(MODAL_STYLE_ID)) return;
   const style = document.createElement('style');
-  style.id = PULSE_STYLE_ID;
+  style.id = MODAL_STYLE_ID;
   style.textContent = `
     @keyframes timeline-pulse {
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.6; transform: scale(1.15); }
     }
     .timeline-pulse { animation: timeline-pulse 2s ease-in-out infinite; }
+
+    @keyframes modalScaleIn {
+      from { opacity: 0; transform: scale(0.92); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    @keyframes modalOverlayIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .task-modal-overlay { animation: modalOverlayIn 0.2s ease-out; }
+    .task-modal-panel { animation: modalScaleIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+    .task-modal-md table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 8px 0;
+      font-size: 13px;
+    }
+    .task-modal-md table th,
+    .task-modal-md table td {
+      border: 1px solid var(--md-surface-variant, #E0E0E0);
+      padding: 6px 10px;
+      text-align: left;
+    }
+    .task-modal-md table th {
+      background: var(--md-surface-variant, #F0F0F0);
+      font-weight: 600;
+    }
+    .task-modal-md table tr:nth-child(even) td {
+      background: var(--md-surface, rgba(0,0,0,0.02));
+    }
+    .task-modal-md blockquote {
+      border-left: 4px solid var(--md-primary, #6750A4);
+      background: var(--md-surface, rgba(103,80,164,0.05));
+      margin: 8px 0;
+      padding: 8px 16px;
+      border-radius: 0 8px 8px 0;
+    }
+    .task-modal-md a {
+      color: var(--md-primary, #6750A4);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .task-modal-md a:hover {
+      opacity: 0.8;
+    }
+    .task-modal-md pre {
+      background: var(--md-surface-variant, #F5F5F5);
+      border-radius: 8px;
+      padding: 12px;
+      overflow-x: auto;
+      font-size: 13px;
+    }
+    .task-modal-md code {
+      font-family: 'Fira Code', 'Consolas', monospace;
+      font-size: 0.9em;
+    }
+    .task-modal-md code:not(pre code) {
+      background: var(--md-surface-variant, #F0F0F0);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .json-collapsible-toggle {
+      cursor: pointer;
+      user-select: none;
+      opacity: 0.6;
+      font-size: 10px;
+      display: inline-block;
+      width: 14px;
+      text-align: center;
+      margin-right: 2px;
+      transition: transform 0.15s;
+    }
+    .json-collapsible-toggle:hover { opacity: 1; }
+
+    .json-copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: var(--md-surface-variant, #E0E0E0);
+      border: none;
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      opacity: 0.7;
+      transition: opacity 0.15s;
+    }
+    .json-copy-btn:hover { opacity: 1; }
   `;
   document.head.appendChild(style);
 }
@@ -67,6 +158,18 @@ function formatShortDate(iso) {
   const d = new Date(iso);
   if (isNaN(d)) return null;
   return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function formatDuration(ms) {
+  if (!ms || ms < 0) return null;
+  const totalSec = Math.floor(ms / 1000);
+  if (totalSec < 60) return `${totalSec}s`;
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  if (min < 60) return sec > 0 ? `${min}m ${sec}s` : `${min}m`;
+  const hr = Math.floor(min / 60);
+  const rm = min % 60;
+  return rm > 0 ? `${hr}h ${rm}m` : `${hr}h`;
 }
 
 function processGherkinText(text) {
@@ -142,14 +245,24 @@ function MarkdownContent({ text }) {
         }
         if (part.trim() === '') return null;
         return (
-          <div key={i} style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--md-on-background)' }}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{part}</ReactMarkdown>
+          <div key={i} className="task-modal-md" style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--md-on-background)' }}>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeHighlight]}
+              components={{
+                a: ({ node, ...props }) => (
+                  <a {...props} target="_blank" rel="noopener noreferrer" />
+                ),
+              }}
+            >{part}</ReactMarkdown>
           </div>
         );
       })}
     </>
   );
 }
+
+const HAS_MARKDOWN = /[#*`]/;
 
 function getStepTime(task, stepKey) {
   if (stepKey === 'created') return task.created_at;
@@ -158,8 +271,17 @@ function getStepTime(task, stepKey) {
   return null;
 }
 
-function Timeline({ task }) {
-  useEffect(() => { ensurePulseStyle(); }, []);
+function FailedIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 6l12 12" />
+      <path d="M18 6L6 18" />
+    </svg>
+  );
+}
+
+function Timeline({ task, isMobile }) {
+  useEffect(() => { ensureModalStyles(); }, []);
 
   const status = task.status || 'todo';
   const isFailed = status === 'failed';
@@ -168,6 +290,78 @@ function Timeline({ task }) {
     : TIMELINE_STEPS;
 
   const activeIdx = steps.reduce((last, s, i) => s.statuses.includes(status) ? i : last, -1);
+  const vertical = isMobile;
+
+  function getDuration(prevStep, curStep) {
+    const t1 = getStepTime(task, prevStep.key);
+    const t2 = getStepTime(task, curStep.key);
+    if (!t1 || !t2) return null;
+    const ms = new Date(t2) - new Date(t1);
+    return formatDuration(ms);
+  }
+
+  if (vertical) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+        {steps.map((step, i) => {
+          const isCompleted = i < activeIdx;
+          const isCurrent = i === activeIdx;
+          const isFail = step.key === 'failed';
+          const stepColor = isFail ? '#BA1A1A'
+            : isCompleted ? '#2E7D32'
+            : isCurrent ? (STATUS_STYLES[status]?.color || '#E65100')
+            : '#BDBDBD';
+          const stepTime = (isCompleted || isCurrent) ? getStepTime(task, step.key) : null;
+          const duration = i > 0 && (isCompleted || isCurrent) ? getDuration(steps[i - 1], step) : null;
+
+          return (
+            <div key={step.key}>
+              {i > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', paddingLeft: 9 }}>
+                  <div style={{
+                    width: 2, height: duration ? 28 : 20,
+                    backgroundColor: isCompleted ? '#2E7D32' : 'var(--md-surface-variant, #E0E0E0)',
+                  }} />
+                  {duration && (
+                    <span style={{ fontSize: 10, color: 'var(--md-on-surface-variant, #999)', marginLeft: 10, fontStyle: 'italic' }}>{duration}</span>
+                  )}
+                </div>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div
+                  className={isCurrent ? 'timeline-pulse' : undefined}
+                  style={{
+                    width: 20, height: 20, borderRadius: '50%', border: `2px solid ${stepColor}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    backgroundColor: (isCompleted || isCurrent) ? stepColor : 'transparent',
+                  }}
+                >
+                  {isCompleted && (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                  {isFail && isCurrent && <FailedIcon />}
+                  {isCurrent && !isCompleted && !isFail && (
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,0.5)' }} />
+                  )}
+                </div>
+                <div>
+                  <span style={{
+                    fontSize: 12, fontWeight: 500,
+                    color: isCurrent ? 'var(--md-on-background)' : isCompleted ? 'var(--md-on-surface-variant, #666)' : '#BDBDBD',
+                  }}>{step.label}</span>
+                  {stepTime && (
+                    <span style={{ fontSize: 10, color: 'var(--md-on-surface-variant, #999)', marginLeft: 8 }}>{formatShortDate(stepTime)}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px 0', alignItems: 'flex-start' }}>
@@ -180,6 +374,7 @@ function Timeline({ task }) {
           : isCurrent ? (STATUS_STYLES[status]?.color || '#E65100')
           : '#BDBDBD';
         const stepTime = (isCompleted || isCurrent) ? getStepTime(task, step.key) : null;
+        const duration = i > 0 && (isCompleted || isCurrent) ? getDuration(steps[i - 1], step) : null;
 
         return (
           <div key={step.key} style={{ display: 'flex', alignItems: 'flex-start', flex: 1, minWidth: 70 }}>
@@ -197,21 +392,25 @@ function Timeline({ task }) {
                     <path d="M5 13l4 4L19 7" />
                   </svg>
                 )}
-                {isCurrent && !isCompleted && (
+                {isFail && isCurrent && <FailedIcon />}
+                {isCurrent && !isCompleted && !isFail && (
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,0.5)' }} />
                 )}
               </div>
               <span style={{
                 fontSize: 10, marginTop: 6, fontWeight: 500, textAlign: 'center', lineHeight: 1.2,
-                color: isCurrent ? 'var(--md-on-background)' : isCompleted ? '#666' : '#BDBDBD',
+                color: isCurrent ? 'var(--md-on-background)' : isCompleted ? 'var(--md-on-surface-variant, #666)' : '#BDBDBD',
               }}>{step.label}</span>
               {stepTime && (
-                <span style={{ fontSize: 9, color: '#999', marginTop: 2, textAlign: 'center' }}>{formatShortDate(stepTime)}</span>
+                <span style={{ fontSize: 9, color: 'var(--md-on-surface-variant, #999)', marginTop: 2, textAlign: 'center' }}>{formatShortDate(stepTime)}</span>
               )}
             </div>
             {i < steps.length - 1 && (
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', paddingTop: 10, paddingLeft: 4, paddingRight: 4, minWidth: 12 }}>
-                <div style={{ height: 2, width: '100%', borderRadius: 1, backgroundColor: isCompleted ? '#2E7D32' : '#E0E0E0' }} />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 10, paddingLeft: 4, paddingRight: 4, minWidth: 12 }}>
+                <div style={{ height: 2, width: '100%', borderRadius: 1, backgroundColor: isCompleted ? '#2E7D32' : 'var(--md-surface-variant, #E0E0E0)' }} />
+                {duration && (
+                  <span style={{ fontSize: 9, color: 'var(--md-on-surface-variant, #999)', marginTop: 2, fontStyle: 'italic' }}>{duration}</span>
+                )}
               </div>
             )}
           </div>
@@ -221,7 +420,24 @@ function Timeline({ task }) {
   );
 }
 
-function JsonSyntax({ data, indent = 0 }) {
+function CollapsibleJson({ label, data, indent }) {
+  const [expanded, setExpanded] = useState(true);
+  const toggle = useCallback(() => setExpanded(e => !e), []);
+
+  return (
+    <span>
+      <span className="json-collapsible-toggle" onClick={toggle} style={{ transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)', display: 'inline-block' }}>▶</span>
+      {label}
+      {expanded ? (
+        <JsonSyntax data={data} indent={indent} _skipBrace />
+      ) : (
+        <span style={{ color: '#757575' }}>{Array.isArray(data) ? `[…${data.length}]` : `{…${Object.keys(data).length}}`}</span>
+      )}
+    </span>
+  );
+}
+
+function JsonSyntax({ data, indent = 0, _skipBrace = false }) {
   const pad = '\u00A0\u00A0'.repeat(indent);
   const padInner = '\u00A0\u00A0'.repeat(indent + 1);
 
@@ -232,46 +448,74 @@ function JsonSyntax({ data, indent = 0 }) {
 
   if (Array.isArray(data)) {
     if (data.length === 0) return <span style={{ color: '#757575' }}>[]</span>;
-    return (
-      <span>
-        <span style={{ color: '#757575' }}>[</span>{'\n'}
-        {data.map((item, i) => (
-          <span key={i}>
-            {padInner}<JsonSyntax data={item} indent={indent + 1} />
-            {i < data.length - 1 ? <span style={{ color: '#757575' }}>,</span> : null}{'\n'}
-          </span>
-        ))}
-        {pad}<span style={{ color: '#757575' }}>]</span>
-      </span>
-    );
+    if (_skipBrace) {
+      return (
+        <span>
+          <span style={{ color: '#757575' }}>[</span>{'\n'}
+          {data.map((item, i) => (
+            <span key={i}>
+              {padInner}
+              {item && typeof item === 'object' ? (
+                <CollapsibleJson label="" data={item} indent={indent + 1} />
+              ) : (
+                <JsonSyntax data={item} indent={indent + 1} />
+              )}
+              {i < data.length - 1 ? <span style={{ color: '#757575' }}>,</span> : null}{'\n'}
+            </span>
+          ))}
+          {pad}<span style={{ color: '#757575' }}>]</span>
+        </span>
+      );
+    }
+    return <CollapsibleJson label="" data={data} indent={indent} />;
   }
 
   if (typeof data === 'object') {
     const entries = Object.entries(data);
     if (entries.length === 0) return <span style={{ color: '#757575' }}>{'{}'}</span>;
-    return (
-      <span>
-        <span style={{ color: '#757575' }}>{'{'}</span>{'\n'}
-        {entries.map(([key, val], i) => (
-          <span key={key}>
-            {padInner}<span style={{ color: '#1565C0' }}>"{key}"</span><span style={{ color: '#757575' }}>: </span><JsonSyntax data={val} indent={indent + 1} />
-            {i < entries.length - 1 ? <span style={{ color: '#757575' }}>,</span> : null}{'\n'}
-          </span>
-        ))}
-        {pad}<span style={{ color: '#757575' }}>{'}'}</span>
-      </span>
-    );
+    if (_skipBrace) {
+      return (
+        <span>
+          <span style={{ color: '#757575' }}>{'{'}</span>{'\n'}
+          {entries.map(([key, val], i) => (
+            <span key={key}>
+              {padInner}<span style={{ color: '#1565C0' }}>"{key}"</span><span style={{ color: '#757575' }}>: </span>
+              {val && typeof val === 'object' ? (
+                <CollapsibleJson label="" data={val} indent={indent + 1} />
+              ) : (
+                <JsonSyntax data={val} indent={indent + 1} />
+              )}
+              {i < entries.length - 1 ? <span style={{ color: '#757575' }}>,</span> : null}{'\n'}
+            </span>
+          ))}
+          {pad}<span style={{ color: '#757575' }}>{'}'}</span>
+        </span>
+      );
+    }
+    return <CollapsibleJson label="" data={data} indent={indent} />;
   }
 
   return <span>{String(data)}</span>;
 }
 
 function ResultDisplay({ result, bgColor, borderColor, textColor }) {
-  if (!result) return <p style={{ fontSize: 14, color: '#999' }}>No result yet</p>;
+  const [copied, setCopied] = useState(false);
+
+  if (!result) return <p style={{ fontSize: 14, color: 'var(--md-on-surface-variant, #999)' }}>No result yet</p>;
 
   let parsed = result;
   if (typeof result === 'string') {
     try { parsed = JSON.parse(result); } catch {
+      if (HAS_MARKDOWN.test(result)) {
+        return (
+          <div className="task-modal-md" style={{
+            padding: 16, background: bgColor, borderRadius: 12,
+            border: `1px solid ${borderColor}`, color: textColor,
+          }}>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{result}</ReactMarkdown>
+          </div>
+        );
+      }
       return <div style={{
         fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap',
         padding: 16, background: bgColor, borderRadius: 12,
@@ -288,18 +532,41 @@ function ResultDisplay({ result, bgColor, borderColor, textColor }) {
     }}>{String(parsed)}</div>;
   }
 
+  const summaryMd = parsed.summary && typeof parsed.summary === 'string' && HAS_MARKDOWN.test(parsed.summary);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(JSON.stringify(parsed, null, 2)).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }).catch(() => {});
+  };
+
   return (
-    <pre style={{
-      fontSize: 13, fontFamily: 'monospace', whiteSpace: 'pre-wrap', overflowX: 'auto',
-      padding: 16, background: '#FAFAFA', borderRadius: 12,
-      border: '1px solid #E0E0E0', margin: 0, lineHeight: 1.6,
-    }}>
-      <JsonSyntax data={parsed} indent={0} />
-    </pre>
+    <>
+      {summaryMd && (
+        <div className="task-modal-md" style={{ marginBottom: 8, fontSize: 14, lineHeight: 1.7, color: 'var(--md-on-background)' }}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{parsed.summary}</ReactMarkdown>
+        </div>
+      )}
+      <div style={{ position: 'relative' }}>
+        <button className="json-copy-btn" onClick={handleCopy}>
+          {copied ? '✓ Copied' : '📋 Copy'}
+        </button>
+        <pre style={{
+          fontSize: 13, fontFamily: "'Fira Code', Consolas, monospace", whiteSpace: 'pre-wrap', overflowX: 'auto',
+          padding: 16, paddingTop: 32, background: 'var(--md-surface, #FAFAFA)', borderRadius: 12,
+          border: '1px solid var(--md-surface-variant, #E0E0E0)', margin: 0, lineHeight: 1.6,
+        }}>
+          <JsonSyntax data={parsed} indent={0} />
+        </pre>
+      </div>
+    </>
   );
 }
 
 export default function TaskDetailModal({ task, onClose, onStatusChange, onDelete, isMobile, isTablet }) {
+  useEffect(() => { ensureModalStyles(); }, []);
+
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', handler);
@@ -332,13 +599,13 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
   };
 
   const sectionLabelStyle = {
-    fontSize: 12, fontWeight: 600, color: "#999",
+    fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant, #999)",
     textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6,
   };
 
   return (
-    <div style={overlayStyle} onClick={isMobile ? undefined : onClose}>
-      <div style={panelStyle} onClick={e => e.stopPropagation()}>
+    <div className={isMobile ? undefined : 'task-modal-overlay'} style={overlayStyle} onClick={isMobile ? undefined : onClose}>
+      <div className={isMobile ? undefined : 'task-modal-panel'} style={panelStyle} onClick={e => e.stopPropagation()}>
         {isMobile && (
           <div style={{ display: "flex", justifyContent: "center", padding: "8px 0 0" }}>
             <div style={{ width: 40, height: 4, borderRadius: 2, background: "var(--md-surface-variant)" }} />
@@ -355,7 +622,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
               }}>{task.status.replace("_", " ")}</span>
               <span style={{
                 padding: "4px 10px", borderRadius: 8, fontSize: 11, fontWeight: 500,
-                background: "#F3F3F3", color: "#666", textTransform: "uppercase",
+                background: "var(--md-surface-variant, #F3F3F3)", color: "var(--md-on-surface-variant, #666)", textTransform: "uppercase",
               }}>{task.type}</span>
               {task.priority && task.priority !== "normal" && (
                 <span style={{
@@ -384,40 +651,40 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
           }}>
             {task.project && (
               <div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Project</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant, #999)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Project</div>
                 <div style={{ fontSize: 14, fontWeight: 500 }}>{task.project.name}</div>
               </div>
             )}
             {agent && (
               <div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Agent</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant, #999)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Agent</div>
                 <div style={{ fontSize: 14, fontWeight: 500 }}>{icon} {agent}</div>
               </div>
             )}
             {task.dispatched_by && (
               <div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Dispatched by</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant, #999)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Dispatched by</div>
                 <div style={{ fontSize: 14, fontWeight: 500 }}>{task.dispatched_by}</div>
               </div>
             )}
             <div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Created</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant, #999)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Created</div>
               <div style={{ fontSize: 14 }}>{formatDate(task.created_at)}</div>
             </div>
             {task.started_at && (
               <div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Started</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant, #999)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Started</div>
                 <div style={{ fontSize: 14 }}>{formatDate(task.started_at)}</div>
               </div>
             )}
             {task.completed_at && (task.status === "completed" || task.status === "done") && (
               <div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Completed</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant, #999)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Completed</div>
                 <div style={{ fontSize: 14 }}>{formatDate(task.completed_at)}</div>
               </div>
             )}
             <div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Stage</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant, #999)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Stage</div>
               <select
                 value={task.stage || ""}
                 onChange={e => onStatusChange(task.id, { stage: e.target.value || null })}
@@ -425,7 +692,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
                 style={{
                   padding: "4px 8px", borderRadius: 8, fontSize: 13, fontWeight: 500,
                   border: "1px solid var(--md-surface-variant)", background: "var(--md-surface)",
-                  color: task.stage ? (STAGE_COLORS[task.stage] || "#666") : "#999",
+                  color: task.stage ? (STAGE_COLORS[task.stage] || "var(--md-on-surface-variant, #666)") : "var(--md-on-surface-variant, #999)",
                   cursor: "pointer", fontFamily: "'Roboto', system-ui, sans-serif", outline: "none",
                 }}
               >
@@ -441,7 +708,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
               padding: isMobile ? 12 : 16, background: 'var(--md-surface)',
               borderRadius: 12, border: '1px solid var(--md-surface-variant)',
             }}>
-              <Timeline task={task} />
+              <Timeline task={task} isMobile={isMobile} />
             </div>
           </div>
 
@@ -502,7 +769,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
             </div>
           )}
 
-          <div style={{ fontSize: 11, color: "#999", fontFamily: "monospace", marginTop: 8 }}>
+          <div style={{ fontSize: 11, color: "var(--md-on-surface-variant, #999)", fontFamily: "monospace", marginTop: 8 }}>
             {task.id}
           </div>
 
