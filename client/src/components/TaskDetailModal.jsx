@@ -50,25 +50,42 @@ function parseResult(result) {
   return JSON.stringify(result, null, 2);
 }
 
-export default function TaskDetailModal({ task, onClose, onStatusChange, onDelete }) {
+export default function TaskDetailModal({ task, onClose, onStatusChange, onDelete, isMobile, isTablet }) {
   if (!task) return null;
   const agent = task.assigned_agent?.toLowerCase();
   const icon = AGENT_ICONS[agent] || "🤖";
   const statusStyle = STATUS_STYLES[task.status] || STATUS_STYLES.todo;
 
-  return (
-    <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
-      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200,
-      backdropFilter: "blur(4px)",
-    }} onClick={onClose}>
-      <div style={{
-        background: "var(--md-background)", borderRadius: 20, padding: 0,
-        width: 600, maxHeight: "85vh", overflow: "hidden",
-        boxShadow: "0 24px 80px rgba(0,0,0,0.2)",
-      }} onClick={e => e.stopPropagation()}>
+  const overlayStyle = isMobile ? {
+    position: "fixed", inset: 0, background: "var(--md-background)", zIndex: 200,
+    display: "flex", flexDirection: "column",
+    animation: "slideUp 0.3s ease-out",
+  } : {
+    position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+    display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200,
+    backdropFilter: "blur(4px)",
+  };
 
-        <div style={{ padding: "24px 24px 16px", borderBottom: "1px solid var(--md-surface-variant)" }}>
+  const panelStyle = isMobile ? {
+    flex: 1, display: "flex", flexDirection: "column", overflow: "hidden",
+  } : {
+    background: "var(--md-background)", borderRadius: 20, padding: 0,
+    width: isTablet ? "90%" : 600, maxWidth: isTablet ? 600 : "none",
+    maxHeight: "85vh", overflow: "hidden",
+    boxShadow: "0 24px 80px rgba(0,0,0,0.2)",
+  };
+
+  return (
+    <div style={overlayStyle} onClick={isMobile ? undefined : onClose}>
+      <div style={panelStyle} onClick={e => e.stopPropagation()}>
+        {/* Swipe handle for mobile */}
+        {isMobile && (
+          <div style={{ display: "flex", justifyContent: "center", padding: "8px 0 0" }}>
+            <div style={{ width: 40, height: 4, borderRadius: 2, background: "var(--md-surface-variant)" }} />
+          </div>
+        )}
+
+        <div style={{ padding: isMobile ? "12px 16px 12px" : "24px 24px 16px", borderBottom: "1px solid var(--md-surface-variant)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
               <span style={{
@@ -91,17 +108,18 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
             </div>
             <button onClick={onClose} style={{
               background: "none", border: "none", cursor: "pointer",
-              fontSize: 20, color: "var(--md-on-surface-variant)", padding: 4, lineHeight: 1,
+              fontSize: 20, color: "var(--md-on-surface-variant)", padding: 8, lineHeight: 1,
+              minWidth: 44, minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center",
             }}>✕</button>
           </div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, lineHeight: 1.3, color: "var(--md-on-background)" }}>
+          <h2 style={{ margin: 0, fontSize: isMobile ? 18 : 22, fontWeight: 700, lineHeight: 1.3, color: "var(--md-on-background)" }}>
             {task.title}
           </h2>
         </div>
 
-        <div style={{ padding: "16px 24px 24px", overflowY: "auto", maxHeight: "calc(85vh - 200px)" }}>
+        <div style={{ padding: isMobile ? "12px 16px 16px" : "16px 24px 24px", overflowY: "auto", flex: isMobile ? 1 : "none", maxHeight: isMobile ? "none" : "calc(85vh - 200px)" }}>
           <div style={{
-            display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+            display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit, minmax(140px, 1fr))",
             gap: 12, marginBottom: 20,
           }}>
             {task.project && (
@@ -145,7 +163,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
               <div style={{ fontSize: 12, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>Description</div>
               <div style={{
                 fontSize: 14, lineHeight: 1.7, whiteSpace: "pre-wrap",
-                color: "var(--md-on-background)", padding: 16,
+                color: "var(--md-on-background)", padding: isMobile ? 12 : 16,
                 background: "var(--md-surface)", borderRadius: 12,
                 border: "1px solid var(--md-surface-variant)",
               }}>{task.description}</div>
@@ -157,7 +175,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
               <div style={{ fontSize: 12, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>Acceptance Criteria</div>
               <div style={{
                 fontSize: 14, lineHeight: 1.7, whiteSpace: "pre-wrap",
-                padding: 16, background: "#FFFDE7", borderRadius: 12,
+                padding: isMobile ? 12 : 16, background: "#FFFDE7", borderRadius: 12,
                 border: "1px solid #FFF9C4", color: "#5D4037",
               }}>{renderGherkin(task.acceptance_criteria)}</div>
             </div>
@@ -168,7 +186,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
               <div style={{ fontSize: 12, fontWeight: 600, color: "#2E7D32", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>✓ Result</div>
               <div style={{
                 fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap",
-                padding: 16, background: "#E8F5E9", borderRadius: 12,
+                padding: isMobile ? 12 : 16, background: "#E8F5E9", borderRadius: 12,
                 border: "1px solid #C8E6C9", color: "#1B5E20",
               }}>{parseResult(task.result)}</div>
             </div>
@@ -181,7 +199,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
               </div>
               <div style={{
                 fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap",
-                padding: 16, borderRadius: 12,
+                padding: isMobile ? 12 : 16, borderRadius: 12,
                 background: task.qa_result.passed ? "#E8F5E9" : "#FBE9E7",
                 border: `1px solid ${task.qa_result.passed ? "#C8E6C9" : "#FFCCBC"}`,
                 color: task.qa_result.passed ? "#1B5E20" : "#BF360C",
@@ -194,7 +212,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
               <div style={{ fontSize: 12, fontWeight: 600, color: "#BA1A1A", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>✕ Error</div>
               <div style={{
                 fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap",
-                padding: 16, background: "#FBE9E7", borderRadius: 12,
+                padding: isMobile ? 12 : 16, background: "#FBE9E7", borderRadius: 12,
                 border: "1px solid #FFCCBC", color: "#BF360C",
               }}>{task.error}</div>
             </div>
@@ -209,15 +227,16 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
               <button onClick={() => { onStatusChange(task.id, { status: "assigned", assigned_agent: task.assigned_agent || "neo" }); }} style={{
                 flex: 1, background: "var(--md-primary)", color: "var(--md-on-primary)",
                 border: "none", padding: "10px 20px", borderRadius: 12, fontWeight: 600, fontSize: 14, cursor: "pointer",
+                minHeight: isMobile ? 48 : "auto",
               }}>Assign</button>
             )}
             {task.status === "failed" && (
               <button onClick={() => { onStatusChange(task.id, { status: "todo" }); }} style={{
                 flex: 1, background: "#E8A317", color: "#fff",
                 border: "none", padding: "10px 20px", borderRadius: 12, fontWeight: 600, fontSize: 14, cursor: "pointer",
+                minHeight: isMobile ? 48 : "auto",
               }}>Retry</button>
             )}
-            {/* No delete button — history must be preserved */}
           </div>
         </div>
       </div>

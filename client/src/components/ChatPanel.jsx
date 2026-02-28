@@ -16,7 +16,7 @@ function cleanText(text) {
     .trim();
 }
 
-export default function ChatPanel() {
+export default function ChatPanel({ isMobile }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -93,7 +93,10 @@ export default function ChatPanel() {
       <button
         onClick={() => setOpen(true)}
         style={{
-          position: "fixed", bottom: 24, right: 24, width: 56, height: 56,
+          position: "fixed",
+          bottom: isMobile ? 80 : 24,
+          right: isMobile ? 80 : 24,
+          width: 56, height: 56,
           borderRadius: "50%", background: "var(--md-primary)", border: "none",
           fontSize: 24, cursor: "pointer", zIndex: 1000, color: "var(--md-on-primary)",
           display: "flex", alignItems: "center", justifyContent: "center",
@@ -103,15 +106,20 @@ export default function ChatPanel() {
     );
   }
 
+  const containerStyle = isMobile ? {
+    position: "fixed", inset: 0, background: "var(--md-background)", zIndex: 1000,
+    display: "flex", flexDirection: "column",
+  } : {
+    position: "fixed", bottom: 24, right: 24, width: 400, height: 500,
+    background: "var(--md-background)", borderRadius: 24,
+    border: "1px solid var(--md-surface-variant)", zIndex: 1000,
+    display: "flex", flexDirection: "column",
+    boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+    overflow: "hidden",
+  };
+
   return (
-    <div style={{
-      position: "fixed", bottom: 24, right: 24, width: 400, height: 500,
-      background: "var(--md-background)", borderRadius: 24,
-      border: "1px solid var(--md-surface-variant)", zIndex: 1000,
-      display: "flex", flexDirection: "column",
-      boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
-      overflow: "hidden",
-    }}>
+    <div style={containerStyle}>
       {/* Header */}
       <div style={{
         padding: "14px 20px", borderBottom: "1px solid var(--md-surface-variant)",
@@ -120,7 +128,8 @@ export default function ChatPanel() {
         <span style={{ fontWeight: 600, fontSize: 14 }}>💬 #dante-agents</span>
         <button onClick={() => setOpen(false)} style={{
           background: "none", border: "none", color: "var(--md-border)",
-          fontSize: 18, cursor: "pointer",
+          fontSize: 18, cursor: "pointer", minWidth: 44, minHeight: 44,
+          display: "flex", alignItems: "center", justifyContent: "center",
         }}>✕</button>
       </div>
 
@@ -164,6 +173,7 @@ export default function ChatPanel() {
       <div style={{
         padding: 12, borderTop: "1px solid var(--md-surface-variant)",
         display: "flex", gap: 8,
+        paddingBottom: isMobile ? "max(12px, env(safe-area-inset-bottom, 12px))" : 12,
       }}>
         <textarea
           ref={inputRef}
@@ -178,6 +188,7 @@ export default function ChatPanel() {
             color: "var(--md-on-background)", padding: "10px 14px", fontSize: 13,
             resize: "none", outline: "none", borderRadius: 12,
             fontFamily: "'Roboto', system-ui, sans-serif",
+            minHeight: isMobile ? 44 : "auto",
           }}
           onFocus={e => e.target.style.borderColor = "var(--md-primary)"}
           onBlur={e => e.target.style.borderColor = "var(--md-surface-variant)"}
@@ -191,6 +202,7 @@ export default function ChatPanel() {
             border: "none", padding: "10px 16px", borderRadius: 20,
             fontWeight: 500, fontSize: 13, cursor: input.trim() ? "pointer" : "default",
             fontFamily: "'Roboto', system-ui, sans-serif",
+            minHeight: isMobile ? 44 : "auto",
           }}
         >Send</button>
       </div>

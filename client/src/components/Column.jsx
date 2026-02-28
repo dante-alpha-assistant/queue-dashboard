@@ -1,7 +1,10 @@
-export default function Column({ title, color, count, children }) {
+export default function Column({ title, color, count, children, isTablet }) {
   return (
     <div style={{
-      flex: "1 1 0", minWidth: 260, maxWidth: 340, display: "flex", flexDirection: "column",
+      flex: isTablet ? "0 0 280px" : "1 1 0",
+      minWidth: isTablet ? 280 : 260,
+      maxWidth: isTablet ? 320 : 340,
+      display: "flex", flexDirection: "column",
       background: "var(--md-surface-container)", borderRadius: 16,
       overflow: "hidden",
     }}>

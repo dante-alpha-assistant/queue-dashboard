@@ -6,10 +6,10 @@ const ITEMS = [
   { key: "failed", label: "Failed", color: "#BA1A1A" },
 ];
 
-export default function StatsBar({ stats }) {
+export default function StatsBar({ stats, isTablet }) {
   const total = Object.values(stats).reduce((a, b) => a + b, 0);
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: isTablet ? "wrap" : "nowrap" }}>
       <span style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)", marginRight: 4 }}>
         {total} tasks
       </span>
