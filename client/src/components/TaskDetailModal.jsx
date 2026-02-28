@@ -26,6 +26,10 @@ function renderGherkin(text) {
 }
 
 const AGENT_ICONS = { neo: "🕶️", mu: "🔧", beta: "⚡", alpha: "🧠", flow: "🌊" };
+const STAGE_COLORS = {
+  refinery: "#E65100", foundry: "#1565C0", builder: "#2E7D32", inspector: "#6A1B9A", deployer: "#00838F",
+};
+const VALID_STAGES = ["refinery", "foundry", "builder", "inspector", "deployer"];
 const STATUS_STYLES = {
   todo: { bg: "#E8E8E8", color: "#49454F" },
   assigned: { bg: "#E8DEF8", color: "#4F378B" },
@@ -156,6 +160,23 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
                 <div style={{ fontSize: 14 }}>{formatDate(task.completed_at)}</div>
               </div>
             )}
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Stage</div>
+              <select
+                value={task.stage || ""}
+                onChange={e => onStatusChange(task.id, { stage: e.target.value || null })}
+                onClick={e => e.stopPropagation()}
+                style={{
+                  padding: "4px 8px", borderRadius: 8, fontSize: 13, fontWeight: 500,
+                  border: "1px solid var(--md-surface-variant)", background: "var(--md-surface)",
+                  color: task.stage ? (STAGE_COLORS[task.stage] || "#666") : "#999",
+                  cursor: "pointer", fontFamily: "'Roboto', system-ui, sans-serif", outline: "none",
+                }}
+              >
+                <option value="">None</option>
+                {VALID_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
           </div>
 
           {task.description && (

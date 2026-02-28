@@ -66,7 +66,7 @@ router.get("/tasks", async (req, res) => {
 // Create task
 router.post("/tasks", async (req, res) => {
   try {
-    const { title, description, prompt, type, priority, assigned_agent, status, project_id, repository_id, acceptance_criteria } = req.body;
+    const { title, description, prompt, type, priority, assigned_agent, status, project_id, repository_id, acceptance_criteria, stage } = req.body;
     if (!title) return res.status(400).json({ error: "title required" });
 
     const { data, error } = await supabase
@@ -83,6 +83,7 @@ router.post("/tasks", async (req, res) => {
         project_id: project_id || null,
         repository_id: repository_id || null,
         acceptance_criteria: acceptance_criteria || null,
+        stage: stage || null,
       })
       .select()
       .single();

@@ -6,6 +6,9 @@ const PRIORITY_BADGES = { urgent: "🔴", high: "🟠", normal: "", low: "⚪" }
 const TYPE_COLORS = {
   coding: "#6750A4", research: "#0061A4", ops: "#7D5260", general: "#79747E", test: "#386A20",
 };
+const STAGE_COLORS = {
+  refinery: "#E65100", foundry: "#1565C0", builder: "#2E7D32", inspector: "#6A1B9A", deployer: "#00838F",
+};
 
 function timeAgo(iso) {
   if (!iso) return "";
@@ -39,6 +42,13 @@ export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, 
             padding: "2px 8px", borderRadius: 12, fontSize: 10, fontWeight: 600,
             textTransform: "uppercase", letterSpacing: "0.5px",
           }}>{task.type}</span>
+          {task.stage && (
+            <span style={{
+              background: STAGE_COLORS[task.stage] || "#79747E", color: "#fff",
+              padding: "2px 8px", borderRadius: 12, fontSize: 10, fontWeight: 600,
+              textTransform: "uppercase", letterSpacing: "0.5px",
+            }}>{task.stage}</span>
+          )}
           {PRIORITY_BADGES[task.priority] && (
             <span title={task.priority} style={{ fontSize: 10 }}>{PRIORITY_BADGES[task.priority]}</span>
           )}

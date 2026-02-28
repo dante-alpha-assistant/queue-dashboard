@@ -7,6 +7,7 @@ import TaskCard from "./components/TaskCard";
 import DispatchModal from "./components/DispatchModal";
 import ChatPanel from "./components/ChatPanel";
 import TaskDetailModal from "./components/TaskDetailModal";
+import Pingboard from "./pages/Pingboard";
 
 const MOBILE_TABS = [
   { key: "todo", label: "Todo", icon: "📋" },
@@ -35,7 +36,9 @@ export default function App() {
   const [showModal, setShowModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
   const [typeFilter, setTypeFilter] = useState("all");
+  const [stageFilter, setStageFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("todo");
+  const [view, setView] = useState("board");
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
 
   if (loading) {
@@ -53,9 +56,40 @@ export default function App() {
     );
   }
 
+  if (view === "pingboard") {
+    return (
+      <div style={{ fontFamily: "'Roboto', system-ui, sans-serif" }}>
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
+          background: "#0a0a0a", borderBottom: "1px solid #222",
+          display: "flex", gap: 0, padding: "0 16px",
+        }}>
+          {[{ key: "board", label: "📋 Board" }, { key: "pingboard", label: "🤖 Pingboard" }].map(t => (
+            <button key={t.key} onClick={() => setView(t.key)} style={{
+              padding: "10px 20px", background: "none", border: "none",
+              borderBottom: view === t.key ? "2px solid #33ff00" : "2px solid transparent",
+              color: view === t.key ? "#33ff00" : "#888",
+              cursor: "pointer", fontSize: 13, fontWeight: 600,
+              fontFamily: "'JetBrains Mono', monospace",
+            }}>{t.label}</button>
+          ))}
+        </div>
+        <div style={{ paddingTop: 42 }}>
+          <Pingboard />
+        </div>
+      </div>
+    );
+  }
+
   const allTasks = [...todo, ...assigned, ...inProgress, ...done, ...qa, ...completed, ...failed];
   const activeTypes = ["all", ...new Set(allTasks.map(t => t.type).filter(Boolean))];
-  const filterByType = (tasks) => typeFilter === "all" ? tasks : tasks.filter(t => t.type === typeFilter);
+  const activeStages = ["all", ...new Set(allTasks.map(t => t.stage).filter(Boolean))];
+  const filterTasks = (tasks) => {
+    let filtered = typeFilter === "all" ? tasks : tasks.filter(t => t.type === typeFilter);
+    if (stageFilter !== "all") filtered = filtered.filter(t => t.stage === stageFilter);
+    return filtered;
+  };
+  const filterByType = filterTasks;
 
   const getActiveColumnTasks = () => {
     switch (activeTab) {
@@ -102,6 +136,11 @@ export default function App() {
             <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: "-0.02em" }}>
               tasks<span style={{ color: "var(--md-primary)" }}>.</span>dante<span style={{ color: "var(--md-primary)" }}>.</span>id
             </span>
+            <button onClick={() => setView("pingboard")} style={{
+              marginLeft: "auto", padding: "4px 10px", borderRadius: 6,
+              background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)",
+              color: "var(--md-on-surface-variant)", cursor: "pointer", fontSize: 11, fontWeight: 600,
+            }}>🤖</button>
           </div>
         </div>
 
@@ -129,6 +168,21 @@ export default function App() {
               }}>{type}</button>
             ))}
           </div>
+          {activeStages.length > 1 && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+              {activeStages.map(stage => (
+                <button key={stage} onClick={() => setStageFilter(stage)} style={{
+                  padding: "6px 14px", borderRadius: 16, fontSize: 12, fontWeight: 500,
+                  minHeight: 36,
+                  border: stageFilter === stage ? "2px solid var(--md-primary)" : "1px solid var(--md-surface-variant)",
+                  background: stageFilter === stage ? "var(--md-primary-container)" : "var(--md-surface)",
+                  color: stageFilter === stage ? "var(--md-on-primary-container)" : "var(--md-on-surface-variant)",
+                  cursor: "pointer", textTransform: "capitalize",
+                  fontFamily: "'Roboto', system-ui, sans-serif",
+                }}>{stage === "all" ? "all stages" : stage}</button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Column header */}
@@ -223,6 +277,12 @@ export default function App() {
                 tasks<span style={{ color: "var(--md-primary)" }}>.</span>dante<span style={{ color: "var(--md-primary)" }}>.</span>id
               </span>
             </div>
+            <button onClick={() => setView("pingboard")} style={{
+              marginLeft: 16, padding: "6px 14px", borderRadius: 8,
+              background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)",
+              color: "var(--md-on-surface-variant)", cursor: "pointer", fontSize: 12, fontWeight: 600,
+              fontFamily: "'Roboto', system-ui, sans-serif",
+            }}>🤖 Pingboard</button>
           </div>
           <StatsBar stats={stats} isTablet={isTablet} />
           <button onClick={() => setShowModal(true)} style={{
@@ -266,6 +326,24 @@ export default function App() {
               ))}
             </div>
           </div>
+          {activeStages.length > 1 && (<>
+            <div style={{ width: 1, height: 24, background: "var(--md-surface-variant)" }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Stage</span>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {activeStages.map(stage => (
+                  <button key={stage} onClick={() => setStageFilter(stage)} style={{
+                    padding: "4px 12px", borderRadius: 16, fontSize: 12, fontWeight: 500,
+                    border: stageFilter === stage ? "2px solid var(--md-primary)" : "1px solid var(--md-surface-variant)",
+                    background: stageFilter === stage ? "var(--md-primary-container)" : "var(--md-surface)",
+                    color: stageFilter === stage ? "var(--md-on-primary-container)" : "var(--md-on-surface-variant)",
+                    cursor: "pointer", textTransform: "capitalize",
+                    fontFamily: "'Roboto', system-ui, sans-serif", transition: "all 150ms",
+                  }}>{stage === "all" ? "all stages" : stage}</button>
+                ))}
+              </div>
+            </div>
+          </>)}
         </div>
       </div>
 
