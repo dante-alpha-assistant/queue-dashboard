@@ -1,3 +1,30 @@
+const GHERKIN_KEYWORDS = [
+  { pattern: /^(\s*)(Feature:)(.*)/, style: { color: "#6A1B9A", fontWeight: 700, fontSize: 15 } },
+  { pattern: /^(\s*)(Scenario Outline:)(.*)/, style: { color: "#1565C0", fontWeight: 700 } },
+  { pattern: /^(\s*)(Background:|Scenario:)(.*)/, style: { color: "#1565C0", fontWeight: 700 } },
+  { pattern: /^(\s*)(Given )(.*)/, style: { color: "#2E7D32", fontWeight: 600 } },
+  { pattern: /^(\s*)(When )(.*)/, style: { color: "#E65100", fontWeight: 600 } },
+  { pattern: /^(\s*)(Then )(.*)/, style: { color: "#1565C0", fontWeight: 600 } },
+  { pattern: /^(\s*)(And |But )(.*)/, style: { color: "#757575", fontWeight: 600 } },
+];
+
+function renderGherkin(text) {
+  if (!text) return null;
+  return text.split("\n").map((line, i) => {
+    for (const { pattern, style } of GHERKIN_KEYWORDS) {
+      const m = line.match(pattern);
+      if (m) {
+        return (
+          <div key={i}>
+            {m[1]}<span style={style}>{m[2]}</span><span style={{ color: "#5D4037" }}>{m[3]}</span>
+          </div>
+        );
+      }
+    }
+    return <div key={i} style={{ color: "#5D4037" }}>{line}</div>;
+  });
+}
+
 const AGENT_ICONS = { neo: "🕶️", mu: "🔧", beta: "⚡", alpha: "🧠", flow: "🌊" };
 const STATUS_STYLES = {
   todo: { bg: "#E8E8E8", color: "#49454F" },
@@ -132,7 +159,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
                 fontSize: 14, lineHeight: 1.7, whiteSpace: "pre-wrap",
                 padding: 16, background: "#FFFDE7", borderRadius: 12,
                 border: "1px solid #FFF9C4", color: "#5D4037",
-              }}>{task.acceptance_criteria}</div>
+              }}>{renderGherkin(task.acceptance_criteria)}</div>
             </div>
           )}
 
