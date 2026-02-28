@@ -410,7 +410,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
                 <div style={{ fontSize: 14 }}>{formatDate(task.started_at)}</div>
               </div>
             )}
-            {task.completed_at && (
+            {task.completed_at && (task.status === "completed" || task.status === "done") && (
               <div>
                 <div style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Completed</div>
                 <div style={{ fontSize: 14 }}>{formatDate(task.completed_at)}</div>

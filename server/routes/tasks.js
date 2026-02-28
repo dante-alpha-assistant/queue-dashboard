@@ -104,6 +104,11 @@ router.patch("/tasks/:id", async (req, res) => {
     if (updates.status === "in_progress") {
       updates.started_at = new Date().toISOString();
     }
+    if (updates.status === "todo") {
+      updates.started_at = null;
+      updates.completed_at = null;
+      updates.error = null;
+    }
 
     const { data, error } = await supabase
       .from("agent_tasks")
