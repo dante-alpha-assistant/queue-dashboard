@@ -1,22 +1,33 @@
-const COLORS = {
-  todo: "#79747E", assigned: "#6750A4", in_progress: "#E8A317", done: "#386A20",
-  qa: "#7B5EA7", completed: "#1B5E20", failed: "#BA1A1A",
-};
-const LABELS = {
-  todo: "Todo", assigned: "Assigned", in_progress: "Active",
-  qa: "QA", completed: "Completed", failed: "Failed",
-};
+const ITEMS = [
+  { key: "todo", label: "Todo", color: "#79747E" },
+  { key: "in_progress", label: "Active", color: "#E8A317" },
+  { key: "qa", label: "QA", color: "#7B5EA7", merge: "done" },
+  { key: "completed", label: "Done", color: "#1B5E20" },
+  { key: "failed", label: "Failed", color: "#BA1A1A" },
+];
 
 export default function StatsBar({ stats }) {
+  const total = Object.values(stats).reduce((a, b) => a + b, 0);
   return (
-    <div style={{ display: "flex", gap: 16, fontSize: 12 }}>
-      {Object.entries(LABELS).map(([key, label]) => (
-        <div key={key} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <div style={{ width: 6, height: 6, borderRadius: "50%", background: COLORS[key] }} />
-          <span style={{ color: "var(--md-on-surface-variant)" }}>{label}</span>
-          <span style={{ fontWeight: 600, color: COLORS[key] }}>{key === "qa" ? (stats.qa || 0) + (stats.done || 0) : (stats[key] || 0)}</span>
-        </div>
-      ))}
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)", marginRight: 4 }}>
+        {total} tasks
+      </span>
+      {ITEMS.map(({ key, label, color, merge }) => {
+        const count = merge ? (stats[key] || 0) + (stats[merge] || 0) : (stats[key] || 0);
+        if (count === 0) return null;
+        return (
+          <div key={key} style={{
+            display: "flex", alignItems: "center", gap: 4,
+            padding: "3px 10px", borderRadius: 12,
+            background: `${color}15`, fontSize: 12,
+          }}>
+            <div style={{ width: 6, height: 6, borderRadius: "50%", background: color }} />
+            <span style={{ fontWeight: 500, color }}>{count}</span>
+            <span style={{ color: "var(--md-on-surface-variant)", fontSize: 11 }}>{label}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }

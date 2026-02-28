@@ -1,9 +1,12 @@
-import { useState } from "react";
-
 const AGENT_ICONS = { neo: "🕶️", mu: "🔧", beta: "⚡", alpha: "🧠", flow: "🌊" };
-const STATUS_COLORS = {
-  todo: "#79747E", assigned: "#6750A4", in_progress: "#E8A317",
-  done: "#386A20", qa: "#7B5EA7", completed: "#1B5E20", failed: "#BA1A1A",
+const STATUS_STYLES = {
+  todo: { bg: "#E8E8E8", color: "#49454F" },
+  assigned: { bg: "#E8DEF8", color: "#4F378B" },
+  in_progress: { bg: "#FFF3E0", color: "#E65100" },
+  done: { bg: "#E8F5E9", color: "#2E7D32" },
+  qa: { bg: "#EDE7F6", color: "#5E35B1" },
+  completed: { bg: "#C8E6C9", color: "#1B5E20" },
+  failed: { bg: "#FFDAD6", color: "#BA1A1A" },
 };
 
 function formatDate(iso) {
@@ -13,145 +16,188 @@ function formatDate(iso) {
   });
 }
 
+function parseResult(result) {
+  if (!result) return null;
+  if (typeof result === "string") return result;
+  if (result.output) return result.output;
+  return JSON.stringify(result, null, 2);
+}
+
 export default function TaskDetailModal({ task, onClose, onStatusChange, onDelete }) {
   if (!task) return null;
   const agent = task.assigned_agent?.toLowerCase();
   const icon = AGENT_ICONS[agent] || "🤖";
-
-  const sectionStyle = {
-    marginBottom: 16, padding: 12, background: "var(--md-surface)",
-    borderRadius: 12, border: "1px solid var(--md-surface-variant)",
-  };
-  const labelStyle = {
-    fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant)",
-    textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4,
-  };
+  const statusStyle = STATUS_STYLES[task.status] || STATUS_STYLES.todo;
 
   return (
     <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
       display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200,
+      backdropFilter: "blur(4px)",
     }} onClick={onClose}>
       <div style={{
-        background: "var(--md-background)", borderRadius: 24, padding: 24,
-        width: 560, maxHeight: "85vh", overflow: "auto",
-        border: "1px solid var(--md-surface-variant)",
-        boxShadow: "0 12px 48px rgba(0,0,0,0.15)",
+        background: "var(--md-background)", borderRadius: 20, padding: 0,
+        width: 600, maxHeight: "85vh", overflow: "hidden",
+        boxShadow: "0 24px 80px rgba(0,0,0,0.2)",
       }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
+
+        <div style={{ padding: "24px 24px 16px", borderBottom: "1px solid var(--md-surface-variant)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
               <span style={{
-                background: STATUS_COLORS[task.status] || "#79747E", color: "#fff",
-                padding: "4px 12px", borderRadius: 12, fontSize: 12, fontWeight: 600, textTransform: "uppercase",
+                padding: "4px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                background: statusStyle.bg, color: statusStyle.color,
+                textTransform: "uppercase", letterSpacing: "0.5px",
               }}>{task.status.replace("_", " ")}</span>
               <span style={{
-                background: "#E8DEF8", color: "#4F378B",
-                padding: "4px 12px", borderRadius: 12, fontSize: 12, fontWeight: 500,
+                padding: "4px 10px", borderRadius: 8, fontSize: 11, fontWeight: 500,
+                background: "#F3F3F3", color: "#666", textTransform: "uppercase",
               }}>{task.type}</span>
-              {task.priority !== "normal" && (
+              {task.priority && task.priority !== "normal" && (
                 <span style={{
-                  padding: "4px 12px", borderRadius: 12, fontSize: 12, fontWeight: 500,
-                  background: task.priority === "urgent" ? "#FFDAD6" : task.priority === "high" ? "#FFE0B2" : "#E8E8E8",
-                  color: task.priority === "urgent" ? "#BA1A1A" : task.priority === "high" ? "#E65100" : "#666",
+                  padding: "4px 10px", borderRadius: 8, fontSize: 11, fontWeight: 600,
+                  background: task.priority === "urgent" ? "#FFDAD6" : "#FFE0B2",
+                  color: task.priority === "urgent" ? "#BA1A1A" : "#E65100",
+                  textTransform: "uppercase",
                 }}>{task.priority}</span>
               )}
             </div>
-            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "var(--md-on-background)" }}>{task.title}</h2>
+            <button onClick={onClose} style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontSize: 20, color: "var(--md-on-surface-variant)", padding: 4, lineHeight: 1,
+            }}>✕</button>
           </div>
-          <button onClick={onClose} style={{
-            background: "var(--md-surface-variant)", border: "none", borderRadius: 12,
-            width: 32, height: 32, cursor: "pointer", fontSize: 16, color: "var(--md-on-surface-variant)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>×</button>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, lineHeight: 1.3, color: "var(--md-on-background)" }}>
+            {task.title}
+          </h2>
         </div>
 
-        <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-          {task.project && (
-            <div style={{ ...sectionStyle, flex: 1, marginBottom: 0, minWidth: 120 }}>
-              <div style={labelStyle}>Project</div>
-              <div style={{ fontWeight: 500 }}>{task.project.name}</div>
+        <div style={{ padding: "16px 24px 24px", overflowY: "auto", maxHeight: "calc(85vh - 200px)" }}>
+          <div style={{
+            display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+            gap: 12, marginBottom: 20,
+          }}>
+            {task.project && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Project</div>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>{task.project.name}</div>
+              </div>
+            )}
+            {agent && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Agent</div>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>{icon} {agent}</div>
+              </div>
+            )}
+            {task.dispatched_by && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Dispatched by</div>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>{task.dispatched_by}</div>
+              </div>
+            )}
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Created</div>
+              <div style={{ fontSize: 14 }}>{formatDate(task.created_at)}</div>
             </div>
-          )}
-          {agent && (
-            <div style={{ ...sectionStyle, flex: 1, marginBottom: 0, minWidth: 120 }}>
-              <div style={labelStyle}>Assigned To</div>
-              <div style={{ fontWeight: 500 }}>{icon} {agent}</div>
-            </div>
-          )}
-          {task.dispatched_by && (
-            <div style={{ ...sectionStyle, flex: 1, marginBottom: 0, minWidth: 120 }}>
-              <div style={labelStyle}>Dispatched By</div>
-              <div style={{ fontWeight: 500 }}>{task.dispatched_by}</div>
-            </div>
-          )}
-        </div>
+            {task.started_at && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Started</div>
+                <div style={{ fontSize: 14 }}>{formatDate(task.started_at)}</div>
+              </div>
+            )}
+            {task.completed_at && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Completed</div>
+                <div style={{ fontSize: 14 }}>{formatDate(task.completed_at)}</div>
+              </div>
+            )}
+          </div>
 
-        {task.description && (
-          <div style={sectionStyle}>
-            <div style={labelStyle}>Description</div>
-            <div style={{ fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{task.description}</div>
-          </div>
-        )}
-        {task.acceptance_criteria && (
-          <div style={sectionStyle}>
-            <div style={labelStyle}>Acceptance Criteria</div>
-            <div style={{ fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{task.acceptance_criteria}</div>
-          </div>
-        )}
-        {task.result && (
-          <div style={{ ...sectionStyle, borderColor: "#C8E6C9" }}>
-            <div style={labelStyle}>Result</div>
-            <div style={{ fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", color: "#386A20" }}>
-              {typeof task.result === "string" ? task.result : JSON.stringify(task.result, null, 2)}
+          {task.description && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>Description</div>
+              <div style={{
+                fontSize: 14, lineHeight: 1.7, whiteSpace: "pre-wrap",
+                color: "var(--md-on-background)", padding: 16,
+                background: "var(--md-surface)", borderRadius: 12,
+                border: "1px solid var(--md-surface-variant)",
+              }}>{task.description}</div>
             </div>
-          </div>
-        )}
-        {task.qa_result && (
-          <div style={{ ...sectionStyle, borderColor: task.qa_result.passed ? "#C8E6C9" : "#FFDAD6" }}>
-            <div style={labelStyle}>QA Result</div>
-            <div style={{ fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", color: task.qa_result.passed ? "#386A20" : "#BA1A1A" }}>
-              {typeof task.qa_result === "string" ? task.qa_result : JSON.stringify(task.qa_result, null, 2)}
+          )}
+
+          {task.acceptance_criteria && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>Acceptance Criteria</div>
+              <div style={{
+                fontSize: 14, lineHeight: 1.7, whiteSpace: "pre-wrap",
+                padding: 16, background: "#FFFDE7", borderRadius: 12,
+                border: "1px solid #FFF9C4", color: "#5D4037",
+              }}>{task.acceptance_criteria}</div>
             </div>
-          </div>
-        )}
-        {task.error && (
-          <div style={{ ...sectionStyle, borderColor: "#FFDAD6" }}>
-            <div style={labelStyle}>Error</div>
-            <div style={{ fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", color: "#BA1A1A" }}>{task.error}</div>
-          </div>
-        )}
-
-        <div style={sectionStyle}>
-          <div style={labelStyle}>Timeline</div>
-          <div style={{ display: "flex", gap: 16, fontSize: 12, color: "var(--md-on-surface-variant)", flexWrap: "wrap" }}>
-            <span>Created: {formatDate(task.created_at)}</span>
-            {task.started_at && <span>Started: {formatDate(task.started_at)}</span>}
-            {task.completed_at && <span>Completed: {formatDate(task.completed_at)}</span>}
-          </div>
-        </div>
-
-        <div style={{ fontSize: 11, color: "var(--md-on-surface-variant)", fontFamily: "monospace" }}>ID: {task.id}</div>
-
-        <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
-          {task.status === "todo" && (
-            <button onClick={() => { onStatusChange(task.id, { status: "assigned", assigned_agent: task.assigned_agent || "neo" }); onClose(); }} style={{
-              flex: 1, background: "var(--md-primary)", color: "var(--md-on-primary)",
-              border: "none", padding: 12, borderRadius: 20, fontWeight: 500, cursor: "pointer",
-            }}>Assign</button>
           )}
-          {task.status === "failed" && (
-            <button onClick={() => { onStatusChange(task.id, { status: "assigned" }); onClose(); }} style={{
-              flex: 1, background: "#E8A317", color: "#fff",
-              border: "none", padding: 12, borderRadius: 20, fontWeight: 500, cursor: "pointer",
-            }}>Retry</button>
+
+          {task.result && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#2E7D32", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>✓ Result</div>
+              <div style={{
+                fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap",
+                padding: 16, background: "#E8F5E9", borderRadius: 12,
+                border: "1px solid #C8E6C9", color: "#1B5E20",
+              }}>{parseResult(task.result)}</div>
+            </div>
           )}
-          {(task.status === "done" || task.status === "completed" || task.status === "failed") && (
-            <button onClick={() => { onDelete(task.id); onClose(); }} style={{
-              background: "var(--md-surface-variant)", color: "var(--md-on-surface-variant)",
-              border: "none", padding: "12px 24px", borderRadius: 20, fontWeight: 500, cursor: "pointer",
-            }}>Delete</button>
+
+          {task.qa_result && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: task.qa_result.passed ? "#2E7D32" : "#BA1A1A", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>
+                {task.qa_result.passed ? "✓ QA Passed" : "✕ QA Failed"}
+              </div>
+              <div style={{
+                fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap",
+                padding: 16, borderRadius: 12,
+                background: task.qa_result.passed ? "#E8F5E9" : "#FBE9E7",
+                border: `1px solid ${task.qa_result.passed ? "#C8E6C9" : "#FFCCBC"}`,
+                color: task.qa_result.passed ? "#1B5E20" : "#BF360C",
+              }}>{typeof task.qa_result === "string" ? task.qa_result : (task.qa_result.notes || task.qa_result.failures?.join("\n") || JSON.stringify(task.qa_result, null, 2))}</div>
+            </div>
           )}
+
+          {task.error && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#BA1A1A", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>✕ Error</div>
+              <div style={{
+                fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap",
+                padding: 16, background: "#FBE9E7", borderRadius: 12,
+                border: "1px solid #FFCCBC", color: "#BF360C",
+              }}>{task.error}</div>
+            </div>
+          )}
+
+          <div style={{ fontSize: 11, color: "#999", fontFamily: "monospace", marginTop: 8 }}>
+            {task.id}
+          </div>
+
+          <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+            {task.status === "todo" && (
+              <button onClick={() => { onStatusChange(task.id, { status: "assigned", assigned_agent: task.assigned_agent || "neo" }); }} style={{
+                flex: 1, background: "var(--md-primary)", color: "var(--md-on-primary)",
+                border: "none", padding: "10px 20px", borderRadius: 12, fontWeight: 600, fontSize: 14, cursor: "pointer",
+              }}>Assign</button>
+            )}
+            {task.status === "failed" && (
+              <button onClick={() => { onStatusChange(task.id, { status: "todo" }); }} style={{
+                flex: 1, background: "#E8A317", color: "#fff",
+                border: "none", padding: "10px 20px", borderRadius: 12, fontWeight: 600, fontSize: 14, cursor: "pointer",
+              }}>Retry</button>
+            )}
+            {(task.status === "done" || task.status === "completed" || task.status === "failed") && (
+              <button onClick={() => { onDelete(task.id); }} style={{
+                background: "none", color: "#BA1A1A",
+                border: "1px solid #FFCCBC", padding: "10px 20px", borderRadius: 12,
+                fontWeight: 500, fontSize: 13, cursor: "pointer",
+              }}>Delete</button>
+            )}
+          </div>
         </div>
       </div>
     </div>
