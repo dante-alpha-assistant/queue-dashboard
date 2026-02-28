@@ -16,15 +16,15 @@ function timeAgo(iso) {
   return Math.floor(s / 86400) + "d";
 }
 
-export default function TaskCard({ task, onStatusChange, onDelete }) {
+export default function TaskCard({ task, onStatusChange, onDelete, onCardClick }) {
   const agent = task.assigned_agent?.toLowerCase();
   const icon = AGENT_ICONS[agent] || "🤖";
 
   return (
-    <div style={{
+    <div onClick={() => onCardClick?.(task)} style={{
       background: "var(--md-background)", borderRadius: 12,
       border: "1px solid var(--md-surface-variant)", padding: 12,
-      marginBottom: 8, transition: "all 200ms ease",
+      marginBottom: 8, transition: "all 200ms ease", cursor: "pointer",
     }}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
@@ -78,7 +78,7 @@ export default function TaskCard({ task, onStatusChange, onDelete }) {
         <div style={{ display: "flex", gap: 4 }}>
           {task.status === "todo" && (
             <button
-              onClick={() => onStatusChange?.(task.id, { status: "assigned", assigned_agent: task.assigned_agent || "neo" })}
+              onClick={(e) => { e.stopPropagation(); onStatusChange?.(task.id, { status: "assigned", assigned_agent: task.assigned_agent || "neo" }); }}
               style={{
                 fontSize: 11, background: "var(--md-primary)", color: "var(--md-on-primary)",
                 border: "none", padding: "4px 10px", borderRadius: 12, cursor: "pointer",
@@ -88,7 +88,7 @@ export default function TaskCard({ task, onStatusChange, onDelete }) {
           )}
           {task.status === "failed" && (
             <button
-              onClick={() => onStatusChange?.(task.id, { status: "assigned" })}
+              onClick={(e) => { e.stopPropagation(); onStatusChange?.(task.id, { status: "assigned" }); }}
               style={{
                 fontSize: 11, background: "#E8A317", color: "#fff",
                 border: "none", padding: "4px 10px", borderRadius: 12, cursor: "pointer",
@@ -98,7 +98,7 @@ export default function TaskCard({ task, onStatusChange, onDelete }) {
           )}
           {(task.status === "done" || task.status === "failed") && (
             <button
-              onClick={() => onDelete?.(task.id)}
+              onClick={(e) => { e.stopPropagation(); onDelete?.(task.id); }}
               style={{
                 fontSize: 11, background: "var(--md-surface-variant)", color: "var(--md-on-surface-variant)",
                 border: "none", padding: "4px 8px", borderRadius: 12, cursor: "pointer",

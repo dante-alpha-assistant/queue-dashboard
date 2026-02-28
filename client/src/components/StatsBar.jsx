@@ -3,7 +3,7 @@ const COLORS = {
   qa: "#7B5EA7", completed: "#1B5E20", failed: "#BA1A1A",
 };
 const LABELS = {
-  todo: "Todo", assigned: "Assigned", in_progress: "Active", done: "Done",
+  todo: "Todo", assigned: "Assigned", in_progress: "Active",
   qa: "QA", completed: "Completed", failed: "Failed",
 };
 
@@ -14,7 +14,7 @@ export default function StatsBar({ stats }) {
         <div key={key} style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <div style={{ width: 6, height: 6, borderRadius: "50%", background: COLORS[key] }} />
           <span style={{ color: "var(--md-on-surface-variant)" }}>{label}</span>
-          <span style={{ fontWeight: 600, color: COLORS[key] }}>{stats[key] || 0}</span>
+          <span style={{ fontWeight: 600, color: COLORS[key] }}>{key === "qa" ? (stats.qa || 0) + (stats.done || 0) : (stats[key] || 0)}</span>
         </div>
       ))}
     </div>

@@ -4,6 +4,7 @@ import StatsBar from "./components/StatsBar";
 import Column from "./components/Column";
 import TaskCard from "./components/TaskCard";
 import DispatchModal from "./components/DispatchModal";
+import TaskDetailModal from "./components/TaskDetailModal";
 import ChatPanel from "./components/ChatPanel";
 
 export default function App() {
@@ -13,6 +14,7 @@ export default function App() {
     projects, selectedProject, setSelectedProject,
   } = useQueue();
   const [showModal, setShowModal] = useState(false);
+  const [selectedTask, setSelectedTask] = useState(null);
 
   if (loading) {
     return (
@@ -81,30 +83,35 @@ export default function App() {
         overflowX: "auto", minHeight: 0,
       }}>
         <Column title="Todo" color="#79747E" count={todo.length}>
-          {todo.map((t) => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} />)}
+          {todo.map((t) => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} onCardClick={setSelectedTask} />)}
         </Column>
         <Column title="Assigned" color="#6750A4" count={assigned.length}>
-          {assigned.map((t) => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} />)}
+          {assigned.map((t) => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} onCardClick={setSelectedTask} />)}
         </Column>
         <Column title="In Progress" color="#E8A317" count={inProgress.length}>
-          {inProgress.map((t) => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} />)}
+          {inProgress.map((t) => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} onCardClick={setSelectedTask} />)}
         </Column>
-        <Column title="Done" color="#386A20" count={done.length}>
-          {done.slice(0, 20).map((t) => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} />)}
-        </Column>
-        <Column title="QA" color="#7B5EA7" count={qa.length}>
-          {qa.map((t) => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} />)}
+        <Column title="QA" color="#7B5EA7" count={done.length + qa.length}>
+          {[...qa, ...done].slice(0, 30).map((t) => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} onCardClick={setSelectedTask} />)}
         </Column>
         <Column title="Completed" color="#1B5E20" count={completed.length}>
-          {completed.slice(0, 20).map((t) => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} />)}
+          {completed.slice(0, 20).map((t) => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} onCardClick={setSelectedTask} />)}
         </Column>
         <Column title="Failed" color="#BA1A1A" count={failed.length}>
-          {failed.map((t) => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} />)}
+          {failed.map((t) => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} onCardClick={setSelectedTask} />)}
         </Column>
       </div>
 
       <ChatPanel />
       {showModal && <DispatchModal onClose={() => setShowModal(false)} dispatch={dispatch} projects={projects} />}
+      {selectedTask && (
+        <TaskDetailModal
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+          onStatusChange={updateTask}
+          onDelete={deleteTask}
+        />
+      )}
     </div>
   );
 }
