@@ -59,11 +59,39 @@ agentsRouter.get("/:name", async (req, res) => {
 // Update allowed fields only
 agentsRouter.patch("/:name", async (req, res) => {
   try {
-    const allowed = ["status", "current_load", "current_tasks", "last_heartbeat", "metrics", "metadata", "max_capacity", "description"];
+    const allowed = ["status", "current_load", "current_tasks", "last_heartbeat", "metrics", "metadata", "max_capacity", "description", "disabled_at", "disabled_by"];
     const updates = { updated_at: new Date().toISOString() };
     for (const key of allowed) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
     }
+
+    // Guard disabled status: cannot change disabled → other status without force_reenable
+    if (updates.status && updates.status !== 'disabled') {
+      const { data: current } = await supabase
+        .from("agent_cards")
+        .select("status, disabled_at, disabled_by")
+        .eq("id", req.params.name)
+        .single();
+      if (current?.status === 'disabled' && !req.body.force_reenable) {
+        return res.status(409).json({
+          error: "Agent is disabled. Set force_reenable: true to re-enable.",
+          disabled_at: current.disabled_at,
+          disabled_by: current.disabled_by,
+        });
+      }
+      // Re-enabling: clear disabled fields
+      if (current?.status === 'disabled' && req.body.force_reenable) {
+        updates.disabled_at = null;
+        updates.disabled_by = null;
+      }
+    }
+
+    // Auto-set disabled metadata when disabling
+    if (updates.status === 'disabled') {
+      updates.disabled_at = new Date().toISOString();
+      updates.disabled_by = req.body.disabled_by || 'api';
+    }
+
     const { data, error } = await supabase
       .from("agent_cards")
       .update(updates)
