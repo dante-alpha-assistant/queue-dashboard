@@ -217,13 +217,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
                 border: "none", padding: "10px 20px", borderRadius: 12, fontWeight: 600, fontSize: 14, cursor: "pointer",
               }}>Retry</button>
             )}
-            {(task.status === "done" || task.status === "completed" || task.status === "failed") && (
-              <button onClick={() => { onDelete(task.id); }} style={{
-                background: "none", color: "#BA1A1A",
-                border: "1px solid #FFCCBC", padding: "10px 20px", borderRadius: 12,
-                fontWeight: 500, fontSize: 13, cursor: "pointer",
-              }}>Delete</button>
-            )}
+            {/* No delete button — history must be preserved */}
           </div>
         </div>
       </div>

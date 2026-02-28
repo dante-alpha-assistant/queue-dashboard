@@ -1,7 +1,7 @@
 const ITEMS = [
   { key: "todo", label: "Todo", color: "#79747E" },
   { key: "in_progress", label: "Active", color: "#E8A317" },
-  { key: "qa", label: "QA", color: "#7B5EA7", merge: "done" },
+  { key: "qa_testing", label: "QA", color: "#7B5EA7" },
   { key: "completed", label: "Done", color: "#1B5E20" },
   { key: "failed", label: "Failed", color: "#BA1A1A" },
 ];

@@ -38,7 +38,7 @@ router.get("/stats", async (req, res) => {
     if (req.query.project_id) query = query.eq("project_id", req.query.project_id);
     const { data, error } = await query;
     if (error) throw error;
-    const stats = { todo: 0, assigned: 0, in_progress: 0, done: 0, qa: 0, completed: 0, failed: 0 };
+    const stats = { todo: 0, assigned: 0, in_progress: 0, done: 0, qa: 0, qa_testing: 0, completed: 0, failed: 0 };
     data.forEach((t) => { if (stats[t.status] !== undefined) stats[t.status]++; });
     res.json(stats);
   } catch (e) {
@@ -53,7 +53,7 @@ router.get("/tasks", async (req, res) => {
       .from("agent_tasks")
       .select("*, project:agent_projects(id, name, slug), repository:agent_repositories(id, name, url, provider)")
       .order("created_at", { ascending: false })
-      .limit(100);
+      .limit(500);
     if (req.query.project_id) query = query.eq("project_id", req.query.project_id);
     if (req.query.repository_id) query = query.eq("repository_id", req.query.repository_id);
     const { data, error } = await query;
@@ -118,15 +118,11 @@ router.patch("/tasks/:id", async (req, res) => {
   }
 });
 
-// Delete task
+// Archive task (soft delete — never actually delete)
 router.delete("/tasks/:id", async (req, res) => {
   try {
-    const { error } = await supabase
-      .from("agent_tasks")
-      .delete()
-      .eq("id", req.params.id);
-    if (error) throw error;
-    res.json({ ok: true });
+    // Don't delete — move to a terminal state instead
+    res.status(403).json({ error: "Tasks cannot be deleted. History must be preserved." });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

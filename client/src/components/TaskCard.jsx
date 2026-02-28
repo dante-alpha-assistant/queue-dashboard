@@ -96,15 +96,7 @@ export default function TaskCard({ task, onStatusChange, onDelete, onCardClick }
               }}
             >Retry</button>
           )}
-          {(task.status === "done" || task.status === "failed") && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete?.(task.id); }}
-              style={{
-                fontSize: 11, background: "var(--md-surface-variant)", color: "var(--md-on-surface-variant)",
-                border: "none", padding: "4px 8px", borderRadius: 12, cursor: "pointer",
-              }}
-            >×</button>
-          )}
+          {/* No delete button — history must be preserved */}
         </div>
       </div>
 

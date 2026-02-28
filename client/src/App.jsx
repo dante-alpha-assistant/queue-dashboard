@@ -35,8 +35,6 @@ export default function App() {
   }
 
   const filterByType = (tasks) => typeFilter === "all" ? tasks : tasks.filter(t => t.type === typeFilter);
-  const qaAll = [...qa, ...done];
-
   return (
     <div style={{
       display: "flex", flexDirection: "column", height: "100vh",
@@ -114,8 +112,8 @@ export default function App() {
         <Column title="In Progress" color="#E8A317" count={filterByType(inProgress).length}>
           {filterByType(inProgress).map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} onCardClick={setSelectedTask} />)}
         </Column>
-        <Column title="QA" color="#7B5EA7" count={filterByType(qaAll).length}>
-          {filterByType(qaAll).slice(0, 30).map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} onCardClick={setSelectedTask} />)}
+        <Column title="QA Testing" color="#7B5EA7" count={filterByType(qa).length}>
+          {filterByType(qa).slice(0, 30).map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} onCardClick={setSelectedTask} />)}
         </Column>
         <Column title="Completed" color="#1B5E20" count={filterByType(completed).length}>
           {filterByType(completed).slice(0, 20).map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} onCardClick={setSelectedTask} />)}
