@@ -7,7 +7,7 @@ import DispatchModal from "./components/DispatchModal";
 import ChatPanel from "./components/ChatPanel";
 import TaskDetailModal from "./components/TaskDetailModal";
 
-const TYPES = ["all", "coding", "ops", "general", "research", "qa"];
+// Types are derived from actual task data — no hardcoded list
 
 export default function App() {
   const {
@@ -34,6 +34,9 @@ export default function App() {
     );
   }
 
+  // Derive type chips from actual task data — only show types that exist
+  const allTasks = [...todo, ...assigned, ...inProgress, ...done, ...qa, ...completed, ...failed];
+  const activeTypes = ["all", ...new Set(allTasks.map(t => t.type).filter(Boolean))];
   const filterByType = (tasks) => typeFilter === "all" ? tasks : tasks.filter(t => t.type === typeFilter);
   return (
     <div style={{
@@ -87,7 +90,7 @@ export default function App() {
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Type</span>
             <div style={{ display: "flex", gap: 4 }}>
-              {TYPES.map(type => (
+              {activeTypes.map(type => (
                 <button key={type} onClick={() => setTypeFilter(type)} style={{
                   padding: "4px 12px", borderRadius: 16, fontSize: 12, fontWeight: 500,
                   border: typeFilter === type ? "2px solid var(--md-primary)" : "1px solid var(--md-surface-variant)",
