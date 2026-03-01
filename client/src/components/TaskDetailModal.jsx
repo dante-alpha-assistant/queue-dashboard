@@ -559,7 +559,7 @@ function SmartRetryInfo({ metadata }) {
 
 /* ── Main Modal ───────────────────────────────────────────── */
 
-export default function TaskDetailModal({ task, onClose, onStatusChange, onDelete: _unused, isMobile, isTablet }) {
+export default function TaskDetailModal({ task, onClose, onStatusChange, isMobile, isTablet }) {
   const [closing, setClosing] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
   const [collapsedSections, setCollapsedSections] = useState({});
