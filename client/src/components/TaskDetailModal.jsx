@@ -769,7 +769,11 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
             </div>
           )}
 
-          <div style={{ fontSize: 11, color: "var(--md-on-surface-variant, #999)", fontFamily: "monospace", marginTop: 8 }}>
+          <div style={{
+            fontSize: 11, color: "var(--md-on-surface-variant, #999)", marginTop: 8,
+            fontFamily: "'Roboto', system-ui, sans-serif", opacity: 0.6,
+            letterSpacing: "0.02em",
+          }}>
             {task.id}
           </div>
 
