@@ -1,22 +1,19 @@
 import { useState, useCallback } from "react";
 import useQueue from "./hooks/useQueue";
 import useBreakpoint from "./hooks/useBreakpoint";
-import useTaskEvents from "./hooks/useTaskEvents";
 import StatsBar from "./components/StatsBar";
 import Column from "./components/Column";
-import DispatchButton from "./components/DispatchButton";
 import TaskCard from "./components/TaskCard";
 import DispatchModal from "./components/DispatchModal";
 import ChatPanel from "./components/ChatPanel";
 import TaskDetailModal from "./components/TaskDetailModal";
 import Pingboard from "./pages/Pingboard";
-import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
+import SearchFilter from "./components/SearchFilter";
 
 const MOBILE_TABS = [
   { key: "todo", label: "Todo", icon: "📋" },
   { key: "assigned", label: "Active", icon: "👤" },
   { key: "in_progress", label: "Active", icon: "⚡" },
-  { key: "blocked", label: "Blocked", icon: "🚫" },
   { key: "qa", label: "QA", icon: "🧪" },
   { key: "completed", label: "Done", icon: "✅" },
   { key: "deployed", label: "Deployed", icon: "🚀" },
@@ -27,7 +24,6 @@ const MOBILE_TABS = [
 const BOTTOM_TABS = [
   { key: "todo", label: "Todo", icon: "📋", color: "#79747E" },
   { key: "active", label: "Active", icon: "⚡", color: "#E8A317" },
-  { key: "blocked", label: "Blocked", icon: "🚫", color: "#D84315" },
   { key: "qa", label: "QA", icon: "🧪", color: "#7B5EA7" },
   { key: "completed", label: "Done", icon: "✅", color: "#1B5E20" },
   { key: "deployed", label: "Deployed", icon: "🚀", color: "#00897B" },
@@ -36,19 +32,24 @@ const BOTTOM_TABS = [
 
 export default function App() {
   const {
-    stats, todo, assigned, inProgress, done, qa, completed, deployed, blocked, failed,
-    loading, dispatch, updateTask,
+    stats, todo, assigned, inProgress, done, qa, completed, deployed, failed,
+    loading, dispatch, updateTask, deleteTask,
     projects, selectedProject, setSelectedProject,
   } = useQueue();
   const [showModal, setShowModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
   const [typeFilter, setTypeFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
+  const [searchTerm, setSearchTerm] = useState(() => {
+    try { return localStorage.getItem("task-search") || ""; } catch { return ""; }
+  });
+  const handleSearchChange = useCallback((val) => {
+    setSearchTerm(val);
+    try { localStorage.setItem("task-search", val); } catch {}
+  }, []);
   const [activeTab, setActiveTab] = useState("todo");
   const [view, setView] = useState("board");
-  const [timeFilter, setTimeFilter] = useState({ range: "today", customFrom: "", customTo: "" });
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
-  const { progress: taskProgress, monitor: taskMonitor, connected: sseConnected } = useTaskEvents();
 
   // Collapsible columns for Deployed and Failed
   const COLLAPSIBLE_COLUMNS = ["deployed", "failed"];
@@ -108,14 +109,16 @@ export default function App() {
     );
   }
 
-  const allTasksRaw = [...todo, ...assigned, ...inProgress, ...blocked, ...done, ...qa, ...completed, ...deployed, ...failed];
-  const allTasks = filterTasksByTime(allTasksRaw, timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
+  const allTasks = [...todo, ...assigned, ...inProgress, ...done, ...qa, ...completed, ...deployed, ...failed];
   const activeTypes = ["all", ...new Set(allTasks.map(t => t.type).filter(Boolean))];
   const activeStages = ["all", ...new Set(allTasks.map(t => t.stage).filter(Boolean))];
   const filterTasks = (tasks) => {
-    let filtered = filterTasksByTime(tasks, timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
-    if (typeFilter !== "all") filtered = filtered.filter(t => t.type === typeFilter);
+    let filtered = typeFilter === "all" ? tasks : tasks.filter(t => t.type === typeFilter);
     if (stageFilter !== "all") filtered = filtered.filter(t => t.stage === stageFilter);
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(t => (t.title || "").toLowerCase().includes(term));
+    }
     return filtered;
   };
   const filterByType = filterTasks;
@@ -124,7 +127,6 @@ export default function App() {
     switch (activeTab) {
       case "todo": return filterByType(todo);
       case "active": return [...filterByType(assigned), ...filterByType(inProgress)];
-      case "blocked": return filterByType(blocked);
       case "qa": return filterByType(qa);
       case "completed": return filterByType(completed);
       case "deployed": return filterByType(deployed);
@@ -137,7 +139,6 @@ export default function App() {
     switch (activeTab) {
       case "todo": return { title: "Todo", color: "#79747E" };
       case "active": return { title: "Active", color: "#E8A317" };
-      case "blocked": return { title: "Blocked", color: "#D84315" };
       case "qa": return { title: "QA Testing", color: "#7B5EA7" };
       case "completed": return { title: "Completed", color: "#1B5E20" };
       case "deployed": return { title: "Deployed", color: "#00897B" };
@@ -147,7 +148,7 @@ export default function App() {
   };
 
   const renderCards = (tasks) =>
-    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={setSelectedTask} isMobile={isMobile} progress={taskProgress[t.id]} monitor={taskMonitor[t.id]} />);
+    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} onCardClick={setSelectedTask} isMobile={isMobile} />);
 
   // MOBILE LAYOUT
   if (isMobile) {
@@ -179,6 +180,8 @@ export default function App() {
 
         {/* Filter bar - wrapping */}
         <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--md-surface-variant)" }}>
+          <SearchFilter value={searchTerm} onChange={handleSearchChange} isMobile={true} />
+          <div style={{ height: 8 }} />
           <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)} style={{
             width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--md-surface-variant)",
             background: "var(--md-surface)", color: "var(--md-on-background)", fontSize: 13,
@@ -216,9 +219,6 @@ export default function App() {
               ))}
             </div>
           )}
-          <div style={{ marginTop: 6 }}>
-            <TimeFilter allTasks={allTasksRaw} value={timeFilter} onChange={setTimeFilter} isMobile={true} />
-          </div>
         </div>
 
         {/* Column header */}
@@ -229,7 +229,6 @@ export default function App() {
             background: `${colMeta.color}20`, color: colMeta.color,
             padding: "2px 10px", borderRadius: 10, fontSize: 12, fontWeight: 700,
           }}>{colTasks.length}</span>
-          {activeTab === "todo" && <DispatchButton />}
         </div>
 
         {/* Task list */}
@@ -283,10 +282,9 @@ export default function App() {
           <TaskDetailModal
             task={selectedTask}
             onClose={() => setSelectedTask(null)}
-            onStatusChange={async (id, updates) => { await updateTask(id, updates); setSelectedTask(null); }}
+            onStatusChange={(id, updates) => { updateTask(id, updates); setSelectedTask(null); }}
+            onDelete={(id) => { deleteTask(id); setSelectedTask(null); }}
             isMobile={isMobile}
-            progress={selectedTask ? taskProgress[selectedTask.id] : null}
-            monitor={selectedTask ? taskMonitor[selectedTask.id] : null}
           />
         )}
       </div>
@@ -336,6 +334,8 @@ export default function App() {
           display: "flex", alignItems: "center", gap: 12, flexWrap: isTablet ? "wrap" : "nowrap",
           paddingBottom: 16, borderBottom: "1px solid var(--md-surface-variant)",
         }}>
+          <SearchFilter value={searchTerm} onChange={handleSearchChange} isMobile={false} />
+          <div style={{ width: 1, height: 24, background: "var(--md-surface-variant)" }} />
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Project</span>
             <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)} style={{
@@ -382,15 +382,13 @@ export default function App() {
               </div>
             </div>
           </>)}
-          <div style={{ width: 1, height: 24, background: "var(--md-surface-variant)" }} />
-          <TimeFilter allTasks={allTasksRaw} value={timeFilter} onChange={setTimeFilter} isMobile={false} />
         </div>
       </div>
 
       <div style={{
         flex: 1, display: "flex", gap: 12, padding: "16px 24px", overflowX: "auto", minHeight: 0,
       }}>
-        <Column title="Todo" color="#79747E" count={filterByType(todo).length} isTablet={isTablet} headerAction={<DispatchButton />}>
+        <Column title="Todo" color="#79747E" count={filterByType(todo).length} isTablet={isTablet}>
           {renderCards(filterByType(todo))}
         </Column>
         <Column title="Assigned" color="#6750A4" count={filterByType(assigned).length} isTablet={isTablet}>
@@ -398,9 +396,6 @@ export default function App() {
         </Column>
         <Column title="In Progress" color="#E8A317" count={filterByType(inProgress).length} isTablet={isTablet}>
           {renderCards(filterByType(inProgress))}
-        </Column>
-        <Column title="Blocked" color="#D84315" count={filterByType(blocked).length} isTablet={isTablet}>
-          {renderCards(filterByType(blocked))}
         </Column>
         <Column title="QA Testing" color="#7B5EA7" count={filterByType(qa).length} isTablet={isTablet}>
           {renderCards(filterByType(qa).slice(0, 30))}
@@ -424,11 +419,10 @@ export default function App() {
         <TaskDetailModal
           task={selectedTask}
           onClose={() => setSelectedTask(null)}
-          onStatusChange={async (id, updates) => { await updateTask(id, updates); setSelectedTask(null); }}
+          onStatusChange={(id, updates) => { updateTask(id, updates); setSelectedTask(null); }}
+          onDelete={(id) => { deleteTask(id); setSelectedTask(null); }}
           isMobile={false}
           isTablet={isTablet}
-          progress={selectedTask ? taskProgress[selectedTask.id] : null}
-          monitor={selectedTask ? taskMonitor[selectedTask.id] : null}
         />
       )}
     </div>
