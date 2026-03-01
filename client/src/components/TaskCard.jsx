@@ -165,7 +165,7 @@ function Badge({ label, color, bg, style: extraStyle }) {
 }
 
 /* ── Action Bar ───────────────────────────────────────────── */
-function ActionBar({ task, onStatusChange, isMobile }) {
+function ActionBar({ task, onStatusChange, onDelete, isMobile }) {
   const btnBase = {
     fontSize: 12, border: "none", padding: isMobile ? "8px 18px" : "7px 16px",
     borderRadius: 100, cursor: "pointer", fontWeight: 600,
@@ -177,19 +177,52 @@ function ActionBar({ task, onStatusChange, isMobile }) {
 
   const actions = [];
 
-  // Only View button on card — actions like Assign, Retry, Deprecate live in the detail modal
-  actions.push(
-    <button
-      key="view"
-      onClick={(e) => { e.stopPropagation(); }}
-      style={{ ...btnBase, background: "var(--md-surface-variant, #E7E0EC)", color: "var(--md-on-surface-variant, #49454F)" }}
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
-      </svg>
-      View
-    </button>
-  );
+  if (task.status === "failed") {
+    actions.push(
+      <button
+        key="retry"
+        onClick={(e) => { e.stopPropagation(); onStatusChange?.(task.id, { status: "assigned" }); }}
+        style={{ ...btnBase, background: "#E65100", color: "#fff" }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 105.64-12.48L1 10" />
+        </svg>
+        Retry
+      </button>
+    );
+  }
+
+  if (task.status === "todo") {
+    actions.push(
+      <button
+        key="assign"
+        onClick={(e) => { e.stopPropagation(); onStatusChange?.(task.id, { status: "assigned", assigned_agent: task.assigned_agent || "neo" }); }}
+        style={{ ...btnBase, background: "var(--md-primary, #6750A4)", color: "var(--md-on-primary, #fff)" }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="23" y1="11" x2="17" y2="11" />
+        </svg>
+        Assign
+      </button>
+    );
+  }
+
+  if (onDelete && (task.status === "todo" || task.status === "failed")) {
+    actions.push(
+      <button
+        key="delete"
+        onClick={(e) => { e.stopPropagation(); onDelete?.(task.id); }}
+        style={{ ...btnBase, background: "transparent", color: "var(--md-outline, #79747E)" }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" />
+        </svg>
+        Delete
+      </button>
+    );
+  }
+
+  if (actions.length === 0) return null;
 
   return (
     <div style={{
@@ -203,7 +236,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
 }
 
 /* ── Task Card ────────────────────────────────────────────── */
-export default function TaskCard({ task, onStatusChange, onCardClick, isMobile }) {
+export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, isMobile }) {
   const agent = task.assigned_agent?.toLowerCase();
   const icon = AGENT_ICONS[agent] || "🤖";
   const role = AGENT_ROLES[agent] || "Agent";
@@ -369,6 +402,7 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile }
       <ActionBar
         task={task}
         onStatusChange={onStatusChange}
+        onDelete={onDelete}
         isMobile={isMobile}
       />
     </div>
