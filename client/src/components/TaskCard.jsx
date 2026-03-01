@@ -44,7 +44,7 @@ function PipelineStepper({ stage }) {
       {STAGES.map((s, i) => {
         const isCompleted = i < currentIdx;
         const isCurrent = i === currentIdx;
-        const color = isCurrent ? (STAGE_COLORS[s] || "#79747E") : isCompleted ? "#386A20" : "#BDBDBD";
+        const color = isCurrent ? (STAGE_COLORS[s] || "#79747E") : isCompleted ? "#386A20" : "var(--md-outline-variant)";
         return (
           <div key={s} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 28 }}>
@@ -62,13 +62,13 @@ function PipelineStepper({ stage }) {
               </div>
               <span style={{
                 fontSize: 8, fontWeight: 600, marginTop: 2,
-                color: isCurrent ? color : isCompleted ? "#386A20" : "#BDBDBD",
+                color: isCurrent ? color : isCompleted ? "#386A20" : "var(--md-outline-variant)",
                 letterSpacing: "0.5px", textTransform: "uppercase",
               }}>{STAGE_LABELS[s]}</span>
             </div>
             {i < STAGES.length - 1 && (
               <div style={{
-                flex: 1, height: 2, background: isCompleted ? "#386A20" : "var(--md-surface-variant, #E0E0E0)",
+                flex: 1, height: 2, background: isCompleted ? "#386A20" : "var(--md-surface-variant)",
                 marginTop: -10, minWidth: 4,
               }} />
             )}
@@ -132,12 +132,12 @@ export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, 
       }}>
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
           <span style={{
-            fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6,
+            fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 8,
             background: `${statusColor}18`, color: statusColor,
             textTransform: "uppercase", letterSpacing: "0.5px",
           }}>{task.status.replace("_", " ")}</span>
           <span style={{
-            fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 6,
+            fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 8,
             background: `${TYPE_COLORS[task.type] || "#79747E"}12`,
             color: TYPE_COLORS[task.type] || "#79747E", textTransform: "uppercase",
           }}>{task.type}</span>
@@ -192,7 +192,7 @@ export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, 
               <span style={{ opacity: 0.6, fontStyle: "italic", fontSize: 11 }}>{role}</span>
             </span>
           ) : (
-            <span style={{ fontSize: 12, color: "#BDBDBD" }}>unassigned</span>
+            <span style={{ fontSize: 12, color: "var(--md-outline)" }}>unassigned</span>
           )}
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <span style={{
