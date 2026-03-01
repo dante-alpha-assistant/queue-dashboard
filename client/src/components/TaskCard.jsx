@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import AgentPicker from './AgentPicker';
-import { ProgressBadge } from './ProgressFeed';
+import RetryButton from './RetryButton';
 
 const AGENT_ICONS = { neo: "🕶️", mu: "🔧", beta: "⚡", alpha: "🧠", flow: "🌊", ifra: "🛠️" };
 const AGENT_ROLES = { neo: "Builder", alpha: "Leader", beta: "QA", mu: "Builder", flow: "Orchestrator", ifra: "Ops" };
@@ -29,7 +28,7 @@ const STAGE_COLORS = {
 const STAGES = ["refinery", "foundry", "builder", "inspector", "deployer"];
 const STAGE_LABELS = { refinery: "Refine", foundry: "Found", builder: "Build", inspector: "Inspect", deployer: "Deploy" };
 const STAGE_SHORT = { refinery: "REF", foundry: "FND", builder: "BLD", inspector: "INS", deployer: "DEP" };
-const ACTIVE_STATUSES = new Set(["in_progress", "assigned", "running", "qa_testing", "completed"]);
+const ACTIVE_STATUSES = new Set(["in_progress", "assigned", "running", "qa_testing"]);
 
 function formatDuration(ms) {
   if (!ms || ms < 0) return "0s";
@@ -111,7 +110,7 @@ function PipelineStepper({ stage, isMobile }) {
 }
 
 /* ── Duration Ticker ──────────────────────────────────────── */
-const TERMINAL_STATUSES = new Set(["deployed", "failed", "cancelled"]);
+const TERMINAL_STATUSES = new Set(["deployed", "completed", "failed", "cancelled"]);
 
 function DurationTicker({ updatedAt, startedAt, completedAt, active, status }) {
   const [now, setNow] = useState(Date.now());
@@ -125,22 +124,10 @@ function DurationTicker({ updatedAt, startedAt, completedAt, active, status }) {
   const stateEnteredAt = startedAt || updatedAt;
   if (!stateEnteredAt) return null;
 
-  // Completed: live ticker counting time waiting for deploy (from completed_at)
-  // Deployed: frozen duration from completed_at to updated_at (deploy time)
-  // Other terminal: frozen at completion
-  // Active: live ticker from state entry
+  // Terminal: frozen duration; Active: live ticker from state entry
   const isTerminal = TERMINAL_STATUSES.has(status);
   let elapsed;
-  if (status === "completed") {
-    // Live ticker: time since task was completed, waiting for deploy
-    const from = completedAt ? new Date(completedAt).getTime() : new Date(updatedAt).getTime();
-    elapsed = now - from;
-  } else if (status === "deployed") {
-    // Frozen: show how long it waited between completion and deployment
-    const from = completedAt ? new Date(completedAt).getTime() : new Date(stateEnteredAt).getTime();
-    const end = new Date(updatedAt).getTime();
-    elapsed = end - from;
-  } else if (isTerminal) {
+  if (isTerminal) {
     const end = completedAt ? new Date(completedAt).getTime() : new Date(updatedAt).getTime();
     elapsed = end - new Date(stateEnteredAt).getTime();
   } else if (active) {
@@ -180,12 +167,6 @@ function Badge({ label, color, bg, style: extraStyle }) {
 
 /* ── Action Bar ───────────────────────────────────────────── */
 function ActionBar({ task, onStatusChange, isMobile }) {
-  const [showPicker, setShowPicker] = useState(false);
-  const [assigning, setAssigning] = useState(false);
-  const [assignError, setAssignError] = useState(null);
-  const [humanInput, setHumanInput] = useState("");
-  const [unblocking, setUnblocking] = useState(false);
-
   const btnBase = {
     fontSize: 12, border: "none", padding: isMobile ? "8px 18px" : "7px 16px",
     borderRadius: 100, cursor: "pointer", fontWeight: 600,
@@ -195,66 +176,33 @@ function ActionBar({ task, onStatusChange, isMobile }) {
     display: "inline-flex", alignItems: "center", gap: 6,
   };
 
-  const handleAssign = async (agentId) => {
-    setShowPicker(false);
-    setAssigning(true);
-    setAssignError(null);
-    try {
-      await onStatusChange?.(task.id, { status: "assigned", assigned_agent: agentId });
-    } catch (e) {
-      setAssignError(e.message || "Assignment failed");
-      setTimeout(() => setAssignError(null), 3000);
-    } finally {
-      setAssigning(false);
-    }
-  };
-
   const actions = [];
 
   if (task.status === "failed") {
     actions.push(
-      <button
+      <RetryButton
         key="retry"
-        onClick={(e) => { e.stopPropagation(); onStatusChange?.(task.id, { status: "assigned" }); }}
+        onRetry={onStatusChange}
+        taskId={task.id}
+        updates={{ status: "assigned" }}
         style={{ ...btnBase, background: "#E65100", color: "#fff" }}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 105.64-12.48L1 10" />
-        </svg>
-        Retry
-      </button>
+        stopPropagation
+      />
     );
   }
 
   if (task.status === "todo") {
     actions.push(
-      <div key="assign" style={{ position: "relative" }}>
-        <button
-          onClick={(e) => { e.stopPropagation(); setShowPicker(!showPicker); }}
-          disabled={assigning}
-          style={{
-            ...btnBase,
-            background: assigning ? "var(--md-outline, #79747E)" : "var(--md-primary, #6750A4)",
-            color: "var(--md-on-primary, #fff)",
-            opacity: assigning ? 0.7 : 1,
-          }}
-        >
-          {assigning ? (
-            <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⏳</span>
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="23" y1="11" x2="17" y2="11" />
-            </svg>
-          )}
-          {assigning ? "Assigning…" : "Assign"}
-        </button>
-        {showPicker && (
-          <AgentPicker
-            onSelect={handleAssign}
-            onCancel={() => setShowPicker(false)}
-          />
-        )}
-      </div>
+      <button
+        key="assign"
+        onClick={(e) => { e.stopPropagation(); onStatusChange?.(task.id, { status: "assigned", assigned_agent: task.assigned_agent || "neo" }); }}
+        style={{ ...btnBase, background: "var(--md-primary, #6750A4)", color: "var(--md-on-primary, #fff)" }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="23" y1="11" x2="17" y2="11" />
+        </svg>
+        Assign
+      </button>
     );
   }
 
@@ -321,20 +269,14 @@ function ActionBar({ task, onStatusChange, isMobile }) {
       display: "flex", gap: 8, padding: "10px 16px 12px",
       justifyContent: "flex-end", alignItems: "center",
       borderTop: "1px solid var(--md-surface-variant, #E7E0EC)",
-      flexWrap: "wrap",
     }}>
-      {assignError && (
-        <span style={{ fontSize: 12, color: "#BA1A1A", fontWeight: 500, marginRight: "auto" }}>
-          ⚠️ {assignError}
-        </span>
-      )}
       {actions}
     </div>
   );
 }
 
 /* ── Task Card ────────────────────────────────────────────── */
-export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, progress, monitor }) {
+export default function TaskCard({ task, onStatusChange, onCardClick, isMobile }) {
   const agent = task.assigned_agent?.toLowerCase();
   const icon = AGENT_ICONS[agent] || "🤖";
   const role = AGENT_ROLES[agent] || "Agent";
@@ -418,9 +360,6 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
 
         {/* Pipeline Stepper */}
         <PipelineStepper stage={task.stage} isMobile={isMobile} />
-
-        {/* Live Progress */}
-        {isActive && <ProgressBadge progress={progress} monitor={monitor} />}
 
         {/* Agent info row */}
         <div style={{

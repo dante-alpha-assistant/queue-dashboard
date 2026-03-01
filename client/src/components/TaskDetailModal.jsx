@@ -7,6 +7,7 @@ import StatusTimeline from './StatusTimeline';
 import ActivityLog from './ActivityLog';
 import TaskComments from './TaskComments';
 import { ProgressDetail } from './ProgressFeed';
+import RetryButton from './RetryButton';
 
 /* ── Constants ────────────────────────────────────────────── */
 
@@ -54,7 +55,7 @@ const STAGE_COLORS = {
 };
 const STAGES = ["refinery", "foundry", "builder", "inspector", "deployer"];
 const STAGE_LABELS = { refinery: "Refine", foundry: "Found", builder: "Build", inspector: "Inspect", deployer: "Deploy" };
-const ACTIVE_STATUSES = new Set(["in_progress", "assigned", "running", "qa_testing", "completed"]);
+const ACTIVE_STATUSES = new Set(["in_progress", "assigned", "running", "qa_testing"]);
 
 const HAS_MARKDOWN = /[#*`\[|]/;
 
@@ -680,7 +681,7 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
 
 /* ── Main Modal ───────────────────────────────────────────── */
 
-export default function TaskDetailModal({ task, onClose, onStatusChange, isMobile, isTablet, progress, monitor }) {
+export default function TaskDetailModal({ task, onClose, onStatusChange, isMobile, isTablet }) {
   const [closing, setClosing] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
   const [collapsedSections, setCollapsedSections] = useState({});
@@ -716,14 +717,12 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const handleDeprecate = async () => {
     if (!deprecateConfirm) { setDeprecateConfirm(true); return; }
     setDeprecating(true);
-    setDeprecateError(null);
     try {
       await onStatusChange(task.id, { status: 'deprecated' });
       handleClose();
-    } catch (err) {
+    } catch {
       setDeprecating(false);
       setDeprecateConfirm(false);
-      setDeprecateError(err.message || "Failed to deprecate task");
     }
   };
 
@@ -883,17 +882,8 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
       {/* Timeline */}
       <div className="tdm-sidebar-card">
         <SectionLabel icon="⏱️" collapsible collapsed={collapsedSections.timeline} onToggle={() => toggleSection('timeline')}>Timeline</SectionLabel>
-        {!collapsedSections.timeline && (
-          task.status_history && task.status_history.length > 0
-            ? <StatusTimeline task={task} />
-            : <Timeline task={task} />
-        )}
+        {!collapsedSections.timeline && <Timeline task={task} />}
       </div>
-
-      {/* Live Progress Feed */}
-      {isActive && (progress || monitor) && (
-        <ProgressDetail progress={progress} monitor={monitor} />
-      )}
 
       {/* Smart retry */}
       <SmartRetryInfo metadata={task.metadata} />
@@ -1141,6 +1131,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
               {timeAgo(task.updated_at || task.created_at)}
             </span>
           )}
+
           <button className="tdm-action-btn" onClick={handleClose}
             style={{ background: 'var(--md-surface-container-low, #F7F2FA)', color: 'var(--md-on-surface-variant, #49454F)', border: '1px solid var(--md-surface-variant, #E7E0EC)', minHeight: isMobile ? 42 : 36 }}>
             Close

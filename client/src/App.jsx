@@ -9,6 +9,7 @@ import TaskCard from "./components/TaskCard";
 import ChatPanel from "./components/ChatPanel";
 import TaskDetailModal from "./components/TaskDetailModal";
 import Pingboard from "./pages/Pingboard";
+import ToastContainer from "./components/Toast";
 import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
 
 const MOBILE_TABS = [
@@ -437,6 +438,7 @@ export default function App() {
           monitor={selectedTask ? taskMonitor[selectedTask.id] : null}
         />
       )}
+      <ToastContainer />
     </div>
   );
 }
