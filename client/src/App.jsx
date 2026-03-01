@@ -8,6 +8,7 @@ import DispatchModal from "./components/DispatchModal";
 import ChatPanel from "./components/ChatPanel";
 import TaskDetailModal from "./components/TaskDetailModal";
 import Pingboard from "./pages/Pingboard";
+import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
 
 const MOBILE_TABS = [
   { key: "todo", label: "Todo", icon: "📋" },
@@ -41,6 +42,7 @@ export default function App() {
   const [stageFilter, setStageFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("todo");
   const [view, setView] = useState("board");
+  const [timeFilter, setTimeFilter] = useState({ range: "today", customFrom: "", customTo: "" });
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
 
   // Collapsible columns for Deployed and Failed
@@ -101,11 +103,13 @@ export default function App() {
     );
   }
 
-  const allTasks = [...todo, ...assigned, ...inProgress, ...done, ...qa, ...completed, ...deployed, ...failed];
+  const allTasksRaw = [...todo, ...assigned, ...inProgress, ...done, ...qa, ...completed, ...deployed, ...failed];
+  const allTasks = filterTasksByTime(allTasksRaw, timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
   const activeTypes = ["all", ...new Set(allTasks.map(t => t.type).filter(Boolean))];
   const activeStages = ["all", ...new Set(allTasks.map(t => t.stage).filter(Boolean))];
   const filterTasks = (tasks) => {
-    let filtered = typeFilter === "all" ? tasks : tasks.filter(t => t.type === typeFilter);
+    let filtered = filterTasksByTime(tasks, timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
+    if (typeFilter !== "all") filtered = filtered.filter(t => t.type === typeFilter);
     if (stageFilter !== "all") filtered = filtered.filter(t => t.stage === stageFilter);
     return filtered;
   };
@@ -205,6 +209,9 @@ export default function App() {
               ))}
             </div>
           )}
+          <div style={{ marginTop: 6 }}>
+            <TimeFilter allTasks={allTasksRaw} value={timeFilter} onChange={setTimeFilter} isMobile={true} />
+          </div>
         </div>
 
         {/* Column header */}
@@ -366,6 +373,8 @@ export default function App() {
               </div>
             </div>
           </>)}
+          <div style={{ width: 1, height: 24, background: "var(--md-surface-variant)" }} />
+          <TimeFilter allTasks={allTasksRaw} value={timeFilter} onChange={setTimeFilter} isMobile={false} />
         </div>
       </div>
 

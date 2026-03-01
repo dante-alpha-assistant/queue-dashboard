@@ -59,6 +59,21 @@ router.get("/tasks", async (req, res) => {
     if (req.query.include_deprecated !== "true") {
       query = query.neq("status", "deprecated");
     }
+
+
+    const { since, until } = req.query;
+    const ALWAYS_INCLUDE_STATUSES = ["todo", "assigned", "in_progress", "qa_testing"];
+
+    if (since || until) {
+      // Build an OR filter: (created_at within range) OR (status in always-include list)
+      const timeParts = [];
+      if (since) timeParts.push(`created_at.gte.${since}`);
+      if (until) timeParts.push(`created_at.lte.${until}`);
+      const timeFilter = timeParts.join(",");
+      const statusFilter = `status.in.(${ALWAYS_INCLUDE_STATUSES.join(",")})`;
+      query = query.or(`and(${timeFilter}),${statusFilter}`);
+    }
+
     const { data, error } = await query;
     if (error) throw error;
     res.json(data);
