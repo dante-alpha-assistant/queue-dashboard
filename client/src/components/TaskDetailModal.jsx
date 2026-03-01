@@ -396,15 +396,19 @@ function PriorityBadge({ priority }) {
 function DurationTicker({ task, compact }) {
   const [now, setNow] = useState(Date.now());
   const active = ACTIVE_STATUSES.has(task.status);
+  const isTerminal = ['deployed','completed','done','failed','cancelled'].includes(task.status);
   useEffect(() => {
-    if (!active || !task.created_at) return;
+    if (!active) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [active, task.created_at]);
+  }, [active]);
 
-  if (!task.created_at) return null;
-  const end = task.completed_at ? new Date(task.completed_at) : (active ? now : new Date(task.updated_at || task.created_at));
-  const elapsed = end - new Date(task.created_at).getTime();
+  const stateEnteredAt = task.started_at || task.updated_at;
+  if (!stateEnteredAt) return null;
+  const end = isTerminal
+    ? (task.completed_at ? new Date(task.completed_at) : new Date(task.updated_at || stateEnteredAt))
+    : (active ? now : Date.now());
+  const elapsed = end - new Date(stateEnteredAt).getTime();
   return (
     <span style={{
       fontSize: compact ? 12 : 13, fontWeight: 600, fontVariantNumeric: "tabular-nums",

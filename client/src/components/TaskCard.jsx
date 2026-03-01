@@ -111,26 +111,28 @@ function PipelineStepper({ stage, isMobile }) {
 /* ── Duration Ticker ──────────────────────────────────────── */
 const TERMINAL_STATUSES = new Set(["deployed", "completed", "done", "failed", "cancelled"]);
 
-function DurationTicker({ createdAt, updatedAt, active, status }) {
+function DurationTicker({ updatedAt, startedAt, completedAt, active, status }) {
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
-    if (!active || !updatedAt) return;
+    if (!active) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [active, updatedAt]);
+  }, [active]);
 
-  if (!updatedAt) return null;
+  const stateEnteredAt = startedAt || updatedAt;
+  if (!stateEnteredAt) return null;
 
-  // Terminal states: show total duration (created → updated), frozen
+  // Terminal: frozen duration; Active: live ticker from state entry
   const isTerminal = TERMINAL_STATUSES.has(status);
   let elapsed;
-  if (isTerminal && createdAt) {
-    elapsed = new Date(updatedAt).getTime() - new Date(createdAt).getTime();
+  if (isTerminal) {
+    const end = completedAt ? new Date(completedAt).getTime() : new Date(updatedAt).getTime();
+    elapsed = end - new Date(stateEnteredAt).getTime();
   } else if (active) {
-    elapsed = now - new Date(updatedAt).getTime();
+    elapsed = now - new Date(stateEnteredAt).getTime();
   } else {
-    elapsed = Date.now() - new Date(updatedAt).getTime();
+    elapsed = Date.now() - new Date(stateEnteredAt).getTime();
   }
   return (
     <span style={{
@@ -293,7 +295,7 @@ export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, 
             <Badge label={priority.label} color={priority.color} bg={priority.bg} />
           )}
         </div>
-        <DurationTicker createdAt={task.created_at} updatedAt={task.updated_at} active={isActive} status={task.status} />
+        <DurationTicker updatedAt={task.updated_at} startedAt={task.started_at} completedAt={task.completed_at} active={isActive} status={task.status} />
       </div>
 
       {/* ── Body ────────────────────────────────────────── */}
