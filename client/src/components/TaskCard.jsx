@@ -175,39 +175,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
 
   const actions = [];
 
-  if (task.status === "failed") {
-    actions.push(
-      <button
-        key="retry"
-        onClick={(e) => { e.stopPropagation(); onStatusChange?.(task.id, { status: "assigned" }); }}
-        style={{ ...btnBase, background: "#E65100", color: "#fff" }}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 105.64-12.48L1 10" />
-        </svg>
-        Retry
-      </button>
-    );
-  }
-
-  if (task.status === "todo") {
-    actions.push(
-      <button
-        key="assign"
-        onClick={(e) => { e.stopPropagation(); onStatusChange?.(task.id, { status: "assigned", assigned_agent: task.assigned_agent || "neo" }); }}
-        style={{ ...btnBase, background: "var(--md-primary, #6750A4)", color: "var(--md-on-primary, #fff)" }}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="23" y1="11" x2="17" y2="11" />
-        </svg>
-        Assign
-      </button>
-    );
-  }
-
-  /* Delete removed — tasks are immutable history */
-
-  // View button always present
+  // Only View button on card — actions like Assign, Retry, Deprecate live in the detail modal
   actions.push(
     <button
       key="view"
