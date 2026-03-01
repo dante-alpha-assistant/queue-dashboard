@@ -15,6 +15,7 @@ const MOBILE_TABS = [
   { key: "in_progress", label: "Active", icon: "⚡" },
   { key: "qa", label: "QA", icon: "🧪" },
   { key: "completed", label: "Done", icon: "✅" },
+  { key: "deployed", label: "Deployed", icon: "🚀" },
   { key: "failed", label: "Failed", icon: "❌" },
 ];
 
@@ -24,12 +25,13 @@ const BOTTOM_TABS = [
   { key: "active", label: "Active", icon: "⚡", color: "#E8A317" },
   { key: "qa", label: "QA", icon: "🧪", color: "#7B5EA7" },
   { key: "completed", label: "Done", icon: "✅", color: "#1B5E20" },
+  { key: "deployed", label: "Deployed", icon: "🚀", color: "#00897B" },
   { key: "failed", label: "Failed", icon: "❌", color: "#BA1A1A" },
 ];
 
 export default function App() {
   const {
-    stats, todo, assigned, inProgress, done, qa, completed, failed,
+    stats, todo, assigned, inProgress, done, qa, completed, deployed, failed,
     loading, dispatch, updateTask, deleteTask,
     projects, selectedProject, setSelectedProject,
   } = useQueue();
@@ -81,7 +83,7 @@ export default function App() {
     );
   }
 
-  const allTasks = [...todo, ...assigned, ...inProgress, ...done, ...qa, ...completed, ...failed];
+  const allTasks = [...todo, ...assigned, ...inProgress, ...done, ...qa, ...completed, ...deployed, ...failed];
   const activeTypes = ["all", ...new Set(allTasks.map(t => t.type).filter(Boolean))];
   const activeStages = ["all", ...new Set(allTasks.map(t => t.stage).filter(Boolean))];
   const filterTasks = (tasks) => {
@@ -97,6 +99,7 @@ export default function App() {
       case "active": return [...filterByType(assigned), ...filterByType(inProgress)];
       case "qa": return filterByType(qa);
       case "completed": return filterByType(completed);
+      case "deployed": return filterByType(deployed);
       case "failed": return filterByType(failed);
       default: return filterByType(todo);
     }
@@ -108,6 +111,7 @@ export default function App() {
       case "active": return { title: "Active", color: "#E8A317" };
       case "qa": return { title: "QA Testing", color: "#7B5EA7" };
       case "completed": return { title: "Completed", color: "#1B5E20" };
+      case "deployed": return { title: "Deployed", color: "#00897B" };
       case "failed": return { title: "Failed", color: "#BA1A1A" };
       default: return { title: "Todo", color: "#79747E" };
     }
@@ -364,6 +368,9 @@ export default function App() {
         </Column>
         <Column title="Completed" color="#1B5E20" count={filterByType(completed).length} isTablet={isTablet}>
           {renderCards(filterByType(completed).slice(0, 20))}
+        </Column>
+        <Column title="Deployed" color="#00897B" count={filterByType(deployed).length} isTablet={isTablet}>
+          {renderCards(filterByType(deployed).slice(0, 20))}
         </Column>
         <Column title="Failed" color="#BA1A1A" count={filterByType(failed).length} isTablet={isTablet}>
           {renderCards(filterByType(failed))}
