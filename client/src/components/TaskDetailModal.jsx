@@ -211,7 +211,7 @@ function GherkinBlock({ text }) {
     <div style={{
       borderRadius: 8, padding: '12px 16px', margin: '8px 0',
       borderLeft: '4px solid #2E7D32', background: 'rgba(46, 125, 50, 0.06)',
-      fontFamily: 'monospace', fontSize: 13,
+      fontFamily: "'Fira Code', Consolas, monospace", fontSize: 13,
     }}>
       {lines.map((line, i) => {
         for (const { pattern, style } of GHERKIN_KEYWORDS) {

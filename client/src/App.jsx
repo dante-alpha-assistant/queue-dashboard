@@ -202,7 +202,7 @@ export default function App() {
         {/* Task list */}
         <div style={{ flex: 1, overflow: "auto", padding: "4px 12px 80px", minHeight: 0 }}>
           {colTasks.length === 0 && (
-            <div style={{ textAlign: "center", color: "var(--md-border)", padding: 40, fontSize: 13 }}>No tasks</div>
+            <div style={{ textAlign: "center", color: "var(--md-on-surface-variant)", padding: 40, fontSize: 13 }}>No tasks</div>
           )}
           {renderCards(colTasks)}
         </div>
