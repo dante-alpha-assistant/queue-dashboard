@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import useQueue from "./hooks/useQueue";
 import useBreakpoint from "./hooks/useBreakpoint";
 import StatsBar from "./components/StatsBar";
@@ -42,6 +42,24 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("todo");
   const [view, setView] = useState("board");
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
+
+  // Collapsible columns for Deployed and Failed
+  const COLLAPSIBLE_COLUMNS = ["deployed", "failed"];
+  const [collapsedCols, setCollapsedCols] = useState(() => {
+    try {
+      const saved = localStorage.getItem("collapsed-columns");
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    // Default: deployed and failed are collapsed
+    return { deployed: true, failed: true };
+  });
+  const toggleCollapse = useCallback((col) => {
+    setCollapsedCols(prev => {
+      const next = { ...prev, [col]: !prev[col] };
+      localStorage.setItem("collapsed-columns", JSON.stringify(next));
+      return next;
+    });
+  }, []);
 
   if (loading) {
     return (
@@ -369,10 +387,12 @@ export default function App() {
         <Column title="Completed" color="#1B5E20" count={filterByType(completed).length} isTablet={isTablet}>
           {renderCards(filterByType(completed).slice(0, 20))}
         </Column>
-        <Column title="Deployed" color="#00897B" count={filterByType(deployed).length} isTablet={isTablet}>
+        <Column title="Deployed" color="#00897B" count={filterByType(deployed).length} isTablet={isTablet}
+          collapsible collapsed={!!collapsedCols.deployed} onToggleCollapse={() => toggleCollapse("deployed")}>
           {renderCards(filterByType(deployed).slice(0, 20))}
         </Column>
-        <Column title="Failed" color="#BA1A1A" count={filterByType(failed).length} isTablet={isTablet}>
+        <Column title="Failed" color="#BA1A1A" count={filterByType(failed).length} isTablet={isTablet}
+          collapsible collapsed={!!collapsedCols.failed} onToggleCollapse={() => toggleCollapse("failed")}>
           {renderCards(filterByType(failed))}
         </Column>
       </div>
