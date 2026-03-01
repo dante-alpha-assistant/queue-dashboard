@@ -222,19 +222,7 @@ function ActionBar({ task, onStatusChange, onDelete, isMobile }) {
     );
   }
 
-  // View button always present
-  actions.push(
-    <button
-      key="view"
-      onClick={(e) => { e.stopPropagation(); }}
-      style={{ ...btnBase, background: "var(--md-surface-variant, #E7E0EC)", color: "var(--md-on-surface-variant, #49454F)" }}
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
-      </svg>
-      View
-    </button>
-  );
+  if (actions.length === 0) return null;
 
   return (
     <div style={{
