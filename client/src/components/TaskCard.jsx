@@ -163,7 +163,7 @@ function Badge({ label, color, bg, style: extraStyle }) {
 }
 
 /* ── Action Bar ───────────────────────────────────────────── */
-function ActionBar({ task, onStatusChange, onDelete, isMobile }) {
+function ActionBar({ task, onStatusChange, isMobile }) {
   const btnBase = {
     fontSize: 12, border: "none", padding: isMobile ? "8px 18px" : "7px 16px",
     borderRadius: 100, cursor: "pointer", fontWeight: 600,
@@ -205,20 +205,7 @@ function ActionBar({ task, onStatusChange, onDelete, isMobile }) {
     );
   }
 
-  if (onDelete && (task.status === "todo" || task.status === "failed")) {
-    actions.push(
-      <button
-        key="delete"
-        onClick={(e) => { e.stopPropagation(); onDelete?.(task.id); }}
-        style={{ ...btnBase, background: "transparent", color: "var(--md-outline, #79747E)" }}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" />
-        </svg>
-        Delete
-      </button>
-    );
-  }
+  /* Delete removed — tasks are immutable history */
 
   // View button always present
   actions.push(
@@ -246,7 +233,7 @@ function ActionBar({ task, onStatusChange, onDelete, isMobile }) {
 }
 
 /* ── Task Card ────────────────────────────────────────────── */
-export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, isMobile }) {
+export default function TaskCard({ task, onStatusChange, onCardClick, isMobile }) {
   const agent = task.assigned_agent?.toLowerCase();
   const icon = AGENT_ICONS[agent] || "🤖";
   const role = AGENT_ROLES[agent] || "Agent";
@@ -412,7 +399,6 @@ export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, 
       <ActionBar
         task={task}
         onStatusChange={onStatusChange}
-        onDelete={onDelete}
         isMobile={isMobile}
       />
     </div>

@@ -33,7 +33,7 @@ const BOTTOM_TABS = [
 export default function App() {
   const {
     stats, todo, assigned, inProgress, done, qa, completed, deployed, failed,
-    loading, dispatch, updateTask, deleteTask,
+    loading, dispatch, updateTask,
     projects, selectedProject, setSelectedProject,
   } = useQueue();
   const [showModal, setShowModal] = useState(false);
@@ -122,7 +122,7 @@ export default function App() {
   };
 
   const renderCards = (tasks) =>
-    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onDelete={deleteTask} onCardClick={setSelectedTask} isMobile={isMobile} />);
+    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={setSelectedTask} isMobile={isMobile} />);
 
   // MOBILE LAYOUT
   if (isMobile) {
@@ -258,7 +258,6 @@ export default function App() {
             task={selectedTask}
             onClose={() => setSelectedTask(null)}
             onStatusChange={(id, updates) => { updateTask(id, updates); setSelectedTask(null); }}
-            onDelete={(id) => { deleteTask(id); setSelectedTask(null); }}
             isMobile={isMobile}
           />
         )}
@@ -393,7 +392,6 @@ export default function App() {
           task={selectedTask}
           onClose={() => setSelectedTask(null)}
           onStatusChange={(id, updates) => { updateTask(id, updates); setSelectedTask(null); }}
-          onDelete={(id) => { deleteTask(id); setSelectedTask(null); }}
           isMobile={false}
           isTablet={isTablet}
         />
