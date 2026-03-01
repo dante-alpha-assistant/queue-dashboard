@@ -20,16 +20,16 @@ const AGENT_ICONS = { neo: "🕶️", mu: "🔧", beta: "⚡", alpha: "🧠", fl
 const AGENT_ROLES = { neo: "Builder", alpha: "Leader", beta: "QA", mu: "Builder", flow: "Orchestrator", ifra: "Ops" };
 
 const STATUS_CONFIG = {
-  todo:        { bg: "#79747E14", color: "#79747E", label: "Todo" },
-  assigned:    { bg: "#6750A414", color: "#6750A4", label: "Assigned" },
-  in_progress: { bg: "#E8A31714", color: "#E8A317", label: "In Progress" },
-  running:     { bg: "#E8A31714", color: "#E8A317", label: "Running" },
-  done:        { bg: "#386A2014", color: "#386A20", label: "Done" },
-  qa:          { bg: "#5E35B114", color: "#5E35B1", label: "QA" },
-  qa_testing:  { bg: "#5E35B114", color: "#5E35B1", label: "QA Testing" },
-  completed:   { bg: "#1B5E2014", color: "#1B5E20", label: "Completed" },
-  failed:      { bg: "#BA1A1A14", color: "#BA1A1A", label: "Failed" },
-  deployed:    { bg: "#00838F14", color: "#00838F", label: "Deployed" },
+  todo:        { bg: "#79747E14", color: "#79747E", label: "Todo",        accent: "#79747E" },
+  assigned:    { bg: "#6750A414", color: "#6750A4", label: "Assigned",    accent: "#6750A4" },
+  in_progress: { bg: "#E8A31714", color: "#E8A317", label: "In Progress", accent: "#D97706" },
+  running:     { bg: "#E8A31714", color: "#E8A317", label: "Running",     accent: "#D97706" },
+  done:        { bg: "#386A2014", color: "#386A20", label: "Done",        accent: "#386A20" },
+  qa:          { bg: "#5E35B114", color: "#5E35B1", label: "QA",          accent: "#5E35B1" },
+  qa_testing:  { bg: "#5E35B114", color: "#5E35B1", label: "QA Testing",  accent: "#5E35B1" },
+  completed:   { bg: "#1B5E2014", color: "#1B5E20", label: "Completed",   accent: "#1B5E20" },
+  failed:      { bg: "#BA1A1A14", color: "#BA1A1A", label: "Failed",      accent: "#BA1A1A" },
+  deployed:    { bg: "#00838F14", color: "#00838F", label: "Deployed",    accent: "#00838F" },
 };
 
 const PRIORITY_CONFIG = {
@@ -81,11 +81,20 @@ function ensureModalStyles() {
       to { opacity: 1; }
     }
     @keyframes tdm-panel-in {
-      from { opacity: 0; transform: translateY(12px) scale(0.97); }
+      from { opacity: 0; transform: translateY(16px) scale(0.96); }
       to { opacity: 1; transform: translateY(0) scale(1); }
     }
-    .tdm-overlay { animation: tdm-overlay-in 0.18s ease-out; }
-    .tdm-panel { animation: tdm-panel-in 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+    @keyframes tdm-slide-up {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    @keyframes tdm-accent-shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    .tdm-overlay { animation: tdm-overlay-in 0.2s ease-out; }
+    .tdm-panel { animation: tdm-panel-in 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
+    .tdm-mobile-panel { animation: tdm-slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
 
     .tdm-md table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 13px; }
     .tdm-md table th, .tdm-md table td { border: 1px solid var(--md-surface-variant, #E7E0EC); padding: 6px 10px; text-align: left; }
@@ -106,34 +115,79 @@ function ensureModalStyles() {
 
     .tdm-stage-select {
       appearance: none; -webkit-appearance: none;
-      padding: 6px 28px 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 600;
+      padding: 5px 24px 5px 8px; border-radius: 6px; font-size: 11px; font-weight: 600;
       border: 1px solid var(--md-surface-variant, #E7E0EC);
       background-color: var(--md-surface, #FFFBFE);
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2379747E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-      background-repeat: no-repeat; background-position: right 8px center;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2379747E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 6px center;
       cursor: pointer; font-family: inherit; outline: none;
       text-transform: uppercase; letter-spacing: 0.04em;
       transition: border-color 0.15s, box-shadow 0.15s;
     }
-    .tdm-stage-select:focus { border-color: var(--md-primary, #6750A4); box-shadow: 0 0 0 3px rgba(103, 80, 164, 0.1); }
+    .tdm-stage-select:focus { border-color: var(--md-primary, #6750A4); box-shadow: 0 0 0 2px rgba(103, 80, 164, 0.1); }
     .tdm-stage-select:hover { border-color: var(--md-outline, #79747E); }
 
     .tdm-action-btn {
-      border: none; padding: 10px 20px; border-radius: 100px; font-weight: 600; font-size: 13px;
-      cursor: pointer; transition: transform 0.1s, box-shadow 0.15s; font-family: 'Roboto', system-ui, sans-serif;
-      letter-spacing: 0.02em; display: inline-flex; align-items: center; gap: 6;
+      border: none; padding: 8px 18px; border-radius: 100px; font-weight: 600; font-size: 13px;
+      cursor: pointer; transition: all 0.15s; font-family: 'Roboto', system-ui, sans-serif;
+      letter-spacing: 0.02em; display: inline-flex; align-items: center; gap: 6px;
     }
     .tdm-action-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
     .tdm-action-btn:active { transform: translateY(0); }
 
-    .tdm-tab { padding: 8px 16px; font-size: 12px; font-weight: 600; border: none; background: none; cursor: pointer; color: var(--md-outline, #79747E); border-bottom: 2px solid transparent; transition: all 0.15s; font-family: 'Roboto', system-ui, sans-serif; letter-spacing: 0.03em; text-transform: uppercase; }
-    .tdm-tab:hover { color: var(--md-on-surface, #1C1B1F); }
-    .tdm-tab[data-active="true"] { color: var(--md-primary, #6750A4); border-bottom-color: var(--md-primary, #6750A4); }
+    .tdm-pill-tab {
+      padding: 6px 14px; font-size: 12px; font-weight: 500; border: none;
+      background: transparent; cursor: pointer; color: var(--md-outline, #79747E);
+      border-radius: 100px; transition: all 0.15s;
+      font-family: 'Roboto', system-ui, sans-serif; letter-spacing: 0.02em;
+      position: relative;
+    }
+    .tdm-pill-tab:hover { color: var(--md-on-surface, #1C1B1F); background: var(--md-surface-container-low, #F7F2FA); }
+    .tdm-pill-tab[data-active="true"] {
+      color: var(--md-primary, #6750A4); background: rgba(103, 80, 164, 0.08);
+      font-weight: 600;
+    }
 
-    .tdm-scrollbar::-webkit-scrollbar { width: 6px; }
+    .tdm-scrollbar::-webkit-scrollbar { width: 5px; }
     .tdm-scrollbar::-webkit-scrollbar-track { background: transparent; }
     .tdm-scrollbar::-webkit-scrollbar-thumb { background: var(--md-surface-variant, #E7E0EC); border-radius: 3px; }
     .tdm-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--md-outline, #79747E); }
+
+    .tdm-meta-cell { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; }
+    .tdm-meta-label { font-size: 10px; font-weight: 500; color: var(--md-outline, #79747E); text-transform: uppercase; letter-spacing: 0.06em; }
+    .tdm-meta-value { font-size: 13px; font-weight: 500; color: var(--md-on-surface, #1C1B1F); }
+
+    .tdm-sidebar-card {
+      background: var(--md-surface-container-low, #F7F2FA);
+      border: 1px solid var(--md-surface-variant, #E7E0EC);
+      border-radius: 12px; padding: 12px;
+    }
+
+    .tdm-kbd {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 20px; height: 18px; padding: 0 5px;
+      background: var(--md-surface-container-low, #F7F2FA);
+      border: 1px solid var(--md-surface-variant, #E7E0EC);
+      border-radius: 4px; font-size: 10px; font-weight: 600;
+      font-family: 'Roboto Mono', monospace;
+      color: var(--md-outline, #79747E);
+      line-height: 1;
+    }
+
+    .tdm-section-toggle {
+      cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px;
+      padding: 4px 0; transition: opacity 0.15s;
+    }
+    .tdm-section-toggle:hover { opacity: 0.7; }
+
+    .tdm-live-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: #22C55E;
+      animation: tdm-live-blink 2s ease-in-out infinite;
+    }
+    @keyframes tdm-live-blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
   `;
   document.head.appendChild(style);
 }
@@ -143,6 +197,11 @@ function ensureModalStyles() {
 function formatDate(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function formatDateShort(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric" });
 }
 
 function formatDuration(ms) {
@@ -155,10 +214,16 @@ function formatDuration(ms) {
   return rm > 0 ? `${h}h ${rm}m` : `${h}h`;
 }
 
-function getElapsed(task) {
-  if (!task.created_at) return null;
-  const end = task.completed_at ? new Date(task.completed_at) : new Date();
-  return end - new Date(task.created_at);
+function timeAgo(iso) {
+  if (!iso) return "";
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
 }
 
 /* ── Gherkin ──────────────────────────────────────────────── */
@@ -265,8 +330,8 @@ function JsonSyntax({ data, indent = 0, _skipBrace = false }) {
 function ResultDisplay({ result, variant = "success" }) {
   const [copied, setCopied] = useState(false);
   const isError = variant === "error";
-  const bgColor = isError ? "#BA1A1A08" : "#386A2008";
-  const borderColor = isError ? "#BA1A1A20" : "#386A2020";
+  const bgColor = isError ? "#BA1A1A06" : "#386A2006";
+  const borderColor = isError ? "#BA1A1A18" : "#386A2018";
 
   if (!result) return <p style={{ fontSize: 13, color: 'var(--md-outline, #79747E)', fontStyle: 'italic' }}>No result yet</p>;
 
@@ -274,13 +339,13 @@ function ResultDisplay({ result, variant = "success" }) {
   if (typeof result === 'string') {
     try { parsed = JSON.parse(result); } catch {
       if (HAS_MARKDOWN.test(result)) {
-        return <div className="tdm-md" style={{ padding: 16, background: bgColor, borderRadius: 12, border: `1px solid ${borderColor}` }}><ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{result}</ReactMarkdown></div>;
+        return <div className="tdm-md" style={{ padding: 14, background: bgColor, borderRadius: 10, border: `1px solid ${borderColor}` }}><ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{result}</ReactMarkdown></div>;
       }
-      return <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', padding: 16, background: bgColor, borderRadius: 12, border: `1px solid ${borderColor}`, color: isError ? '#BA1A1A' : 'var(--md-on-surface, #1C1B1F)' }}>{result}</div>;
+      return <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', padding: 14, background: bgColor, borderRadius: 10, border: `1px solid ${borderColor}`, color: isError ? '#BA1A1A' : 'var(--md-on-surface, #1C1B1F)' }}>{result}</div>;
     }
   }
   if (typeof parsed !== 'object' || parsed === null) {
-    return <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', padding: 16, background: bgColor, borderRadius: 12, border: `1px solid ${borderColor}` }}>{String(parsed)}</div>;
+    return <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', padding: 14, background: bgColor, borderRadius: 10, border: `1px solid ${borderColor}` }}>{String(parsed)}</div>;
   }
 
   const summaryMd = parsed.summary && typeof parsed.summary === 'string' && HAS_MARKDOWN.test(parsed.summary);
@@ -291,7 +356,7 @@ function ResultDisplay({ result, variant = "success" }) {
       {summaryMd && <div className="tdm-md" style={{ marginBottom: 8, fontSize: 14, lineHeight: 1.7 }}><ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{parsed.summary}</ReactMarkdown></div>}
       <div style={{ position: 'relative' }}>
         <button className="tdm-copy-btn" onClick={handleCopy}>{copied ? '✓ Copied' : '📋 Copy'}</button>
-        <pre style={{ fontSize: 12, fontFamily: "'Roboto Mono', 'JetBrains Mono', monospace", whiteSpace: 'pre-wrap', overflowX: 'auto', padding: '16px 16px 16px', paddingTop: 32, background: 'var(--md-surface-container-low, #F7F2FA)', borderRadius: 12, border: '1px solid var(--md-surface-variant, #E7E0EC)', margin: 0, lineHeight: 1.6 }}>
+        <pre style={{ fontSize: 12, fontFamily: "'Roboto Mono', 'JetBrains Mono', monospace", whiteSpace: 'pre-wrap', overflowX: 'auto', padding: '16px 16px 16px', paddingTop: 32, background: 'var(--md-surface-container-low, #F7F2FA)', borderRadius: 10, border: '1px solid var(--md-surface-variant, #E7E0EC)', margin: 0, lineHeight: 1.6 }}>
           <JsonSyntax data={parsed} indent={0} />
         </pre>
       </div>
@@ -304,7 +369,7 @@ function ResultDisplay({ result, variant = "success" }) {
 function Badge({ label, color, bg, style: extra }) {
   return (
     <span style={{
-      fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 100,
+      fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 100,
       background: bg || `${color}14`, color,
       textTransform: "uppercase", letterSpacing: "0.04em",
       lineHeight: 1.2, whiteSpace: "nowrap",
@@ -323,12 +388,12 @@ function PriorityBadge({ priority }) {
   if (!priority || priority === 'normal') return null;
   const c = PRIORITY_CONFIG[priority];
   if (!c) return null;
-  return <Badge label={c.label} color={c.color} bg={c.bg} />;
+  return <Badge label={`${c.icon} ${c.label}`} color={c.color} bg={c.bg} />;
 }
 
 /* ── Duration Ticker ──────────────────────────────────────── */
 
-function DurationTicker({ task }) {
+function DurationTicker({ task, compact }) {
   const [now, setNow] = useState(Date.now());
   const active = ACTIVE_STATUSES.has(task.status);
   useEffect(() => {
@@ -342,14 +407,16 @@ function DurationTicker({ task }) {
   const elapsed = end - new Date(task.created_at).getTime();
   return (
     <span style={{
-      fontSize: 13, fontWeight: 600, fontVariantNumeric: "tabular-nums",
-      color: active ? "#E8A317" : "var(--md-on-surface-variant, #49454F)",
+      fontSize: compact ? 12 : 13, fontWeight: 600, fontVariantNumeric: "tabular-nums",
+      color: active ? "#D97706" : "var(--md-on-surface-variant, #49454F)",
       fontFamily: "'Roboto Mono', 'SF Mono', monospace",
-      display: "inline-flex", alignItems: "center", gap: 5,
+      display: "inline-flex", alignItems: "center", gap: 4,
     }}>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
-        <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
-      </svg>
+      {!compact && (
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
+          <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
+        </svg>
+      )}
       {formatDuration(elapsed)}
     </span>
   );
@@ -357,30 +424,30 @@ function DurationTicker({ task }) {
 
 /* ── Pipeline Stepper ─────────────────────────────────────── */
 
-function PipelineStepper({ stage, isMobile }) {
+function PipelineStepper({ stage }) {
   if (!stage) return null;
   const currentIdx = STAGES.indexOf(stage);
   if (currentIdx === -1) return null;
   return (
-    <div style={{ display: "flex", alignItems: "flex-start", gap: 0, padding: "8px 0" }}>
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 0, padding: "4px 0" }}>
       {STAGES.map((s, i) => {
         const isCompleted = i < currentIdx;
         const isCurrent = i === currentIdx;
         const color = isCurrent ? (STAGE_COLORS[s] || "#79747E") : isCompleted ? "#386A20" : "var(--md-outline-variant, #CAC4D0)";
         return (
           <div key={s} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 40, gap: 4 }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 36, gap: 3 }}>
               <div style={{
-                width: 18, height: 18, borderRadius: "50%", border: `2px solid ${color}`,
+                width: 16, height: 16, borderRadius: "50%", border: `2px solid ${color}`,
                 background: (isCompleted || isCurrent) ? color : "transparent",
                 display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                 animation: isCurrent ? "timeline-pulse 2s ease-in-out infinite" : "none",
               }}>
-                {isCompleted && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>}
+                {isCompleted && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>}
               </div>
-              <span style={{ fontSize: 10, fontWeight: isCurrent ? 700 : 500, color: isCurrent ? color : isCompleted ? "#386A20" : "var(--md-outline-variant, #CAC4D0)", letterSpacing: "0.03em", whiteSpace: "nowrap", textTransform: "uppercase" }}>{STAGE_LABELS[s]}</span>
+              <span style={{ fontSize: 9, fontWeight: isCurrent ? 700 : 500, color: isCurrent ? color : isCompleted ? "#386A20" : "var(--md-outline-variant, #CAC4D0)", letterSpacing: "0.03em", whiteSpace: "nowrap", textTransform: "uppercase" }}>{STAGE_LABELS[s]}</span>
             </div>
-            {i < STAGES.length - 1 && <div style={{ flex: 1, height: 2, minWidth: 8, background: isCompleted ? "#386A20" : "var(--md-surface-variant, #E7E0EC)", marginTop: -12, borderRadius: 1 }} />}
+            {i < STAGES.length - 1 && <div style={{ flex: 1, height: 2, minWidth: 6, background: isCompleted ? "#386A20" : "var(--md-surface-variant, #E7E0EC)", marginTop: -10, borderRadius: 1 }} />}
           </div>
         );
       })}
@@ -416,23 +483,23 @@ function Timeline({ task }) {
         return (
           <div key={step.key}>
             {i > 0 && (
-              <div style={{ paddingLeft: 8 }}>
-                <div style={{ width: 2, height: 12, backgroundColor: isCompleted ? '#386A20' : 'var(--md-surface-variant, #E7E0EC)', borderRadius: 1 }} />
+              <div style={{ paddingLeft: 7 }}>
+                <div style={{ width: 2, height: 10, backgroundColor: isCompleted ? '#386A20' : 'var(--md-surface-variant, #E7E0EC)', borderRadius: 1 }} />
               </div>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div className={isCurrent && !isFail ? 'timeline-pulse' : undefined} style={{
-                width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 backgroundColor: (isCompleted || isCurrent) ? stepColor : 'transparent',
                 border: (isCompleted || isCurrent) ? 'none' : `2px solid ${stepColor}`,
               }}>
-                {isCompleted && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>}
-                {isFail && isCurrent && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12" /><path d="M18 6L6 18" /></svg>}
-                {isCurrent && !isCompleted && !isFail && <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'white' }} />}
+                {isCompleted && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>}
+                {isFail && isCurrent && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12" /><path d="M18 6L6 18" /></svg>}
+                {isCurrent && !isCompleted && !isFail && <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'white' }} />}
               </div>
-              <span style={{ fontSize: 12, fontWeight: isCurrent ? 600 : 400, color: isCurrent ? 'var(--md-on-surface, #1C1B1F)' : isCompleted ? 'var(--md-on-surface-variant, #49454F)' : 'var(--md-outline-variant, #CAC4D0)' }}>{step.label}</span>
-              {stepTime && <span style={{ fontSize: 10, color: 'var(--md-outline, #79747E)', fontFamily: "'Roboto Mono', monospace", marginLeft: 'auto' }}>{formatDate(stepTime)}</span>}
+              <span style={{ fontSize: 11, fontWeight: isCurrent ? 600 : 400, color: isCurrent ? 'var(--md-on-surface, #1C1B1F)' : isCompleted ? 'var(--md-on-surface-variant, #49454F)' : 'var(--md-outline-variant, #CAC4D0)' }}>{step.label}</span>
+              {stepTime && <span style={{ fontSize: 9, color: 'var(--md-outline, #79747E)', fontFamily: "'Roboto Mono', monospace", marginLeft: 'auto' }}>{formatDate(stepTime)}</span>}
             </div>
           </div>
         );
@@ -441,29 +508,51 @@ function Timeline({ task }) {
   );
 }
 
-/* ── Sidebar Meta Row ─────────────────────────────────────── */
+/* ── Section Header ───────────────────────────────────────── */
 
-function MetaRow({ icon, label, children }) {
+function SectionLabel({ children, icon, color, collapsible, collapsed, onToggle }) {
+  const inner = (
+    <>
+      {icon && <span style={{ fontSize: 11 }}>{icon}</span>}
+      {children}
+      {collapsible && (
+        <span style={{ fontSize: 9, opacity: 0.6, transition: 'transform 0.15s', transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)', display: 'inline-block' }}>▼</span>
+      )}
+    </>
+  );
+  const baseStyle = {
+    fontSize: 10, fontWeight: 600, color: color || 'var(--md-outline, #79747E)',
+    textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: collapsed ? 0 : 6,
+    display: 'flex', alignItems: 'center', gap: 5,
+  };
+
+  if (collapsible) {
+    return <div className="tdm-section-toggle" style={baseStyle} onClick={onToggle}>{inner}</div>;
+  }
+  return <div style={baseStyle}>{inner}</div>;
+}
+
+/* ── Meta Cell (for grid layout) ──────────────────────────── */
+
+function MetaCell({ label, children }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: 13 }}>
-      <span style={{ fontSize: 13, width: 18, textAlign: 'center', flexShrink: 0, opacity: 0.7 }}>{icon}</span>
-      <span style={{ color: 'var(--md-outline, #79747E)', fontSize: 12, fontWeight: 500, minWidth: 60 }}>{label}</span>
-      <span style={{ fontWeight: 500, color: 'var(--md-on-surface, #1C1B1F)', flex: 1, minWidth: 0 }}>{children}</span>
+    <div className="tdm-meta-cell">
+      <span className="tdm-meta-label">{label}</span>
+      <span className="tdm-meta-value">{children}</span>
     </div>
   );
 }
 
-/* ── Section Header ───────────────────────────────────────── */
+/* ── Smart Retry Info ─────────────────────────────────────── */
 
-function SectionLabel({ children, icon, color }) {
+function SmartRetryInfo({ metadata }) {
+  if (!metadata?.smart_retry) return null;
+  const sr = metadata.smart_retry;
   return (
-    <div style={{
-      fontSize: 11, fontWeight: 600, color: color || 'var(--md-outline, #79747E)',
-      textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8,
-      display: 'flex', alignItems: 'center', gap: 6,
-    }}>
-      {icon && <span style={{ fontSize: 12 }}>{icon}</span>}
-      {children}
+    <div style={{ padding: 10, background: '#E6510008', borderRadius: 10, border: '1px solid #E6510018', fontSize: 12 }}>
+      <div style={{ fontWeight: 600, color: '#E65100', marginBottom: 4, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>🔄 Smart Retry</div>
+      {sr.reasoning && <div style={{ color: 'var(--md-on-surface-variant, #49454F)', lineHeight: 1.5 }}>{sr.reasoning}</div>}
+      {sr.recommended_agent && <div style={{ marginTop: 4, color: 'var(--md-outline, #79747E)', fontSize: 11 }}>→ Routed to <strong>{sr.recommended_agent}</strong></div>}
     </div>
   );
 }
@@ -473,6 +562,8 @@ function SectionLabel({ children, icon, color }) {
 export default function TaskDetailModal({ task, onClose, onStatusChange, onDelete, isMobile, isTablet }) {
   const [closing, setClosing] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
+  const [collapsedSections, setCollapsedSections] = useState({});
+  const [idCopied, setIdCopied] = useState(false);
 
   useEffect(() => { ensureModalStyles(); }, []);
   useEffect(() => {
@@ -483,28 +574,34 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
 
   const handleClose = useCallback(() => {
     setClosing(true);
-    setTimeout(onClose, 180);
+    setTimeout(onClose, 200);
   }, [onClose]);
+
+  const toggleSection = (key) => setCollapsedSections(s => ({ ...s, [key]: !s[key] }));
+
+  const copyId = () => {
+    navigator.clipboard.writeText(task.id).then(() => { setIdCopied(true); setTimeout(() => setIdCopied(false), 1200); }).catch(() => {});
+  };
 
   if (!task) return null;
 
   const agent = task.assigned_agent?.toLowerCase();
   const icon = AGENT_ICONS[agent] || "🤖";
   const role = AGENT_ROLES[agent] || "Agent";
-  const statusColor = STATUS_CONFIG[task.status]?.color || "#79747E";
+  const sc = STATUS_CONFIG[task.status] || STATUS_CONFIG.todo;
   const typeColor = TYPE_COLORS[task.type] || "#79747E";
-  const priority = PRIORITY_CONFIG[task.priority];
   const isActive = ACTIVE_STATUSES.has(task.status);
   const hasResult = !!task.result;
   const hasError = !!task.error;
   const hasQA = !!task.qa_result;
   const hasCriteria = !!task.acceptance_criteria;
   const hasDescription = !!task.description;
+  const hasMetadata = !!task.metadata && typeof task.metadata === 'object' && Object.keys(task.metadata).length > 0;
 
-  // Determine available tabs
   const tabs = [{ key: 'details', label: 'Details' }];
   if (hasResult || hasError) tabs.push({ key: 'output', label: hasError ? '⚠ Output' : 'Output' });
   if (hasQA) tabs.push({ key: 'qa', label: 'QA' });
+  if (hasMetadata) tabs.push({ key: 'meta', label: 'Meta' });
 
   const useWideLayout = !isMobile && !isTablet;
 
@@ -513,63 +610,85 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
   const overlayStyle = isMobile ? {
     position: "fixed", inset: 0, background: "var(--md-background, #FFFBFE)", zIndex: 200,
     display: "flex", flexDirection: "column",
-    opacity: closing ? 0 : 1, transition: 'opacity 0.18s',
+    opacity: closing ? 0 : 1, transition: 'opacity 0.2s',
   } : {
-    position: "fixed", inset: 0, background: "rgba(0,0,0,0.32)",
+    position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)",
     display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200,
-    backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
-    opacity: closing ? 0 : 1, transition: 'opacity 0.18s',
+    backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
+    opacity: closing ? 0 : 1, transition: 'opacity 0.2s',
   };
 
   const panelStyle = isMobile ? {
     flex: 1, display: "flex", flexDirection: "column", overflow: "hidden",
     fontFamily: "'Roboto', system-ui, -apple-system, sans-serif",
   } : {
-    background: "var(--md-surface, #FFFBFE)", borderRadius: 20, padding: 0,
-    width: useWideLayout ? 860 : 680, maxWidth: "92vw",
-    maxHeight: "88vh", overflow: "hidden",
-    boxShadow: "0 8px 32px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.08)",
+    background: "var(--md-surface, #FFFBFE)", borderRadius: 16, padding: 0,
+    width: useWideLayout ? 900 : 700, maxWidth: "94vw",
+    maxHeight: "90vh", overflow: "hidden",
+    boxShadow: "0 12px 48px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.06)",
     transform: closing ? 'translateY(8px) scale(0.97)' : 'none',
-    transition: 'transform 0.18s',
+    transition: 'transform 0.2s',
     fontFamily: "'Roboto', system-ui, -apple-system, sans-serif",
     display: "flex", flexDirection: "column",
   };
 
-  /* ── Sidebar content (desktop right column / mobile inline) */
+  /* ── Sidebar content ──────────────────────────────────── */
   const sidebarContent = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {/* Agent card */}
       {agent && (
-        <div style={{
-          padding: 14, borderRadius: 14,
-          background: 'var(--md-surface-container-low, #F7F2FA)',
-          border: '1px solid var(--md-surface-variant, #E7E0EC)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <span style={{
-              fontSize: 18, width: 36, height: 36, borderRadius: '50%',
-              background: 'var(--md-surface, #FFFBFE)',
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              border: '1px solid var(--md-surface-variant, #E7E0EC)',
-            }}>{icon}</span>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--md-on-surface, #1C1B1F)' }}>{agent}</div>
-              <div style={{ fontSize: 11, color: 'var(--md-outline, #79747E)', fontStyle: 'italic' }}>{role}</div>
+        <div className="tdm-sidebar-card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ position: 'relative' }}>
+              <span style={{
+                fontSize: 16, width: 32, height: 32, borderRadius: '50%',
+                background: 'var(--md-surface, #FFFBFE)',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                border: '1px solid var(--md-surface-variant, #E7E0EC)',
+              }}>{icon}</span>
+              {isActive && <div className="tdm-live-dot" style={{ position: 'absolute', bottom: -1, right: -1, border: '2px solid var(--md-surface-container-low, #F7F2FA)' }} />}
             </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--md-on-surface, #1C1B1F)' }}>{agent}</div>
+              <div style={{ fontSize: 10, color: 'var(--md-outline, #79747E)' }}>{role}</div>
+            </div>
+            <DurationTicker task={task} compact />
           </div>
-          <DurationTicker task={task} />
         </div>
       )}
 
-      {/* Meta fields */}
-      <div>
-        <SectionLabel icon="📋">Info</SectionLabel>
-        <div style={{ borderRadius: 12, background: 'var(--md-surface-container-low, #F7F2FA)', border: '1px solid var(--md-surface-variant, #E7E0EC)', padding: '6px 14px' }}>
-          {task.project && <MetaRow icon="📁" label="Project">{task.project.name}</MetaRow>}
-          {task.dispatched_by && <MetaRow icon="👤" label="Owner">{task.dispatched_by}</MetaRow>}
-          <MetaRow icon="📅" label="Created">{formatDate(task.created_at)}</MetaRow>
-          {task.completed_at && <MetaRow icon="✅" label="Finished">{formatDate(task.completed_at)}</MetaRow>}
-          <MetaRow icon="🏷️" label="Stage">
+      {/* Compact meta grid */}
+      <div className="tdm-sidebar-card" style={{ padding: '4px 12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
+          <MetaCell label="Type">
+            <span style={{ color: typeColor, fontWeight: 600 }}>{task.type}</span>
+          </MetaCell>
+          <MetaCell label="Priority">
+            {task.priority && task.priority !== 'normal'
+              ? <span style={{ color: PRIORITY_CONFIG[task.priority]?.color }}>{PRIORITY_CONFIG[task.priority]?.icon} {task.priority}</span>
+              : <span style={{ color: 'var(--md-outline, #79747E)' }}>Normal</span>
+            }
+          </MetaCell>
+          {task.dispatched_by && (
+            <MetaCell label="Owner">{task.dispatched_by}</MetaCell>
+          )}
+          {task.project && (
+            <MetaCell label="Project">{task.project.name}</MetaCell>
+          )}
+          <MetaCell label="Created">
+            <span title={task.created_at}>{formatDateShort(task.created_at)}</span>
+          </MetaCell>
+          {task.completed_at && (
+            <MetaCell label="Finished">
+              <span title={task.completed_at}>{formatDateShort(task.completed_at)}</span>
+            </MetaCell>
+          )}
+        </div>
+
+        {/* Stage selector */}
+        <div style={{ borderTop: '1px solid var(--md-surface-variant, #E7E0EC)', paddingTop: 8, paddingBottom: 6, marginTop: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span className="tdm-meta-label">Stage</span>
             <select
               className="tdm-stage-select"
               value={task.stage || ""}
@@ -580,30 +699,39 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
               <option value="">None</option>
               {STAGES.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
             </select>
-          </MetaRow>
+          </div>
         </div>
       </div>
 
       {/* Pipeline stepper */}
       {task.stage && (
-        <div>
+        <div className="tdm-sidebar-card">
           <SectionLabel icon="🔄">Pipeline</SectionLabel>
-          <div style={{ borderRadius: 12, background: 'var(--md-surface-container-low, #F7F2FA)', border: '1px solid var(--md-surface-variant, #E7E0EC)', padding: '8px 12px' }}>
-            <PipelineStepper stage={task.stage} isMobile={isMobile} />
-          </div>
+          <PipelineStepper stage={task.stage} />
         </div>
       )}
 
       {/* Timeline */}
-      <div>
-        <SectionLabel icon="⏱️">Timeline</SectionLabel>
-        <div style={{ borderRadius: 12, background: 'var(--md-surface-container-low, #F7F2FA)', border: '1px solid var(--md-surface-variant, #E7E0EC)', padding: '12px 14px' }}>
-          <Timeline task={task} />
-        </div>
+      <div className="tdm-sidebar-card">
+        <SectionLabel icon="⏱️" collapsible collapsed={collapsedSections.timeline} onToggle={() => toggleSection('timeline')}>Timeline</SectionLabel>
+        {!collapsedSections.timeline && <Timeline task={task} />}
       </div>
 
+      {/* Smart retry */}
+      <SmartRetryInfo metadata={task.metadata} />
+
       {/* Task ID */}
-      <div style={{ fontSize: 10, color: 'var(--md-outline, #79747E)', fontFamily: "'Roboto Mono', monospace", wordBreak: 'break-all', opacity: 0.7 }}>{task.id}</div>
+      <div
+        onClick={copyId}
+        style={{
+          fontSize: 9, color: 'var(--md-outline, #79747E)', fontFamily: "'Roboto Mono', monospace",
+          wordBreak: 'break-all', opacity: 0.6, cursor: 'pointer',
+          padding: '4px 0', transition: 'opacity 0.15s',
+        }}
+        title="Click to copy task ID"
+      >
+        {idCopied ? '✓ Copied!' : task.id}
+      </div>
     </div>
   );
 
@@ -613,19 +741,23 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
       {activeTab === 'details' && (
         <>
           {hasDescription && (
-            <div style={{ marginBottom: 20 }}>
-              <SectionLabel icon="📝">Description</SectionLabel>
-              <div style={{ padding: 16, background: 'var(--md-surface-container-low, #F7F2FA)', borderRadius: 12, border: '1px solid var(--md-surface-variant, #E7E0EC)' }}>
-                <MarkdownContent text={task.description} />
-              </div>
+            <div style={{ marginBottom: 16 }}>
+              <SectionLabel icon="📝" collapsible collapsed={collapsedSections.desc} onToggle={() => toggleSection('desc')}>Description</SectionLabel>
+              {!collapsedSections.desc && (
+                <div style={{ padding: 14, background: 'var(--md-surface-container-low, #F7F2FA)', borderRadius: 10, border: '1px solid var(--md-surface-variant, #E7E0EC)' }}>
+                  <MarkdownContent text={task.description} />
+                </div>
+              )}
             </div>
           )}
           {hasCriteria && (
-            <div style={{ marginBottom: 20 }}>
-              <SectionLabel icon="✅" color="#E65100">Acceptance Criteria</SectionLabel>
-              <div style={{ padding: 16, background: '#E6510008', borderRadius: 12, border: '1px solid #E6510020' }}>
-                <MarkdownContent text={task.acceptance_criteria} />
-              </div>
+            <div style={{ marginBottom: 16 }}>
+              <SectionLabel icon="✅" color="#E65100" collapsible collapsed={collapsedSections.criteria} onToggle={() => toggleSection('criteria')}>Acceptance Criteria</SectionLabel>
+              {!collapsedSections.criteria && (
+                <div style={{ padding: 14, background: '#E6510006', borderRadius: 10, border: '1px solid #E6510018' }}>
+                  <MarkdownContent text={task.acceptance_criteria} />
+                </div>
+              )}
             </div>
           )}
           {!hasDescription && !hasCriteria && (
@@ -639,15 +771,15 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
       {activeTab === 'output' && (
         <>
           {hasResult && (
-            <div style={{ marginBottom: 20 }}>
+            <div style={{ marginBottom: 16 }}>
               <SectionLabel icon="✓" color="#386A20">Result</SectionLabel>
               <ResultDisplay result={task.result} variant="success" />
             </div>
           )}
           {hasError && (
-            <div style={{ marginBottom: 20 }}>
+            <div style={{ marginBottom: 16 }}>
               <SectionLabel icon="✕" color="#BA1A1A">Error</SectionLabel>
-              <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', padding: 16, background: '#BA1A1A08', borderRadius: 12, border: '1px solid #BA1A1A20', color: '#BA1A1A' }}>{task.error}</div>
+              <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', padding: 14, background: '#BA1A1A06', borderRadius: 10, border: '1px solid #BA1A1A18', color: '#BA1A1A' }}>{task.error}</div>
             </div>
           )}
         </>
@@ -661,74 +793,90 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
           <ResultDisplay result={task.qa_result} variant={task.qa_result.passed ? "success" : "error"} />
         </div>
       )}
+
+      {activeTab === 'meta' && hasMetadata && (
+        <div>
+          <SectionLabel icon="🔧">Task Metadata</SectionLabel>
+          <div style={{ position: 'relative' }}>
+            <pre style={{ fontSize: 12, fontFamily: "'Roboto Mono', 'JetBrains Mono', monospace", whiteSpace: 'pre-wrap', overflowX: 'auto', padding: 14, background: 'var(--md-surface-container-low, #F7F2FA)', borderRadius: 10, border: '1px solid var(--md-surface-variant, #E7E0EC)', margin: 0, lineHeight: 1.6 }}>
+              <JsonSyntax data={task.metadata} indent={0} />
+            </pre>
+          </div>
+        </div>
+      )}
     </div>
   );
 
   return (
-    <div className={isMobile ? undefined : 'tdm-overlay'} style={overlayStyle} onClick={isMobile ? undefined : handleClose}>
+    <div className={isMobile ? 'tdm-mobile-panel' : 'tdm-overlay'} style={overlayStyle} onClick={isMobile ? undefined : handleClose}>
       <div className={isMobile ? undefined : 'tdm-panel'} style={panelStyle} onClick={e => e.stopPropagation()}>
+
+        {/* ── Status accent bar ───────────────────────────── */}
+        {!isMobile && (
+          <div style={{
+            height: 3, borderRadius: '16px 16px 0 0', flexShrink: 0,
+            background: `linear-gradient(90deg, ${sc.accent || sc.color}, ${sc.accent || sc.color}88)`,
+          }} />
+        )}
 
         {/* ── Header ──────────────────────────────────────── */}
         <div style={{
-          padding: isMobile ? "12px 16px 0" : "24px 28px 0",
+          padding: isMobile ? "12px 16px 0" : "20px 24px 0",
           flexShrink: 0,
         }}>
           {/* Top row: badges + close */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12 }}>
-            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8 }}>
+            <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
               <StatusBadge status={task.status} />
               <Badge label={task.type} color={typeColor} />
               <PriorityBadge priority={task.priority} />
-              {isActive && !isMobile && <DurationTicker task={task} />}
+              {isActive && !isMobile && !useWideLayout && <DurationTicker task={task} />}
             </div>
-            <button onClick={handleClose} style={{
-              background: "var(--md-surface-container-low, #F7F2FA)", border: "1px solid var(--md-surface-variant, #E7E0EC)",
-              cursor: "pointer", fontSize: 13, color: "var(--md-outline, #79747E)", padding: 0,
-              width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center",
-              borderRadius: 10, transition: 'background 0.15s', flexShrink: 0,
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--md-surface-variant, #E7E0EC)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'var(--md-surface-container-low, #F7F2FA)'}
-            >✕</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              {!isMobile && <span className="tdm-kbd">esc</span>}
+              <button onClick={handleClose} style={{
+                background: "transparent", border: "1px solid var(--md-surface-variant, #E7E0EC)",
+                cursor: "pointer", fontSize: 12, color: "var(--md-outline, #79747E)", padding: 0,
+                width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center",
+                borderRadius: 8, transition: 'all 0.15s', flexShrink: 0,
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--md-surface-container-low, #F7F2FA)'; e.currentTarget.style.color = 'var(--md-on-surface, #1C1B1F)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--md-outline, #79747E)'; }}
+              >✕</button>
+            </div>
           </div>
 
           {/* Title */}
           <h2 style={{
-            margin: '0 0 16px', fontSize: isMobile ? 18 : 21, fontWeight: 700, lineHeight: 1.3,
-            color: "var(--md-on-surface, #1C1B1F)", letterSpacing: '-0.01em',
+            margin: '0 0 12px', fontSize: isMobile ? 17 : 20, fontWeight: 700, lineHeight: 1.3,
+            color: "var(--md-on-surface, #1C1B1F)", letterSpacing: '-0.015em',
           }}>
             {task.title}
           </h2>
 
-          {/* Tabs */}
-          {tabs.length > 1 && (
-            <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--md-surface-variant, #E7E0EC)' }}>
-              {tabs.map(t => (
-                <button key={t.key} className="tdm-tab" data-active={activeTab === t.key ? "true" : "false"} onClick={() => setActiveTab(t.key)}>
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          )}
-          {tabs.length <= 1 && <div style={{ borderBottom: '1px solid var(--md-surface-variant, #E7E0EC)' }} />}
+          {/* Pill tabs */}
+          <div style={{ display: 'flex', gap: 4, paddingBottom: 12, borderBottom: '1px solid var(--md-surface-variant, #E7E0EC)' }}>
+            {tabs.map(t => (
+              <button key={t.key} className="tdm-pill-tab" data-active={activeTab === t.key ? "true" : "false"} onClick={() => setActiveTab(t.key)}>
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* ── Body ────────────────────────────────────────── */}
         <div className="tdm-scrollbar" style={{
           flex: 1, overflowY: 'auto', minHeight: 0,
-          padding: isMobile ? "16px 16px 80px" : "20px 28px 80px",
+          padding: isMobile ? "14px 16px 80px" : "18px 24px 24px",
         }}>
           {useWideLayout ? (
-            /* Two-column layout */
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 240px', gap: 24, alignItems: 'start' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 260px', gap: 20, alignItems: 'start' }}>
               <div>{tabContent}</div>
               <div style={{ position: 'sticky', top: 0 }}>{sidebarContent}</div>
             </div>
           ) : (
-            /* Single column */
             <div>
-              {/* Inline sidebar at top on mobile/tablet */}
-              <div style={{ marginBottom: 20 }}>{sidebarContent}</div>
+              <div style={{ marginBottom: 16 }}>{sidebarContent}</div>
               {tabContent}
             </div>
           )}
@@ -737,40 +885,46 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
         {/* ── Action Footer ───────────────────────────────── */}
         <div style={{
           flexShrink: 0,
-          padding: isMobile ? '10px 16px' : '10px 28px',
+          padding: isMobile ? '8px 16px' : '8px 24px',
           background: 'var(--md-surface, #FFFBFE)',
           borderTop: '1px solid var(--md-surface-variant, #E7E0EC)',
-          display: 'flex', gap: 8, alignItems: 'center',
+          display: 'flex', gap: 6, alignItems: 'center',
         }}>
           {task.status === "todo" && (
             <button className="tdm-action-btn" onClick={() => onStatusChange(task.id, { status: "assigned", assigned_agent: task.assigned_agent || "neo" })}
-              style={{ background: 'var(--md-primary, #6750A4)', color: 'var(--md-on-primary, #fff)', minHeight: isMobile ? 44 : 38 }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="23" y1="11" x2="17" y2="11" /></svg>
+              style={{ background: 'var(--md-primary, #6750A4)', color: 'var(--md-on-primary, #fff)', minHeight: isMobile ? 42 : 36 }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="23" y1="11" x2="17" y2="11" /></svg>
               Assign
             </button>
           )}
           {task.status === "failed" && (
             <button className="tdm-action-btn" onClick={() => onStatusChange(task.id, { status: "todo" })}
-              style={{ background: '#E65100', color: '#fff', minHeight: isMobile ? 44 : 38 }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 105.64-12.48L1 10" /></svg>
+              style={{ background: '#E65100', color: '#fff', minHeight: isMobile ? 42 : 36 }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 105.64-12.48L1 10" /></svg>
               Retry
             </button>
           )}
           {(task.status === "done" || task.status === "completed") && (
             <button className="tdm-action-btn" onClick={() => onStatusChange(task.id, { status: "todo" })}
-              style={{ background: 'var(--md-surface-container-low, #F7F2FA)', color: 'var(--md-on-surface-variant, #49454F)', border: '1px solid var(--md-surface-variant, #E7E0EC)', minHeight: isMobile ? 44 : 38 }}>
+              style={{ background: 'var(--md-surface-container-low, #F7F2FA)', color: 'var(--md-on-surface-variant, #49454F)', border: '1px solid var(--md-surface-variant, #E7E0EC)', minHeight: isMobile ? 42 : 36 }}>
               Reopen
             </button>
           )}
           <div style={{ flex: 1 }} />
+          {/* Time hint */}
+          {!isMobile && task.created_at && (
+            <span style={{ fontSize: 10, color: 'var(--md-outline, #79747E)', fontFamily: "'Roboto Mono', monospace" }}>
+              {timeAgo(task.updated_at || task.created_at)}
+            </span>
+          )}
           {onDelete && (
             <button className="tdm-action-btn" onClick={() => { if (window.confirm('Delete this task?')) onDelete(task.id); }}
-              style={{ background: 'transparent', color: '#BA1A1A', border: '1px solid #BA1A1A30', minHeight: isMobile ? 44 : 38 }}>
+              style={{ background: 'transparent', color: '#BA1A1A', border: '1px solid #BA1A1A30', minHeight: isMobile ? 42 : 36 }}>
               Delete
             </button>
           )}
           <button className="tdm-action-btn" onClick={handleClose}
-            style={{ background: 'var(--md-surface-container-low, #F7F2FA)', color: 'var(--md-on-surface-variant, #49454F)', border: '1px solid var(--md-surface-variant, #E7E0EC)', minHeight: isMobile ? 44 : 38 }}>
+            style={{ background: 'var(--md-surface-container-low, #F7F2FA)', color: 'var(--md-on-surface-variant, #49454F)', border: '1px solid var(--md-surface-variant, #E7E0EC)', minHeight: isMobile ? 42 : 36 }}>
             Close
           </button>
         </div>
