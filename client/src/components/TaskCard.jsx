@@ -1,18 +1,16 @@
 import { useState, useEffect } from 'react';
-import AgentPicker from './AgentPicker';
-import { ProgressBadge } from './ProgressFeed';
 
 const AGENT_ICONS = { neo: "🕶️", mu: "🔧", beta: "⚡", alpha: "🧠", flow: "🌊", ifra: "🛠️" };
 const AGENT_ROLES = { neo: "Builder", alpha: "Leader", beta: "QA", mu: "Builder", flow: "Orchestrator", ifra: "Ops" };
 const STATUS_COLORS = {
   todo: "#79747E", assigned: "#6750A4", in_progress: "#E8A317", running: "#E8A317",
   done: "#386A20", failed: "#BA1A1A", qa: "#5E35B1", qa_testing: "#5E35B1",
-  completed: "#1B5E20", deployed: "#00838F", blocked: "#D84315",
+  completed: "#1B5E20", deployed: "#00838F",
 };
 const STATUS_BG = {
   todo: "#79747E14", assigned: "#6750A414", in_progress: "#E8A31714", running: "#E8A31714",
   done: "#386A2014", failed: "#BA1A1A14", qa: "#5E35B114", qa_testing: "#5E35B114",
-  completed: "#1B5E2014", deployed: "#00838F14", blocked: "#D8431514",
+  completed: "#1B5E2014", deployed: "#00838F14",
 };
 const PRIORITY_MAP = {
   urgent: { color: "#D32F2F", bg: "#D32F2F14", label: "Urgent", icon: "🔴" },
@@ -29,7 +27,7 @@ const STAGE_COLORS = {
 const STAGES = ["refinery", "foundry", "builder", "inspector", "deployer"];
 const STAGE_LABELS = { refinery: "Refine", foundry: "Found", builder: "Build", inspector: "Inspect", deployer: "Deploy" };
 const STAGE_SHORT = { refinery: "REF", foundry: "FND", builder: "BLD", inspector: "INS", deployer: "DEP" };
-const ACTIVE_STATUSES = new Set(["in_progress", "assigned", "running", "qa_testing", "completed"]);
+const ACTIVE_STATUSES = new Set(["in_progress", "assigned", "running", "qa_testing"]);
 
 function formatDuration(ms) {
   if (!ms || ms < 0) return "0s";
@@ -57,10 +55,8 @@ function PipelineStepper({ stage, isMobile }) {
   return (
     <div style={{
       display: "flex", alignItems: "flex-start",
-      margin: "12px 0 8px", padding: "8px 12px",
+      margin: "12px 0 4px", padding: "0 2px",
       gap: 0,
-      background: "var(--md-surface-container-low, #F7F2FA)",
-      borderRadius: 12,
     }}>
       {STAGES.map((s, i) => {
         const isCompleted = i < currentIdx;
@@ -71,10 +67,10 @@ function PipelineStepper({ stage, isMobile }) {
           <div key={s} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
             <div style={{
               display: "flex", flexDirection: "column", alignItems: "center",
-              minWidth: isMobile ? 38 : 48, gap: 6,
+              minWidth: isMobile ? 32 : 44, gap: 6,
             }}>
               <div style={{
-                width: 20, height: 20, borderRadius: "50%",
+                width: 18, height: 18, borderRadius: "50%",
                 border: `2px solid ${color}`,
                 background: (isCompleted || isCurrent) ? color : "transparent",
                 display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
@@ -82,7 +78,7 @@ function PipelineStepper({ stage, isMobile }) {
                 transition: "all 200ms ease",
               }}>
                 {isCompleted && (
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
                     <path d="M5 13l4 4L19 7" />
                   </svg>
                 )}
@@ -91,14 +87,14 @@ function PipelineStepper({ stage, isMobile }) {
                 fontSize: isMobile ? 10 : 11,
                 fontWeight: isCurrent ? 700 : 500,
                 color: isCurrent ? color : isCompleted ? "#386A20" : "var(--md-outline-variant, #CAC4D0)",
-                letterSpacing: isMobile ? "0.01em" : "0.03em",
+                letterSpacing: "0.03em",
                 whiteSpace: "nowrap",
                 lineHeight: 1,
               }}>{label}</span>
             </div>
             {i < STAGES.length - 1 && (
               <div style={{
-                flex: 1, height: 2, minWidth: isMobile ? 8 : 12,
+                flex: 1, height: 2, minWidth: 10,
                 background: isCompleted ? "#386A20" : "var(--md-surface-variant, #E7E0EC)",
                 marginTop: -14, borderRadius: 1,
               }} />
@@ -111,43 +107,17 @@ function PipelineStepper({ stage, isMobile }) {
 }
 
 /* ── Duration Ticker ──────────────────────────────────────── */
-const TERMINAL_STATUSES = new Set(["deployed", "done", "failed", "cancelled"]);
-
-function DurationTicker({ updatedAt, startedAt, completedAt, active, status }) {
+function DurationTicker({ updatedAt, active }) {
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
-    if (!active) return;
+    if (!active || !updatedAt) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [active]);
+  }, [active, updatedAt]);
 
-  const stateEnteredAt = startedAt || updatedAt;
-  if (!stateEnteredAt) return null;
-
-  // Completed: live ticker counting time waiting for deploy (from completed_at)
-  // Deployed: frozen duration from completed_at to updated_at (deploy time)
-  // Other terminal: frozen at completion
-  // Active: live ticker from state entry
-  const isTerminal = TERMINAL_STATUSES.has(status);
-  let elapsed;
-  if (status === "completed") {
-    // Live ticker: time since task was completed, waiting for deploy
-    const from = completedAt ? new Date(completedAt).getTime() : new Date(updatedAt).getTime();
-    elapsed = now - from;
-  } else if (status === "deployed") {
-    // Frozen: show how long it waited between completion and deployment
-    const from = completedAt ? new Date(completedAt).getTime() : new Date(stateEnteredAt).getTime();
-    const end = new Date(updatedAt).getTime();
-    elapsed = end - from;
-  } else if (isTerminal) {
-    const end = completedAt ? new Date(completedAt).getTime() : new Date(updatedAt).getTime();
-    elapsed = end - new Date(stateEnteredAt).getTime();
-  } else if (active) {
-    elapsed = now - new Date(stateEnteredAt).getTime();
-  } else {
-    elapsed = Date.now() - new Date(stateEnteredAt).getTime();
-  }
+  if (!updatedAt) return null;
+  const elapsed = (active ? now : Date.now()) - new Date(updatedAt).getTime();
   return (
     <span style={{
       fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums",
@@ -179,13 +149,7 @@ function Badge({ label, color, bg, style: extraStyle }) {
 }
 
 /* ── Action Bar ───────────────────────────────────────────── */
-function ActionBar({ task, onStatusChange, isMobile }) {
-  const [showPicker, setShowPicker] = useState(false);
-  const [assigning, setAssigning] = useState(false);
-  const [assignError, setAssignError] = useState(null);
-  const [humanInput, setHumanInput] = useState("");
-  const [unblocking, setUnblocking] = useState(false);
-
+function ActionBar({ task, onStatusChange, onDelete, isMobile }) {
   const btnBase = {
     fontSize: 12, border: "none", padding: isMobile ? "8px 18px" : "7px 16px",
     borderRadius: 100, cursor: "pointer", fontWeight: 600,
@@ -193,20 +157,6 @@ function ActionBar({ task, onStatusChange, isMobile }) {
     minHeight: isMobile ? 44 : 34, letterSpacing: "0.02em",
     transition: "all 150ms ease",
     display: "inline-flex", alignItems: "center", gap: 6,
-  };
-
-  const handleAssign = async (agentId) => {
-    setShowPicker(false);
-    setAssigning(true);
-    setAssignError(null);
-    try {
-      await onStatusChange?.(task.id, { status: "assigned", assigned_agent: agentId });
-    } catch (e) {
-      setAssignError(e.message || "Assignment failed");
-      setTimeout(() => setAssignError(null), 3000);
-    } finally {
-      setAssigning(false);
-    }
   };
 
   const actions = [];
@@ -228,126 +178,61 @@ function ActionBar({ task, onStatusChange, isMobile }) {
 
   if (task.status === "todo") {
     actions.push(
-      <div key="assign" style={{ position: "relative" }}>
-        <button
-          onClick={(e) => { e.stopPropagation(); setShowPicker(!showPicker); }}
-          disabled={assigning}
-          style={{
-            ...btnBase,
-            background: assigning ? "var(--md-outline, #79747E)" : "var(--md-primary, #6750A4)",
-            color: "var(--md-on-primary, #fff)",
-            opacity: assigning ? 0.7 : 1,
-          }}
-        >
-          {assigning ? (
-            <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⏳</span>
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="23" y1="11" x2="17" y2="11" />
-            </svg>
-          )}
-          {assigning ? "Assigning…" : "Assign"}
-        </button>
-        {showPicker && (
-          <AgentPicker
-            onSelect={handleAssign}
-            onCancel={() => setShowPicker(false)}
-          />
-        )}
-      </div>
+      <button
+        key="assign"
+        onClick={(e) => { e.stopPropagation(); onStatusChange?.(task.id, { status: "assigned", assigned_agent: task.assigned_agent || "neo" }); }}
+        style={{ ...btnBase, background: "var(--md-primary, #6750A4)", color: "var(--md-on-primary, #fff)" }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="23" y1="11" x2="17" y2="11" />
+        </svg>
+        Assign
+      </button>
     );
   }
 
-  if (task.status === "blocked") {
-    const handleUnblock = async (e) => {
-      e.stopPropagation();
-      setUnblocking(true);
-      try {
-        await onStatusChange?.(task.id, { status: "todo", human_input: humanInput || null, assigned_agent: null });
-        setHumanInput("");
-      } catch (err) {
-        setAssignError(err.message || "Unblock failed");
-        setTimeout(() => setAssignError(null), 3000);
-      } finally {
-        setUnblocking(false);
-      }
-    };
-
-    return (
-      <div style={{
-        padding: "10px 16px 12px",
-        borderTop: "1px solid var(--md-surface-variant, #E7E0EC)",
-      }} onClick={e => e.stopPropagation()}>
-        {task.blocked_reason && (
-          <div style={{
-            fontSize: 12, color: "#D84315", fontWeight: 500, marginBottom: 8,
-            display: "flex", alignItems: "flex-start", gap: 6,
-          }}>
-            <span>🚫</span>
-            <span>{task.blocked_reason}</span>
-          </div>
-        )}
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input
-            type="text"
-            placeholder="Response / instructions for agent..."
-            value={humanInput}
-            onChange={e => setHumanInput(e.target.value)}
-            onClick={e => e.stopPropagation()}
-            style={{
-              flex: 1, padding: isMobile ? "10px 12px" : "7px 12px", borderRadius: 8,
-              border: "1px solid var(--md-surface-variant, #E7E0EC)",
-              background: "var(--md-surface, #FFFBFE)",
-              color: "var(--md-on-surface, #1C1B1F)",
-              fontSize: 13, fontFamily: "'Roboto', system-ui, sans-serif",
-              outline: "none", minHeight: isMobile ? 44 : 34,
-            }}
-            onKeyDown={e => { if (e.key === "Enter") handleUnblock(e); }}
-          />
-          <button
-            onClick={handleUnblock}
-            disabled={unblocking}
-            style={{
-              ...btnBase,
-              background: unblocking ? "var(--md-outline, #79747E)" : "#2E7D32",
-              color: "#fff",
-              opacity: unblocking ? 0.7 : 1,
-              whiteSpace: "nowrap",
-            }}
-          >
-            {unblocking ? "⏳" : "✅"} Unblock
-          </button>
-        </div>
-        {assignError && (
-          <span style={{ fontSize: 12, color: "#BA1A1A", fontWeight: 500, marginTop: 6, display: "block" }}>
-            ⚠️ {assignError}
-          </span>
-        )}
-      </div>
+  if (onDelete && (task.status === "todo" || task.status === "failed")) {
+    actions.push(
+      <button
+        key="delete"
+        onClick={(e) => { e.stopPropagation(); onDelete?.(task.id); }}
+        style={{ ...btnBase, background: "transparent", color: "var(--md-outline, #79747E)" }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" />
+        </svg>
+        Delete
+      </button>
     );
   }
 
-  if (actions.length === 0 && !assignError) return null;
+  // View button always present
+  actions.push(
+    <button
+      key="view"
+      onClick={(e) => { e.stopPropagation(); }}
+      style={{ ...btnBase, background: "var(--md-surface-variant, #E7E0EC)", color: "var(--md-on-surface-variant, #49454F)" }}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+      </svg>
+      View
+    </button>
+  );
 
   return (
     <div style={{
       display: "flex", gap: 8, padding: "10px 16px 12px",
       justifyContent: "flex-end", alignItems: "center",
       borderTop: "1px solid var(--md-surface-variant, #E7E0EC)",
-      flexWrap: "wrap",
     }}>
-      {assignError && (
-        <span style={{ fontSize: 12, color: "#BA1A1A", fontWeight: 500, marginRight: "auto" }}>
-          ⚠️ {assignError}
-        </span>
-      )}
       {actions}
     </div>
   );
 }
 
 /* ── Task Card ────────────────────────────────────────────── */
-export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, progress, monitor }) {
+export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, isMobile }) {
   const agent = task.assigned_agent?.toLowerCase();
   const icon = AGENT_ICONS[agent] || "🤖";
   const role = AGENT_ROLES[agent] || "Agent";
@@ -381,9 +266,9 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
       {/* ── Header: badges + duration ───────────────────── */}
       <div style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
-        padding: "16px 16px 8px", gap: 12, flexWrap: "wrap",
+        padding: "14px 16px 8px", gap: 12,
       }}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", rowGap: 6 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <Badge
             label={task.status.replace("_", " ")}
             color={statusColor}
@@ -394,17 +279,16 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
             <Badge label={priority.label} color={priority.color} bg={priority.bg} />
           )}
         </div>
-        <DurationTicker updatedAt={task.updated_at} startedAt={task.started_at} completedAt={task.completed_at} active={isActive} status={task.status} />
+        <DurationTicker updatedAt={task.updated_at} active={isActive} />
       </div>
 
       {/* ── Body ────────────────────────────────────────── */}
-      <div style={{ padding: "4px 16px 16px" }}>
+      <div style={{ padding: "4px 16px 14px" }}>
         {/* Title */}
         <div style={{
-          fontWeight: 600, fontSize: 15, lineHeight: 1.45,
+          fontWeight: 600, fontSize: 14, lineHeight: 1.45,
           color: "var(--md-on-surface, #1C1B1F)",
-          marginBottom: 8,
-          fontFamily: "'Roboto', system-ui, sans-serif",
+          marginBottom: 6,
         }}>
           {task.title}
         </div>
@@ -413,39 +297,30 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
         {(task.description || task.prompt) && (
           <div style={{
             color: "var(--md-on-surface-variant, #49454F)",
-            fontSize: 13, lineHeight: 1.55,
+            fontSize: 13, lineHeight: 1.5,
             marginBottom: 8, opacity: 0.75,
             display: "-webkit-box", WebkitLineClamp: 2,
             WebkitBoxOrient: "vertical", overflow: "hidden",
           }}>
-            {(task.description || task.prompt).slice(0, 140)}
-            {(task.description || task.prompt).length > 140 ? "…" : ""}
+            {(task.description || task.prompt).slice(0, 120)}
+            {(task.description || task.prompt).length > 120 ? "…" : ""}
           </div>
         )}
 
         {/* Pipeline Stepper */}
         <PipelineStepper stage={task.stage} isMobile={isMobile} />
 
-        {/* Live Progress */}
-        {isActive && <ProgressBadge progress={progress} monitor={monitor} />}
-
         {/* Agent info row */}
         <div style={{
           display: "flex", justifyContent: "space-between", alignItems: "center",
-          marginTop: 12, gap: 16, padding: "8px 0 0",
-          borderTop: "1px solid var(--md-surface-variant, #E7E0EC)",
+          marginTop: 10, gap: 16,
         }}>
           {agent ? (
             <div style={{
               display: "inline-flex", alignItems: "center", gap: 8,
               fontSize: 13, color: "var(--md-on-surface-variant, #49454F)",
             }}>
-              <span style={{
-                fontSize: 14, lineHeight: 1,
-                width: 28, height: 28, borderRadius: "50%",
-                background: "var(--md-surface-container-low, #F7F2FA)",
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-              }}>{icon}</span>
+              <span style={{ fontSize: 16, lineHeight: 1 }}>{icon}</span>
               <span style={{ fontWeight: 600 }}>{agent}</span>
               <span style={{ color: "var(--md-outline, #79747E)", fontSize: 12 }}>·</span>
               <span style={{
@@ -462,14 +337,13 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
           <span style={{
             fontSize: 11, color: "var(--md-outline, #79747E)",
             whiteSpace: "nowrap", flexShrink: 0,
-            fontFamily: "'Roboto', system-ui, sans-serif",
           }}>{formatTime(task.created_at)}</span>
         </div>
 
         {task.project && (
           <div style={{
             fontSize: 11, color: "var(--md-outline, #79747E)",
-            marginTop: 8, fontWeight: 500,
+            marginTop: 6, fontWeight: 500,
           }}>
             📁 {task.project.name}
           </div>
@@ -516,6 +390,7 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
       <ActionBar
         task={task}
         onStatusChange={onStatusChange}
+        onDelete={onDelete}
         isMobile={isMobile}
       />
     </div>
