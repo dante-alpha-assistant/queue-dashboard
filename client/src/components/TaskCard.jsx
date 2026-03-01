@@ -109,7 +109,9 @@ function PipelineStepper({ stage, isMobile }) {
 }
 
 /* ── Duration Ticker ──────────────────────────────────────── */
-function DurationTicker({ updatedAt, active }) {
+const TERMINAL_STATUSES = new Set(["deployed", "completed", "done", "failed", "cancelled"]);
+
+function DurationTicker({ createdAt, updatedAt, active, status }) {
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -119,7 +121,17 @@ function DurationTicker({ updatedAt, active }) {
   }, [active, updatedAt]);
 
   if (!updatedAt) return null;
-  const elapsed = (active ? now : Date.now()) - new Date(updatedAt).getTime();
+
+  // Terminal states: show total duration (created → updated), frozen
+  const isTerminal = TERMINAL_STATUSES.has(status);
+  let elapsed;
+  if (isTerminal && createdAt) {
+    elapsed = new Date(updatedAt).getTime() - new Date(createdAt).getTime();
+  } else if (active) {
+    elapsed = now - new Date(updatedAt).getTime();
+  } else {
+    elapsed = Date.now() - new Date(updatedAt).getTime();
+  }
   return (
     <span style={{
       fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums",
@@ -281,7 +293,7 @@ export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, 
             <Badge label={priority.label} color={priority.color} bg={priority.bg} />
           )}
         </div>
-        <DurationTicker updatedAt={task.updated_at} active={isActive} />
+        <DurationTicker createdAt={task.created_at} updatedAt={task.updated_at} active={isActive} status={task.status} />
       </div>
 
       {/* ── Body ────────────────────────────────────────── */}

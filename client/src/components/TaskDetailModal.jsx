@@ -403,7 +403,7 @@ function DurationTicker({ task, compact }) {
   }, [active, task.created_at]);
 
   if (!task.created_at) return null;
-  const end = task.completed_at ? new Date(task.completed_at) : (active ? now : new Date());
+  const end = task.completed_at ? new Date(task.completed_at) : (active ? now : new Date(task.updated_at || task.created_at));
   const elapsed = end - new Date(task.created_at).getTime();
   return (
     <span style={{
