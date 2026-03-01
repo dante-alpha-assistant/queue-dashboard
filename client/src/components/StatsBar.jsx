@@ -3,6 +3,7 @@ const ITEMS = [
   { key: "in_progress", label: "Active", color: "#E8A317" },
   { key: "qa_testing", label: "QA", color: "#7B5EA7" },
   { key: "completed", label: "Done", color: "#1B5E20" },
+  { key: "deployed", label: "Deployed", color: "#00897B" },
   { key: "failed", label: "Failed", color: "#BA1A1A" },
 ];
 
