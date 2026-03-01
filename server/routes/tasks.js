@@ -3,19 +3,6 @@ import supabase from "../supabase.js";
 
 export const router = Router();
 
-const DISPATCHER_URL = process.env.DISPATCHER_URL || "http://task-dispatcher.agents.svc.cluster.local:8080";
-
-// Manual dispatch — proxy to task-dispatcher
-router.post("/dispatch", async (req, res) => {
-  try {
-    const resp = await fetch(`${DISPATCHER_URL}/api/dispatch`, { method: "POST" });
-    const data = await resp.json();
-    res.json(data);
-  } catch (e) {
-    res.status(502).json({ ok: false, error: `Dispatcher unreachable: ${e.message}` });
-  }
-});
-
 // Projects
 router.get("/projects", async (req, res) => {
   try {
@@ -51,8 +38,8 @@ router.get("/stats", async (req, res) => {
     if (req.query.project_id) query = query.eq("project_id", req.query.project_id);
     const { data, error } = await query;
     if (error) throw error;
-    const stats = { todo: 0, assigned: 0, in_progress: 0, done: 0, qa: 0, qa_testing: 0, completed: 0, failed: 0, deployed: 0, blocked: 0 };
-    data.forEach((t) => { if (t.status !== "deprecated" && stats[t.status] !== undefined) stats[t.status]++; });
+    const stats = { todo: 0, assigned: 0, in_progress: 0, done: 0, qa: 0, qa_testing: 0, completed: 0, failed: 0 };
+    data.forEach((t) => { if (stats[t.status] !== undefined) stats[t.status]++; });
     res.json(stats);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -68,14 +55,9 @@ router.get("/tasks", async (req, res) => {
       .order("created_at", { ascending: false });
     if (req.query.project_id) query = query.eq("project_id", req.query.project_id);
     if (req.query.repository_id) query = query.eq("repository_id", req.query.repository_id);
-    // Hide deprecated tasks by default (soft-deleted); include with ?include_deprecated=true
-    if (req.query.include_deprecated !== "true") {
-      query = query.neq("status", "deprecated");
-    }
-
 
     const { since, until } = req.query;
-    const ALWAYS_INCLUDE_STATUSES = ["todo", "assigned", "in_progress", "qa_testing", "blocked"];
+    const ALWAYS_INCLUDE_STATUSES = ["todo", "assigned", "in_progress", "qa_testing"];
 
     if (since || until) {
       // Build an OR filter: (created_at within range) OR (status in always-include list)
@@ -140,10 +122,6 @@ router.patch("/tasks/:id", async (req, res) => {
       updates.started_at = null;
       updates.completed_at = null;
       updates.error = null;
-      updates.blocked_reason = null;
-    }
-    if (updates.status === "deprecated") {
-      updates.completed_at = updates.completed_at || new Date().toISOString();
     }
 
     const { data, error } = await supabase
