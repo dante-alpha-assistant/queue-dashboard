@@ -35,6 +35,12 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--md-border); border-radius: 3px; }
 
+/* Shared keyframes */
+@keyframes timeline-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.15); }
+}
+
 /* Mobile responsive utilities */
 @media (max-width: 639px) {
   body { -webkit-tap-highlight-color: transparent; }

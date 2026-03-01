@@ -132,12 +132,12 @@ export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, 
       }}>
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
           <span style={{
-            fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6,
+            fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 8,
             background: `${statusColor}18`, color: statusColor,
             textTransform: "uppercase", letterSpacing: "0.5px",
           }}>{task.status.replace("_", " ")}</span>
           <span style={{
-            fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 6,
+            fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 8,
             background: `${TYPE_COLORS[task.type] || "#79747E"}12`,
             color: TYPE_COLORS[task.type] || "#79747E", textTransform: "uppercase",
           }}>{task.type}</span>

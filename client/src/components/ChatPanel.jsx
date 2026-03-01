@@ -127,7 +127,7 @@ export default function ChatPanel({ isMobile }) {
       }}>
         <span style={{ fontWeight: 600, fontSize: 14 }}>💬 #dante-agents</span>
         <button onClick={() => setOpen(false)} style={{
-          background: "none", border: "none", color: "var(--md-border)",
+          background: "none", border: "none", color: "var(--md-on-surface-variant)",
           fontSize: 18, cursor: "pointer", minWidth: 44, minHeight: 44,
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>✕</button>
@@ -136,7 +136,7 @@ export default function ChatPanel({ isMobile }) {
       {/* Messages */}
       <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
         {messages.length === 0 && (
-          <div style={{ color: "var(--md-border)", textAlign: "center", marginTop: 40, fontSize: 13 }}>
+          <div style={{ color: "var(--md-on-surface-variant)", textAlign: "center", marginTop: 40, fontSize: 13 }}>
             No messages yet
           </div>
         )}
@@ -154,7 +154,7 @@ export default function ChatPanel({ isMobile }) {
                   fontSize: 11, fontWeight: 600,
                   color: isUser ? "var(--md-primary)" : "#386A20",
                 }}>{msg.name}</span>
-                <span style={{ fontSize: 10, color: "var(--md-border)" }}>{timeAgo(msg.timestamp)}</span>
+                <span style={{ fontSize: 10, color: "var(--md-on-surface-variant)", opacity: 0.6 }}>{timeAgo(msg.timestamp)}</span>
               </div>
               <div style={{
                 fontSize: 13, lineHeight: 1.5, paddingLeft: 24,
