@@ -13,10 +13,10 @@ const STATUS_BG = {
   completed: "#1B5E2014", deployed: "#00838F14",
 };
 const PRIORITY_MAP = {
-  urgent: { color: "#D32F2F", bg: "#D32F2F14", label: "Urgent" },
-  high: { color: "#E65100", bg: "#E6510014", label: "High" },
+  urgent: { color: "#D32F2F", bg: "#D32F2F14", label: "Urgent", icon: "🔴" },
+  high: { color: "#E65100", bg: "#E6510014", label: "High", icon: "🟠" },
   normal: null,
-  low: { color: "#757575", bg: "#75757514", label: "Low" },
+  low: { color: "#757575", bg: "#75757514", label: "Low", icon: "⚪" },
 };
 const TYPE_COLORS = {
   coding: "#6750A4", research: "#0061A4", ops: "#7D5260", general: "#79747E", test: "#386A20",
@@ -54,8 +54,9 @@ function PipelineStepper({ stage, isMobile }) {
 
   return (
     <div style={{
-      display: "flex", alignItems: "flex-start", gap: 0,
-      margin: "12px 0 4px", padding: "0 4px",
+      display: "flex", alignItems: "flex-start",
+      margin: "12px 0 4px", padding: "0 2px",
+      gap: 0,
     }}>
       {STAGES.map((s, i) => {
         const isCompleted = i < currentIdx;
@@ -66,10 +67,10 @@ function PipelineStepper({ stage, isMobile }) {
           <div key={s} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
             <div style={{
               display: "flex", flexDirection: "column", alignItems: "center",
-              minWidth: isMobile ? 28 : 40, gap: 4,
+              minWidth: isMobile ? 32 : 44, gap: 6,
             }}>
               <div style={{
-                width: 16, height: 16, borderRadius: "50%",
+                width: 18, height: 18, borderRadius: "50%",
                 border: `2px solid ${color}`,
                 background: (isCompleted || isCurrent) ? color : "transparent",
                 display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
@@ -77,25 +78,25 @@ function PipelineStepper({ stage, isMobile }) {
                 transition: "all 200ms ease",
               }}>
                 {isCompleted && (
-                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
                     <path d="M5 13l4 4L19 7" />
                   </svg>
                 )}
               </div>
               <span style={{
-                fontSize: isMobile ? 9 : 10,
+                fontSize: isMobile ? 10 : 11,
                 fontWeight: isCurrent ? 700 : 500,
                 color: isCurrent ? color : isCompleted ? "#386A20" : "var(--md-outline-variant, #CAC4D0)",
-                letterSpacing: "0.02em",
+                letterSpacing: "0.03em",
                 whiteSpace: "nowrap",
                 lineHeight: 1,
               }}>{label}</span>
             </div>
             {i < STAGES.length - 1 && (
               <div style={{
-                flex: 1, height: 2, minWidth: 8,
+                flex: 1, height: 2, minWidth: 10,
                 background: isCompleted ? "#386A20" : "var(--md-surface-variant, #E7E0EC)",
-                marginTop: -12, borderRadius: 1,
+                marginTop: -14, borderRadius: 1,
               }} />
             )}
           </div>
@@ -136,11 +137,12 @@ function DurationTicker({ updatedAt, active }) {
 function Badge({ label, color, bg, style: extraStyle }) {
   return (
     <span style={{
-      fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 100,
+      fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 100,
       background: bg || `${color}14`, color: color,
       textTransform: "uppercase", letterSpacing: "0.04em",
       lineHeight: 1.2, whiteSpace: "nowrap",
       fontFamily: "'Roboto', system-ui, sans-serif",
+      display: "inline-block",
       ...extraStyle,
     }}>{label}</span>
   );
@@ -149,10 +151,10 @@ function Badge({ label, color, bg, style: extraStyle }) {
 /* ── Action Bar ───────────────────────────────────────────── */
 function ActionBar({ task, onStatusChange, onDelete, isMobile }) {
   const btnBase = {
-    fontSize: 12, border: "none", padding: isMobile ? "8px 18px" : "6px 16px",
+    fontSize: 12, border: "none", padding: isMobile ? "8px 18px" : "7px 16px",
     borderRadius: 100, cursor: "pointer", fontWeight: 600,
     fontFamily: "'Roboto', system-ui, sans-serif",
-    minHeight: isMobile ? 44 : 32, letterSpacing: "0.02em",
+    minHeight: isMobile ? 44 : 34, letterSpacing: "0.02em",
     transition: "all 150ms ease",
     display: "inline-flex", alignItems: "center", gap: 6,
   };
@@ -189,22 +191,38 @@ function ActionBar({ task, onStatusChange, onDelete, isMobile }) {
     );
   }
 
-  // View button always available
+  if (onDelete && (task.status === "todo" || task.status === "failed")) {
+    actions.push(
+      <button
+        key="delete"
+        onClick={(e) => { e.stopPropagation(); onDelete?.(task.id); }}
+        style={{ ...btnBase, background: "transparent", color: "var(--md-outline, #79747E)" }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" />
+        </svg>
+        Delete
+      </button>
+    );
+  }
+
+  // View button always present
   actions.push(
     <button
       key="view"
-      onClick={(e) => { e.stopPropagation(); /* handled by card click */ }}
+      onClick={(e) => { e.stopPropagation(); }}
       style={{ ...btnBase, background: "var(--md-surface-variant, #E7E0EC)", color: "var(--md-on-surface-variant, #49454F)" }}
     >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+      </svg>
       View
     </button>
   );
 
-  if (actions.length === 0) return null;
-
   return (
     <div style={{
-      display: "flex", gap: 8, padding: "8px 16px 12px",
+      display: "flex", gap: 8, padding: "10px 16px 12px",
       justifyContent: "flex-end", alignItems: "center",
       borderTop: "1px solid var(--md-surface-variant, #E7E0EC)",
     }}>
@@ -245,12 +263,11 @@ export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, 
     onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)"; }}
     onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}
     >
-      {/* ── Header ──────────────────────────────────────── */}
+      {/* ── Header: badges + duration ───────────────────── */}
       <div style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
-        padding: "12px 16px 8px",
+        padding: "14px 16px 8px", gap: 12,
       }}>
-        {/* Badges row */}
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <Badge
             label={task.status.replace("_", " ")}
@@ -262,17 +279,16 @@ export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, 
             <Badge label={priority.label} color={priority.color} bg={priority.bg} />
           )}
         </div>
-        {/* Duration */}
         <DurationTicker updatedAt={task.updated_at} active={isActive} />
       </div>
 
       {/* ── Body ────────────────────────────────────────── */}
-      <div style={{ padding: "4px 16px 12px" }}>
+      <div style={{ padding: "4px 16px 14px" }}>
         {/* Title */}
         <div style={{
-          fontWeight: 600, fontSize: 14, lineHeight: 1.4,
+          fontWeight: 600, fontSize: 14, lineHeight: 1.45,
           color: "var(--md-on-surface, #1C1B1F)",
-          marginBottom: 4,
+          marginBottom: 6,
         }}>
           {task.title}
         </div>
@@ -294,14 +310,14 @@ export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, 
         {/* Pipeline Stepper */}
         <PipelineStepper stage={task.stage} isMobile={isMobile} />
 
-        {/* Agent info + date */}
+        {/* Agent info row */}
         <div style={{
           display: "flex", justifyContent: "space-between", alignItems: "center",
-          marginTop: 8, gap: 12,
+          marginTop: 10, gap: 16,
         }}>
           {agent ? (
             <div style={{
-              display: "inline-flex", alignItems: "center", gap: 6,
+              display: "inline-flex", alignItems: "center", gap: 8,
               fontSize: 13, color: "var(--md-on-surface-variant, #49454F)",
             }}>
               <span style={{ fontSize: 16, lineHeight: 1 }}>{icon}</span>
@@ -327,7 +343,7 @@ export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, 
         {task.project && (
           <div style={{
             fontSize: 11, color: "var(--md-outline, #79747E)",
-            marginTop: 4, fontWeight: 500,
+            marginTop: 6, fontWeight: 500,
           }}>
             📁 {task.project.name}
           </div>
@@ -337,35 +353,46 @@ export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, 
       {/* ── Error / Result Banner ───────────────────────── */}
       {consoleText && (
         <div style={{
-          display: "flex", alignItems: "flex-start", gap: 8,
-          padding: "10px 16px",
+          display: "flex", alignItems: "flex-start", gap: 10,
+          padding: "12px 16px",
           background: isError ? "#FDECEA" : "#E8F5E9",
           borderTop: `1px solid ${isError ? "#F5C6CB" : "#C8E6C9"}`,
           fontSize: 12, lineHeight: 1.5,
           color: isError ? "#B71C1C" : "#1B5E20",
         }}>
-          <span style={{ fontSize: 16, lineHeight: 1, flexShrink: 0, marginTop: 1 }}>
-            {isError ? "⚠️" : "✅"}
-          </span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1, color: isError ? "#D32F2F" : "#2E7D32" }}>
+            {isError ? (
+              <>
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </>
+            ) : (
+              <>
+                <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </>
+            )}
+          </svg>
           <span style={{ minWidth: 0 }}>
-            <span style={{ fontWeight: 600, display: "block", marginBottom: 2 }}>
+            <span style={{ fontWeight: 600, display: "block", marginBottom: 2, fontSize: 12 }}>
               {isError ? "Error" : "Result"}
             </span>
-            {(typeof consoleText === "string" ? consoleText : JSON.stringify(consoleText)).slice(0, 140)}
-            {(typeof consoleText === "string" ? consoleText : JSON.stringify(consoleText)).length > 140 ? "…" : ""}
+            <span style={{ fontSize: 12 }}>
+              {(typeof consoleText === "string" ? consoleText : JSON.stringify(consoleText)).slice(0, 140)}
+              {(typeof consoleText === "string" ? consoleText : JSON.stringify(consoleText)).length > 140 ? "…" : ""}
+            </span>
           </span>
         </div>
       )}
 
-      {/* ── Action Bar ──────────────────────────────────── */}
-      {(task.status === "failed" || task.status === "todo") && (
-        <ActionBar
-          task={task}
-          onStatusChange={onStatusChange}
-          onDelete={onDelete}
-          isMobile={isMobile}
-        />
-      )}
+      {/* ── Action Bar (always visible) ─────────────────── */}
+      <ActionBar
+        task={task}
+        onStatusChange={onStatusChange}
+        onDelete={onDelete}
+        isMobile={isMobile}
+      />
     </div>
   );
 }
