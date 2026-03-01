@@ -51,7 +51,7 @@ export default function DispatchModal({ onClose, dispatch, projects = [], isMobi
 
   const inputStyle = {
     width: "100%", padding: "12px 16px",
-    border: "1px solid var(--md-border)", background: "var(--md-background)",
+    border: "1px solid var(--md-surface-variant)", background: "var(--md-background)",
     color: "var(--md-on-background)", fontSize: 14, borderRadius: 12,
     fontFamily: "'Roboto', system-ui, sans-serif", outline: "none",
     boxSizing: "border-box",
@@ -147,7 +147,7 @@ export default function DispatchModal({ onClose, dispatch, projects = [], isMobi
         {!isMobile && (
           <div style={{ display: "flex", gap: 12 }}>
             <button onClick={onClose} style={{
-              flex: 1, background: "transparent", border: "1px solid var(--md-border)",
+              flex: 1, background: "transparent", border: "1px solid var(--md-surface-variant)",
               color: "var(--md-on-background)", padding: 12, borderRadius: 20,
               cursor: "pointer", fontWeight: 500, fontSize: 14, fontFamily: "'Roboto', system-ui, sans-serif",
             }}>Cancel</button>
