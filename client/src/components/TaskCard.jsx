@@ -55,8 +55,10 @@ function PipelineStepper({ stage, isMobile }) {
   return (
     <div style={{
       display: "flex", alignItems: "flex-start",
-      margin: "12px 0 4px", padding: "0 2px",
+      margin: "12px 0 8px", padding: "8px 12px",
       gap: 0,
+      background: "var(--md-surface-container-low, #F7F2FA)",
+      borderRadius: 12,
     }}>
       {STAGES.map((s, i) => {
         const isCompleted = i < currentIdx;
@@ -67,10 +69,10 @@ function PipelineStepper({ stage, isMobile }) {
           <div key={s} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
             <div style={{
               display: "flex", flexDirection: "column", alignItems: "center",
-              minWidth: isMobile ? 32 : 44, gap: 6,
+              minWidth: isMobile ? 38 : 48, gap: 6,
             }}>
               <div style={{
-                width: 18, height: 18, borderRadius: "50%",
+                width: 20, height: 20, borderRadius: "50%",
                 border: `2px solid ${color}`,
                 background: (isCompleted || isCurrent) ? color : "transparent",
                 display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
@@ -78,7 +80,7 @@ function PipelineStepper({ stage, isMobile }) {
                 transition: "all 200ms ease",
               }}>
                 {isCompleted && (
-                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
                     <path d="M5 13l4 4L19 7" />
                   </svg>
                 )}
@@ -87,14 +89,14 @@ function PipelineStepper({ stage, isMobile }) {
                 fontSize: isMobile ? 10 : 11,
                 fontWeight: isCurrent ? 700 : 500,
                 color: isCurrent ? color : isCompleted ? "#386A20" : "var(--md-outline-variant, #CAC4D0)",
-                letterSpacing: "0.03em",
+                letterSpacing: isMobile ? "0.01em" : "0.03em",
                 whiteSpace: "nowrap",
                 lineHeight: 1,
               }}>{label}</span>
             </div>
             {i < STAGES.length - 1 && (
               <div style={{
-                flex: 1, height: 2, minWidth: 10,
+                flex: 1, height: 2, minWidth: isMobile ? 8 : 12,
                 background: isCompleted ? "#386A20" : "var(--md-surface-variant, #E7E0EC)",
                 marginTop: -14, borderRadius: 1,
               }} />
@@ -266,9 +268,9 @@ export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, 
       {/* ── Header: badges + duration ───────────────────── */}
       <div style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
-        padding: "14px 16px 8px", gap: 12,
+        padding: "16px 16px 8px", gap: 12, flexWrap: "wrap",
       }}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", rowGap: 6 }}>
           <Badge
             label={task.status.replace("_", " ")}
             color={statusColor}
@@ -283,12 +285,13 @@ export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, 
       </div>
 
       {/* ── Body ────────────────────────────────────────── */}
-      <div style={{ padding: "4px 16px 14px" }}>
+      <div style={{ padding: "4px 16px 16px" }}>
         {/* Title */}
         <div style={{
-          fontWeight: 600, fontSize: 14, lineHeight: 1.45,
+          fontWeight: 600, fontSize: 15, lineHeight: 1.45,
           color: "var(--md-on-surface, #1C1B1F)",
-          marginBottom: 6,
+          marginBottom: 8,
+          fontFamily: "'Roboto', system-ui, sans-serif",
         }}>
           {task.title}
         </div>
@@ -297,13 +300,13 @@ export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, 
         {(task.description || task.prompt) && (
           <div style={{
             color: "var(--md-on-surface-variant, #49454F)",
-            fontSize: 13, lineHeight: 1.5,
+            fontSize: 13, lineHeight: 1.55,
             marginBottom: 8, opacity: 0.75,
             display: "-webkit-box", WebkitLineClamp: 2,
             WebkitBoxOrient: "vertical", overflow: "hidden",
           }}>
-            {(task.description || task.prompt).slice(0, 120)}
-            {(task.description || task.prompt).length > 120 ? "…" : ""}
+            {(task.description || task.prompt).slice(0, 140)}
+            {(task.description || task.prompt).length > 140 ? "…" : ""}
           </div>
         )}
 
@@ -313,14 +316,20 @@ export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, 
         {/* Agent info row */}
         <div style={{
           display: "flex", justifyContent: "space-between", alignItems: "center",
-          marginTop: 10, gap: 16,
+          marginTop: 12, gap: 16, padding: "8px 0 0",
+          borderTop: "1px solid var(--md-surface-variant, #E7E0EC)",
         }}>
           {agent ? (
             <div style={{
               display: "inline-flex", alignItems: "center", gap: 8,
               fontSize: 13, color: "var(--md-on-surface-variant, #49454F)",
             }}>
-              <span style={{ fontSize: 16, lineHeight: 1 }}>{icon}</span>
+              <span style={{
+                fontSize: 14, lineHeight: 1,
+                width: 28, height: 28, borderRadius: "50%",
+                background: "var(--md-surface-container-low, #F7F2FA)",
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+              }}>{icon}</span>
               <span style={{ fontWeight: 600 }}>{agent}</span>
               <span style={{ color: "var(--md-outline, #79747E)", fontSize: 12 }}>·</span>
               <span style={{
@@ -337,13 +346,14 @@ export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, 
           <span style={{
             fontSize: 11, color: "var(--md-outline, #79747E)",
             whiteSpace: "nowrap", flexShrink: 0,
+            fontFamily: "'Roboto', system-ui, sans-serif",
           }}>{formatTime(task.created_at)}</span>
         </div>
 
         {task.project && (
           <div style={{
             fontSize: 11, color: "var(--md-outline, #79747E)",
-            marginTop: 6, fontWeight: 500,
+            marginTop: 8, fontWeight: 500,
           }}>
             📁 {task.project.name}
           </div>
