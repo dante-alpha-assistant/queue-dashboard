@@ -17,6 +17,24 @@
   --md-on-surface-variant: #49454F;
   --md-primary-container: #EADDFF;
   --md-on-primary-container: #21005D;
+  --md-outline: #79747E;
+  --md-outline-variant: #CAC4D0;
+  --md-surface-dim: #DED8E1;
+  --md-surface-bright: #FFFBFE;
+  --md-surface-container-low: #F7F2FA;
+  --md-surface-container-high: #ECE6F0;
+  --md-surface-container-highest: #E6E0E9;
+  --md-error: #BA1A1A;
+  --md-error-container: #FFDAD6;
+  --md-on-error-container: #410002;
+  --md-tertiary: #7D5260;
+  --md-tertiary-container: #FFD8E4;
+  --md-on-tertiary-container: #31111D;
+  --md-warning-container: #FFF3E0;
+  --md-on-warning-container: #E65100;
+  --md-success: #2E7D32;
+  --md-success-container: #E8F5E9;
+  --md-on-success-container: #1B5E20;
 }
 
 * { box-sizing: border-box; }

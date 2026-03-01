@@ -72,26 +72,26 @@ function ensureModalStyles() {
     }
     .task-modal-md table th,
     .task-modal-md table td {
-      border: 1px solid var(--md-surface-variant, #E0E0E0);
+      border: 1px solid var(--md-surface-variant);
       padding: 6px 10px;
       text-align: left;
     }
     .task-modal-md table th {
-      background: var(--md-surface-variant, #F0F0F0);
+      background: var(--md-surface-variant);
       font-weight: 600;
     }
     .task-modal-md table tr:nth-child(even) td {
-      background: var(--md-surface, rgba(0,0,0,0.02));
+      background: var(--md-surface);
     }
     .task-modal-md blockquote {
-      border-left: 4px solid var(--md-primary, #6750A4);
-      background: var(--md-surface, rgba(103,80,164,0.05));
+      border-left: 4px solid var(--md-primary);
+      background: var(--md-surface-container-low);
       margin: 8px 0;
       padding: 8px 16px;
       border-radius: 0 8px 8px 0;
     }
     .task-modal-md a {
-      color: var(--md-primary, #6750A4);
+      color: var(--md-primary);
       text-decoration: underline;
       text-underline-offset: 2px;
     }
@@ -99,7 +99,7 @@ function ensureModalStyles() {
       opacity: 0.8;
     }
     .task-modal-md pre {
-      background: var(--md-surface-variant, #F5F5F5);
+      background: var(--md-surface-variant);
       border-radius: 8px;
       padding: 12px;
       overflow-x: auto;
@@ -110,7 +110,7 @@ function ensureModalStyles() {
       font-size: 0.9em;
     }
     .task-modal-md code:not(pre code) {
-      background: var(--md-surface-variant, #F0F0F0);
+      background: var(--md-surface-variant);
       padding: 2px 6px;
       border-radius: 4px;
     }
@@ -132,7 +132,7 @@ function ensureModalStyles() {
       position: absolute;
       top: 8px;
       right: 8px;
-      background: var(--md-surface-variant, #E0E0E0);
+      background: var(--md-surface-variant);
       border: none;
       border-radius: 6px;
       padding: 4px 8px;
@@ -310,7 +310,7 @@ function Timeline({ task, isMobile }) {
           const stepColor = isFail ? '#BA1A1A'
             : isCompleted ? '#2E7D32'
             : isCurrent ? (STATUS_STYLES[status]?.color || '#E65100')
-            : '#BDBDBD';
+            : 'var(--md-outline-variant)';
           const stepTime = (isCompleted || isCurrent) ? getStepTime(task, step.key) : null;
           const duration = i > 0 && (isCompleted || isCurrent) ? getDuration(steps[i - 1], step) : null;
 
@@ -320,10 +320,10 @@ function Timeline({ task, isMobile }) {
                 <div style={{ display: 'flex', alignItems: 'center', paddingLeft: 9 }}>
                   <div style={{
                     width: 2, height: duration ? 28 : 20,
-                    backgroundColor: isCompleted ? '#2E7D32' : 'var(--md-surface-variant, #E0E0E0)',
+                    backgroundColor: isCompleted ? '#2E7D32' : 'var(--md-surface-variant)',
                   }} />
                   {duration && (
-                    <span style={{ fontSize: 10, color: 'var(--md-on-surface-variant, #999)', marginLeft: 10, fontStyle: 'italic' }}>{duration}</span>
+                    <span style={{ fontSize: 10, color: 'var(--md-on-surface-variant)', marginLeft: 10, fontStyle: 'italic' }}>{duration}</span>
                   )}
                 </div>
               )}
@@ -349,10 +349,10 @@ function Timeline({ task, isMobile }) {
                 <div>
                   <span style={{
                     fontSize: 12, fontWeight: 500,
-                    color: isCurrent ? 'var(--md-on-background)' : isCompleted ? 'var(--md-on-surface-variant, #666)' : '#BDBDBD',
+                    color: isCurrent ? 'var(--md-on-background)' : isCompleted ? 'var(--md-on-surface-variant)' : 'var(--md-outline-variant)',
                   }}>{step.label}</span>
                   {stepTime && (
-                    <span style={{ fontSize: 10, color: 'var(--md-on-surface-variant, #999)', marginLeft: 8 }}>{formatShortDate(stepTime)}</span>
+                    <span style={{ fontSize: 10, color: 'var(--md-on-surface-variant)', marginLeft: 8 }}>{formatShortDate(stepTime)}</span>
                   )}
                 </div>
               </div>
@@ -372,7 +372,7 @@ function Timeline({ task, isMobile }) {
         const stepColor = isFail ? '#BA1A1A'
           : isCompleted ? '#2E7D32'
           : isCurrent ? (STATUS_STYLES[status]?.color || '#E65100')
-          : '#BDBDBD';
+          : 'var(--md-outline-variant)';
         const stepTime = (isCompleted || isCurrent) ? getStepTime(task, step.key) : null;
         const duration = i > 0 && (isCompleted || isCurrent) ? getDuration(steps[i - 1], step) : null;
 
@@ -399,17 +399,17 @@ function Timeline({ task, isMobile }) {
               </div>
               <span style={{
                 fontSize: 10, marginTop: 6, fontWeight: 500, textAlign: 'center', lineHeight: 1.2,
-                color: isCurrent ? 'var(--md-on-background)' : isCompleted ? 'var(--md-on-surface-variant, #666)' : '#BDBDBD',
+                color: isCurrent ? 'var(--md-on-background)' : isCompleted ? 'var(--md-on-surface-variant)' : 'var(--md-outline-variant)',
               }}>{step.label}</span>
               {stepTime && (
-                <span style={{ fontSize: 9, color: 'var(--md-on-surface-variant, #999)', marginTop: 2, textAlign: 'center' }}>{formatShortDate(stepTime)}</span>
+                <span style={{ fontSize: 9, color: 'var(--md-on-surface-variant)', marginTop: 2, textAlign: 'center' }}>{formatShortDate(stepTime)}</span>
               )}
             </div>
             {i < steps.length - 1 && (
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 10, paddingLeft: 4, paddingRight: 4, minWidth: 12 }}>
-                <div style={{ height: 2, width: '100%', borderRadius: 1, backgroundColor: isCompleted ? '#2E7D32' : 'var(--md-surface-variant, #E0E0E0)' }} />
+                <div style={{ height: 2, width: '100%', borderRadius: 1, backgroundColor: isCompleted ? '#2E7D32' : 'var(--md-surface-variant)' }} />
                 {duration && (
-                  <span style={{ fontSize: 9, color: 'var(--md-on-surface-variant, #999)', marginTop: 2, fontStyle: 'italic' }}>{duration}</span>
+                  <span style={{ fontSize: 9, color: 'var(--md-on-surface-variant)', marginTop: 2, fontStyle: 'italic' }}>{duration}</span>
                 )}
               </div>
             )}
@@ -501,7 +501,7 @@ function JsonSyntax({ data, indent = 0, _skipBrace = false }) {
 function ResultDisplay({ result, bgColor, borderColor, textColor }) {
   const [copied, setCopied] = useState(false);
 
-  if (!result) return <p style={{ fontSize: 14, color: 'var(--md-on-surface-variant, #999)' }}>No result yet</p>;
+  if (!result) return <p style={{ fontSize: 14, color: 'var(--md-on-surface-variant)' }}>No result yet</p>;
 
   let parsed = result;
   if (typeof result === 'string') {
@@ -554,8 +554,8 @@ function ResultDisplay({ result, bgColor, borderColor, textColor }) {
         </button>
         <pre style={{
           fontSize: 13, fontFamily: "'Fira Code', Consolas, monospace", whiteSpace: 'pre-wrap', overflowX: 'auto',
-          padding: 16, paddingTop: 32, background: 'var(--md-surface, #FAFAFA)', borderRadius: 12,
-          border: '1px solid var(--md-surface-variant, #E0E0E0)', margin: 0, lineHeight: 1.6,
+          padding: 16, paddingTop: 32, background: 'var(--md-surface)', borderRadius: 12,
+          border: '1px solid var(--md-surface-variant)', margin: 0, lineHeight: 1.6,
         }}>
           <JsonSyntax data={parsed} indent={0} />
         </pre>
@@ -599,7 +599,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
   };
 
   const sectionLabelStyle = {
-    fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant, #999)",
+    fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)",
     textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6,
   };
 
@@ -622,7 +622,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
               }}>{task.status.replace("_", " ")}</span>
               <span style={{
                 padding: "4px 10px", borderRadius: 8, fontSize: 11, fontWeight: 500,
-                background: "var(--md-surface-variant, #F3F3F3)", color: "var(--md-on-surface-variant, #666)", textTransform: "uppercase",
+                background: "var(--md-surface-variant)", color: "var(--md-on-surface-variant)", textTransform: "uppercase",
               }}>{task.type}</span>
               {task.priority && task.priority !== "normal" && (
                 <span style={{
@@ -651,40 +651,40 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
           }}>
             {task.project && (
               <div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant, #999)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Project</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Project</div>
                 <div style={{ fontSize: 14, fontWeight: 500 }}>{task.project.name}</div>
               </div>
             )}
             {agent && (
               <div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant, #999)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Agent</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Agent</div>
                 <div style={{ fontSize: 14, fontWeight: 500 }}>{icon} {agent}</div>
               </div>
             )}
             {task.dispatched_by && (
               <div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant, #999)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Dispatched by</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Dispatched by</div>
                 <div style={{ fontSize: 14, fontWeight: 500 }}>{task.dispatched_by}</div>
               </div>
             )}
             <div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant, #999)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Created</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Created</div>
               <div style={{ fontSize: 14 }}>{formatDate(task.created_at)}</div>
             </div>
             {task.started_at && (
               <div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant, #999)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Started</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Started</div>
                 <div style={{ fontSize: 14 }}>{formatDate(task.started_at)}</div>
               </div>
             )}
             {task.completed_at && (task.status === "completed" || task.status === "done") && (
               <div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant, #999)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Completed</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Completed</div>
                 <div style={{ fontSize: 14 }}>{formatDate(task.completed_at)}</div>
               </div>
             )}
             <div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant, #999)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Stage</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>Stage</div>
               <select
                 value={task.stage || ""}
                 onChange={e => onStatusChange(task.id, { stage: e.target.value || null })}
@@ -692,7 +692,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
                 style={{
                   padding: "4px 8px", borderRadius: 8, fontSize: 13, fontWeight: 500,
                   border: "1px solid var(--md-surface-variant)", background: "var(--md-surface)",
-                  color: task.stage ? (STAGE_COLORS[task.stage] || "var(--md-on-surface-variant, #666)") : "var(--md-on-surface-variant, #999)",
+                  color: task.stage ? (STAGE_COLORS[task.stage] || "var(--md-on-surface-variant)") : "var(--md-on-surface-variant)",
                   cursor: "pointer", fontFamily: "'Roboto', system-ui, sans-serif", outline: "none",
                 }}
               >
@@ -729,8 +729,8 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
             <div style={{ marginBottom: 16 }}>
               <div style={sectionLabelStyle}>Acceptance Criteria</div>
               <div style={{
-                padding: isMobile ? 12 : 16, background: "#FFFDE7", borderRadius: 12,
-                border: "1px solid #FFF9C4",
+                padding: isMobile ? 12 : 16, background: "var(--md-warning-container)", borderRadius: 12,
+                border: "1px solid var(--md-outline-variant)",
               }}>
                 <MarkdownContent text={task.acceptance_criteria} />
               </div>
@@ -740,7 +740,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
           {task.result && (
             <div style={{ marginBottom: 16 }}>
               <div style={{ ...sectionLabelStyle, color: "#2E7D32" }}>✓ Result</div>
-              <ResultDisplay result={task.result} bgColor="#E8F5E9" borderColor="#C8E6C9" textColor="#1B5E20" />
+              <ResultDisplay result={task.result} bgColor="var(--md-success-container)" borderColor="var(--md-outline-variant)" textColor="var(--md-on-success-container)" />
             </div>
           )}
 
@@ -770,7 +770,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
           )}
 
           <div style={{
-            fontSize: 11, color: "var(--md-on-surface-variant, #999)", marginTop: 8,
+            fontSize: 11, color: "var(--md-on-surface-variant)", marginTop: 8,
             fontFamily: "'Roboto', system-ui, sans-serif", opacity: 0.6,
             letterSpacing: "0.02em",
           }}>
