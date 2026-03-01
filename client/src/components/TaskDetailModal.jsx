@@ -30,6 +30,7 @@ const STATUS_CONFIG = {
   completed:   { bg: "#1B5E2014", color: "#1B5E20", label: "Completed",   accent: "#1B5E20" },
   failed:      { bg: "#BA1A1A14", color: "#BA1A1A", label: "Failed",      accent: "#BA1A1A" },
   deployed:    { bg: "#00838F14", color: "#00838F", label: "Deployed",    accent: "#00838F" },
+  deprecated:  { bg: "#9E9E9E14", color: "#9E9E9E", label: "Deprecated",  accent: "#9E9E9E" },
 };
 
 const PRIORITY_CONFIG = {
@@ -564,6 +565,8 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const [activeTab, setActiveTab] = useState('details');
   const [collapsedSections, setCollapsedSections] = useState({});
   const [idCopied, setIdCopied] = useState(false);
+  const [deprecateConfirm, setDeprecateConfirm] = useState(false);
+  const [deprecating, setDeprecating] = useState(false);
 
   useEffect(() => { ensureModalStyles(); }, []);
   useEffect(() => {
@@ -581,6 +584,18 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
 
   const copyId = () => {
     navigator.clipboard.writeText(task.id).then(() => { setIdCopied(true); setTimeout(() => setIdCopied(false), 1200); }).catch(() => {});
+  };
+
+  const handleDeprecate = async () => {
+    if (!deprecateConfirm) { setDeprecateConfirm(true); return; }
+    setDeprecating(true);
+    try {
+      await onStatusChange(task.id, { status: 'deprecated' });
+      handleClose();
+    } catch {
+      setDeprecating(false);
+      setDeprecateConfirm(false);
+    }
   };
 
   if (!task) return null;
@@ -917,7 +932,20 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
               {timeAgo(task.updated_at || task.created_at)}
             </span>
           )}
-          {/* Delete button removed — tasks are immutable history */}
+          {task.status !== 'deprecated' && (
+            <button className="tdm-action-btn" onClick={handleDeprecate} disabled={deprecating}
+              onBlur={() => { if (!deprecating) setDeprecateConfirm(false); }}
+              style={{
+                background: deprecateConfirm ? '#9E9E9E' : 'var(--md-surface-container-low, #F7F2FA)',
+                color: deprecateConfirm ? '#fff' : '#79747E',
+                border: deprecateConfirm ? '1px solid #9E9E9E' : '1px solid var(--md-surface-variant, #E7E0EC)',
+                minHeight: isMobile ? 42 : 36,
+                opacity: deprecating ? 0.6 : 1,
+                cursor: deprecating ? 'wait' : 'pointer',
+              }}>
+              {deprecating ? '⏳ Deprecating…' : deprecateConfirm ? 'Mark as deprecated? This hides the task from the board.' : 'Deprecate'}
+            </button>
+          )}
           <button className="tdm-action-btn" onClick={handleClose}
             style={{ background: 'var(--md-surface-container-low, #F7F2FA)', color: 'var(--md-on-surface-variant, #49454F)', border: '1px solid var(--md-surface-variant, #E7E0EC)', minHeight: isMobile ? 42 : 36 }}>
             Close
