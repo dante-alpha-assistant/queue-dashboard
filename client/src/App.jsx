@@ -42,6 +42,19 @@ export default function App() {
   const [stageFilter, setStageFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("todo");
   const [view, setView] = useState("board");
+  const [collapsedCols, setCollapsedCols] = useState(() => {
+    try {
+      const saved = localStorage.getItem("collapsedColumns");
+      return saved ? JSON.parse(saved) : { deployed: true, failed: true };
+    } catch { return { deployed: true, failed: true }; }
+  });
+  const toggleCollapse = (col) => {
+    setCollapsedCols(prev => {
+      const next = { ...prev, [col]: !prev[col] };
+      localStorage.setItem("collapsedColumns", JSON.stringify(next));
+      return next;
+    });
+  };
   const [timeFilter, setTimeFilter] = useState({ range: "today", customFrom: "", customTo: "" });
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
 
@@ -377,10 +390,10 @@ export default function App() {
         <Column title="Completed" color="#1B5E20" count={filterByType(completed).length} isTablet={isTablet}>
           {renderCards(filterByType(completed).slice(0, 20))}
         </Column>
-        <Column title="Deployed" color="#00897B" count={filterByType(deployed).length} isTablet={isTablet}>
+        <Column title="Deployed" color="#00897B" count={filterByType(deployed).length} isTablet={isTablet} collapsible collapsed={collapsedCols.deployed} onToggleCollapse={() => toggleCollapse("deployed")}>
           {renderCards(filterByType(deployed).slice(0, 20))}
         </Column>
-        <Column title="Failed" color="#BA1A1A" count={filterByType(failed).length} isTablet={isTablet}>
+        <Column title="Failed" color="#BA1A1A" count={filterByType(failed).length} isTablet={isTablet} collapsible collapsed={collapsedCols.failed} onToggleCollapse={() => toggleCollapse("failed")}>
           {renderCards(filterByType(failed))}
         </Column>
       </div>
