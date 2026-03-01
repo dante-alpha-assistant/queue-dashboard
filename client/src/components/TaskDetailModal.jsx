@@ -559,7 +559,7 @@ function SmartRetryInfo({ metadata }) {
 
 /* ── Main Modal ───────────────────────────────────────────── */
 
-export default function TaskDetailModal({ task, onClose, onStatusChange, onDelete, isMobile, isTablet }) {
+export default function TaskDetailModal({ task, onClose, onStatusChange, onDelete: _unused, isMobile, isTablet }) {
   const [closing, setClosing] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
   const [collapsedSections, setCollapsedSections] = useState({});
@@ -917,12 +917,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, onDelet
               {timeAgo(task.updated_at || task.created_at)}
             </span>
           )}
-          {onDelete && (
-            <button className="tdm-action-btn" onClick={() => { if (window.confirm('Delete this task?')) onDelete(task.id); }}
-              style={{ background: 'transparent', color: '#BA1A1A', border: '1px solid #BA1A1A30', minHeight: isMobile ? 42 : 36 }}>
-              Delete
-            </button>
-          )}
+          {/* Delete button removed — tasks are immutable history */}
           <button className="tdm-action-btn" onClick={handleClose}
             style={{ background: 'var(--md-surface-container-low, #F7F2FA)', color: 'var(--md-on-surface-variant, #49454F)', border: '1px solid var(--md-surface-variant, #E7E0EC)', minHeight: isMobile ? 42 : 36 }}>
             Close
