@@ -38,8 +38,8 @@ router.get("/stats", async (req, res) => {
     if (req.query.project_id) query = query.eq("project_id", req.query.project_id);
     const { data, error } = await query;
     if (error) throw error;
-    const stats = { todo: 0, assigned: 0, in_progress: 0, done: 0, qa: 0, qa_testing: 0, completed: 0, failed: 0 };
-    data.forEach((t) => { if (stats[t.status] !== undefined) stats[t.status]++; });
+    const stats = { todo: 0, assigned: 0, in_progress: 0, done: 0, qa: 0, qa_testing: 0, completed: 0, failed: 0, deployed: 0 };
+    data.forEach((t) => { if (t.status !== "deprecated" && stats[t.status] !== undefined) stats[t.status]++; });
     res.json(stats);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -55,6 +55,10 @@ router.get("/tasks", async (req, res) => {
       .order("created_at", { ascending: false });
     if (req.query.project_id) query = query.eq("project_id", req.query.project_id);
     if (req.query.repository_id) query = query.eq("repository_id", req.query.repository_id);
+    // Hide deprecated tasks by default (soft-deleted); include with ?include_deprecated=true
+    if (req.query.include_deprecated !== "true") {
+      query = query.neq("status", "deprecated");
+    }
     const { data, error } = await query;
     if (error) throw error;
     res.json(data);
@@ -108,6 +112,9 @@ router.patch("/tasks/:id", async (req, res) => {
       updates.started_at = null;
       updates.completed_at = null;
       updates.error = null;
+    }
+    if (updates.status === "deprecated") {
+      updates.completed_at = updates.completed_at || new Date().toISOString();
     }
 
     const { data, error } = await supabase
