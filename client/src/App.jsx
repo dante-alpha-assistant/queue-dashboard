@@ -63,16 +63,16 @@ export default function App() {
       <div style={{ fontFamily: "'Roboto', system-ui, sans-serif" }}>
         <div style={{
           position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
-          background: "#0a0a0a", borderBottom: "1px solid #222",
+          background: "var(--md-background)", borderBottom: "1px solid var(--md-surface-variant)",
           display: "flex", gap: 0, padding: "0 16px",
         }}>
           {[{ key: "board", label: "📋 Board" }, { key: "pingboard", label: "🤖 Pingboard" }].map(t => (
             <button key={t.key} onClick={() => setView(t.key)} style={{
               padding: "10px 20px", background: "none", border: "none",
-              borderBottom: view === t.key ? "2px solid #33ff00" : "2px solid transparent",
-              color: view === t.key ? "#33ff00" : "#888",
+              borderBottom: view === t.key ? "2px solid var(--md-primary)" : "2px solid transparent",
+              color: view === t.key ? "var(--md-primary)" : "var(--md-on-surface-variant)",
               cursor: "pointer", fontSize: 13, fontWeight: 600,
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "'Roboto', system-ui, sans-serif",
             }}>{t.label}</button>
           ))}
         </div>

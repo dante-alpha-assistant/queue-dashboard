@@ -17,8 +17,6 @@ const STAGES = ["refinery", "foundry", "builder", "inspector", "deployer"];
 const STAGE_LABELS = { refinery: "REF", foundry: "FND", builder: "BLD", inspector: "INS", deployer: "DEP" };
 const ACTIVE_STATUSES = new Set(["in_progress", "assigned", "running", "qa_testing"]);
 
-const mono = "'JetBrains Mono', 'Fira Code', monospace";
-
 function formatDuration(ms) {
   if (!ms || ms < 0) return "0s";
   const s = Math.floor(ms / 1000);
@@ -63,9 +61,9 @@ function PipelineStepper({ stage }) {
                 )}
               </div>
               <span style={{
-                fontSize: 8, fontFamily: mono, fontWeight: 600, marginTop: 2,
+                fontSize: 8, fontWeight: 600, marginTop: 2,
                 color: isCurrent ? color : isCompleted ? "#386A20" : "#BDBDBD",
-                letterSpacing: "0.5px",
+                letterSpacing: "0.5px", textTransform: "uppercase",
               }}>{STAGE_LABELS[s]}</span>
             </div>
             {i < STAGES.length - 1 && (
@@ -90,9 +88,9 @@ function DurationTicker({ updatedAt, active }) {
     return () => clearInterval(id);
   }, [active, updatedAt]);
 
-  if (!updatedAt) return <span style={{ fontFamily: mono, fontSize: 11 }}>—</span>;
+  if (!updatedAt) return <span style={{ fontSize: 11, color: "var(--md-on-surface-variant)" }}>—</span>;
   const elapsed = (active ? now : Date.now()) - new Date(updatedAt).getTime();
-  return <span style={{ fontFamily: mono, fontSize: 11, color: active ? "#E8A317" : "var(--md-on-surface-variant)" }}>{formatDuration(elapsed)}</span>;
+  return <span style={{ fontSize: 11, fontWeight: 500, color: active ? "#E8A317" : "var(--md-on-surface-variant)" }}>{formatDuration(elapsed)}</span>;
 }
 
 export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, isMobile }) {
@@ -107,18 +105,19 @@ export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, 
     : null;
   const errorText = task.error || null;
   const consoleText = resultText || errorText;
-  const consoleColor = resultText ? "#33ff00" : "#ff4444";
-  const consolePrefix = resultText ? "✓" : "✕";
+  const isError = !resultText && !!errorText;
 
   const btnStyle = {
-    fontSize: 11, border: "none", padding: isMobile ? "8px 14px" : "4px 10px",
-    borderRadius: 4, cursor: "pointer", fontWeight: 600, fontFamily: mono,
-    minHeight: isMobile ? 44 : "auto", textTransform: "uppercase", letterSpacing: "0.5px",
+    fontSize: 12, border: "none", padding: isMobile ? "8px 16px" : "6px 14px",
+    borderRadius: 20, cursor: "pointer", fontWeight: 600,
+    fontFamily: "'Roboto', system-ui, sans-serif",
+    minHeight: isMobile ? 44 : "auto", letterSpacing: "0.02em",
+    transition: "all 150ms",
   };
 
   return (
     <div onClick={() => onCardClick?.(task)} style={{
-      background: "var(--md-background)", borderRadius: 6,
+      background: "var(--md-background)", borderRadius: 12,
       border: "1px solid var(--md-surface-variant)",
       borderLeft: `4px solid ${statusColor}`,
       marginBottom: 8, transition: "all 200ms ease", cursor: "pointer",
@@ -131,23 +130,24 @@ export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, 
         borderBottom: "1px solid var(--md-surface-variant, #E0E0E0)",
         background: "var(--md-surface, #FAFAFA)",
       }}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
           <span style={{
-            fontSize: 10, fontWeight: 700, fontFamily: mono,
-            color: statusColor, textTransform: "uppercase", letterSpacing: "1px",
+            fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6,
+            background: `${statusColor}18`, color: statusColor,
+            textTransform: "uppercase", letterSpacing: "0.5px",
           }}>{task.status.replace("_", " ")}</span>
           <span style={{
-            fontSize: 9, fontWeight: 600, fontFamily: mono,
+            fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 6,
+            background: `${TYPE_COLORS[task.type] || "#79747E"}12`,
             color: TYPE_COLORS[task.type] || "#79747E", textTransform: "uppercase",
-            opacity: 0.8,
           }}>{task.type}</span>
           {PRIORITY_BADGES[task.priority] && (
             <span title={task.priority} style={{ fontSize: 10 }}>{PRIORITY_BADGES[task.priority]}</span>
           )}
           {task.project && (
             <span style={{
-              fontSize: 9, fontFamily: mono, color: "var(--md-on-surface-variant)",
-              opacity: 0.7,
+              fontSize: 10, color: "var(--md-on-surface-variant)",
+              opacity: 0.7, fontWeight: 500,
             }}>/{task.project.name}</span>
           )}
         </div>
@@ -169,7 +169,7 @@ export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, 
         {/* Description preview */}
         {(task.description || task.prompt) && (
           <div style={{
-            color: "var(--md-on-surface-variant)", fontSize: 11, marginBottom: 6,
+            color: "var(--md-on-surface-variant)", fontSize: 12, marginBottom: 6,
             lineHeight: 1.4, opacity: 0.8,
           }}>
             {(task.description || task.prompt).slice(0, 100)}
@@ -185,44 +185,46 @@ export default function TaskCard({ task, onStatusChange, onDelete, onCardClick, 
           {agent ? (
             <span style={{
               display: "inline-flex", alignItems: "center", gap: 4,
-              fontSize: 11, fontFamily: mono, color: "var(--md-on-surface-variant)",
+              fontSize: 12, color: "var(--md-on-surface-variant)",
             }}>
               {icon} <span style={{ fontWeight: 600 }}>{agent}</span>
-              <span style={{ opacity: 0.5 }}>—</span>
-              <span style={{ opacity: 0.6, fontStyle: "italic" }}>{role}</span>
+              <span style={{ opacity: 0.4 }}>·</span>
+              <span style={{ opacity: 0.6, fontStyle: "italic", fontSize: 11 }}>{role}</span>
             </span>
           ) : (
-            <span style={{ fontSize: 11, fontFamily: mono, color: "#BDBDBD" }}>unassigned</span>
+            <span style={{ fontSize: 12, color: "#BDBDBD" }}>unassigned</span>
           )}
-          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <span style={{
-              fontSize: 9, fontFamily: mono, color: "var(--md-on-surface-variant)",
+              fontSize: 10, color: "var(--md-on-surface-variant)",
               opacity: 0.5,
             }}>{formatTime(task.created_at)}</span>
             {task.status === "todo" && (
               <button
                 onClick={(e) => { e.stopPropagation(); onStatusChange?.(task.id, { status: "assigned", assigned_agent: task.assigned_agent || "neo" }); }}
                 style={{ ...btnStyle, background: "var(--md-primary)", color: "var(--md-on-primary)" }}
-              >[ASSIGN]</button>
+              >Assign</button>
             )}
             {task.status === "failed" && (
               <button
                 onClick={(e) => { e.stopPropagation(); onStatusChange?.(task.id, { status: "assigned" }); }}
                 style={{ ...btnStyle, background: "#E8A317", color: "#fff" }}
-              >[RETRY]</button>
+              >Retry</button>
             )}
           </div>
         </div>
       </div>
 
-      {/* Terminal Console */}
+      {/* Result/Error Preview */}
       {consoleText && (
         <div style={{
-          background: "#1a1a1a", padding: "6px 12px",
-          fontFamily: mono, fontSize: 11, lineHeight: 1.4,
-          color: consoleColor, borderTop: "1px solid #333",
+          background: isError ? "rgba(186,26,26,0.04)" : "rgba(46,125,50,0.04)",
+          padding: "8px 12px",
+          fontSize: 12, lineHeight: 1.4,
+          color: isError ? "#BA1A1A" : "#2E7D32",
+          borderTop: `1px solid ${isError ? "rgba(255,204,188,0.3)" : "rgba(200,230,201,0.3)"}`,
         }}>
-          <span style={{ opacity: 0.5 }}>{consolePrefix} </span>
+          <span style={{ fontWeight: 600, marginRight: 4 }}>{isError ? "✕" : "✓"}</span>
           {(typeof consoleText === "string" ? consoleText : JSON.stringify(consoleText)).slice(0, 100)}
           {(typeof consoleText === "string" ? consoleText : JSON.stringify(consoleText)).length > 100 ? "…" : ""}
         </div>
