@@ -5,12 +5,12 @@ const AGENT_ICONS = { neo: "🕶️", mu: "🔧", beta: "⚡", alpha: "🧠", fl
 const AGENT_ROLES = { neo: "Builder", alpha: "Leader", beta: "QA", mu: "Builder", flow: "Orchestrator", ifra: "Ops" };
 const STATUS_COLORS = {
   todo: "#79747E", assigned: "#6750A4", in_progress: "#E8A317", running: "#E8A317",
-  done: "#386A20", failed: "#BA1A1A", qa: "#5E35B1", qa_testing: "#5E35B1",
+  failed: "#BA1A1A", qa: "#5E35B1", qa_testing: "#5E35B1",
   completed: "#1B5E20", deployed: "#00838F", blocked: "#D84315",
 };
 const STATUS_BG = {
   todo: "#79747E14", assigned: "#6750A414", in_progress: "#E8A31714", running: "#E8A31714",
-  done: "#386A2014", failed: "#BA1A1A14", qa: "#5E35B114", qa_testing: "#5E35B114",
+  failed: "#BA1A1A14", qa: "#5E35B114", qa_testing: "#5E35B114",
   completed: "#1B5E2014", deployed: "#00838F14", blocked: "#D8431514",
 };
 const PRIORITY_MAP = {

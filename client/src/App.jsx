@@ -35,7 +35,7 @@ const BOTTOM_TABS = [
 
 export default function App() {
   const {
-    stats, todo, assigned, inProgress, done, qa, completed, deployed, blocked, failed,
+    stats, todo, assigned, inProgress, qa, completed, deployed, blocked, failed,
     loading, dispatch, updateTask,
     projects, selectedProject, setSelectedProject,
   } = useQueue();
@@ -106,7 +106,7 @@ export default function App() {
     );
   }
 
-  const allTasksRaw = [...todo, ...assigned, ...inProgress, ...blocked, ...done, ...qa, ...completed, ...deployed, ...failed];
+  const allTasksRaw = [...todo, ...assigned, ...inProgress, ...blocked, ...qa, ...completed, ...deployed, ...failed];
   const allTasks = filterTasksByTime(allTasksRaw, timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
   const activeTypes = ["all", ...new Set(allTasks.map(t => t.type).filter(Boolean))];
   const activeStages = ["all", ...new Set(allTasks.map(t => t.stage).filter(Boolean))];
@@ -399,7 +399,19 @@ export default function App() {
           {renderCards(filterByType(blocked))}
         </Column>
         <Column title="QA Testing" color="#7B5EA7" count={filterByType(qa).length} isTablet={isTablet}>
-          {renderCards(filterByType(qa).slice(0, 30))}
+          {(() => {
+            const qaFiltered = filterByType(qa).slice(0, 30);
+            const waiting = qaFiltered.filter(t => !t.qa_agent);
+            const reviewing = qaFiltered.filter(t => t.qa_agent);
+            return (
+              <>
+                {waiting.length > 0 && <div style={{ fontSize: 11, fontWeight: 600, color: '#7B5EA7', opacity: 0.7, padding: '4px 8px', textTransform: 'uppercase', letterSpacing: 0.5 }}>Waiting ({waiting.length})</div>}
+                {waiting.map(t => <div key={t.id} style={{ opacity: 0.6 }}><TaskCard task={t} onStatusChange={updateTask} onCardClick={setSelectedTask} isMobile={isMobile} /></div>)}
+                {reviewing.length > 0 && <div style={{ fontSize: 11, fontWeight: 600, color: '#7B5EA7', padding: '4px 8px', textTransform: 'uppercase', letterSpacing: 0.5 }}>In Review ({reviewing.length})</div>}
+                {reviewing.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={setSelectedTask} isMobile={isMobile} />)}
+              </>
+            );
+          })()}
         </Column>
         <Column title="Completed" color="#1B5E20" count={filterByType(completed).length} isTablet={isTablet}>
           {renderCards(filterByType(completed).slice(0, 20))}

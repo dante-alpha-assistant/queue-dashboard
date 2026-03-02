@@ -51,7 +51,7 @@ router.get("/stats", async (req, res) => {
     if (req.query.project_id) query = query.eq("project_id", req.query.project_id);
     const { data, error } = await query;
     if (error) throw error;
-    const stats = { todo: 0, assigned: 0, in_progress: 0, done: 0, qa: 0, qa_testing: 0, completed: 0, failed: 0, deployed: 0, blocked: 0 };
+    const stats = { todo: 0, assigned: 0, in_progress: 0, qa: 0, qa_testing: 0, completed: 0, failed: 0, deployed: 0, blocked: 0 };
     data.forEach((t) => { if (t.status !== "deprecated" && stats[t.status] !== undefined) stats[t.status]++; });
     res.json(stats);
   } catch (e) {
@@ -130,7 +130,7 @@ router.post("/tasks", async (req, res) => {
 router.patch("/tasks/:id", async (req, res) => {
   try {
     const updates = { ...req.body, updated_at: new Date().toISOString() };
-    if (updates.status === "done" || updates.status === "failed") {
+    if (updates.status === "failed") {
       updates.completed_at = new Date().toISOString();
     }
     if (updates.status === "in_progress") {
