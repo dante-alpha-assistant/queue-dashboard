@@ -574,6 +574,9 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const [showAssignPicker, setShowAssignPicker] = useState(false);
   const [assigningAgent, setAssigningAgent] = useState(false);
   const [assignErr, setAssignErr] = useState(null);
+  const [deploying, setDeploying] = useState(false);
+  const [deployError, setDeployError] = useState(null);
+  const [deploySuccess, setDeploySuccess] = useState(false);
 
   useEffect(() => { ensureModalStyles(); }, []);
   useEffect(() => {
@@ -604,6 +607,27 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
       setDeprecating(false);
       setDeprecateConfirm(false);
       setDeprecateError(err.message || "Failed to deprecate task");
+    }
+  };
+
+  const handleDeploy = async () => {
+    setDeploying(true);
+    setDeployError(null);
+    setDeploySuccess(false);
+    try {
+      const resp = await fetch(`/api/deploy/${task.id}`, { method: "POST" });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        throw new Error(data.error || `Deploy failed (HTTP ${resp.status})`);
+      }
+      setDeploySuccess(true);
+      // Auto-close after success so the board refreshes
+      setTimeout(() => handleClose(), 1500);
+    } catch (e) {
+      setDeployError(e.message || "Deploy failed");
+      setTimeout(() => setDeployError(null), 5000);
+    } finally {
+      setDeploying(false);
     }
   };
 
@@ -967,6 +991,28 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
               Reopen
             </button>
           )}
+          {task.status === "completed" && (
+            <button className="tdm-action-btn" onClick={handleDeploy} disabled={deploying || deploySuccess}
+              style={{
+                background: deploySuccess ? '#00838F' : deploying ? '#00838F88' : '#00838F',
+                color: '#fff',
+                minHeight: isMobile ? 42 : 36,
+                opacity: deploying ? 0.8 : 1,
+                cursor: deploying ? 'wait' : 'pointer',
+              }}>
+              {deploying ? (
+                <>
+                  <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite', fontSize: 14 }}>⏳</span>
+                  Deploying…
+                </>
+              ) : deploySuccess ? (
+                <>✅ Deployed</>
+              ) : (
+                <>🚀 Deploy</>
+              )}
+            </button>
+          )}
+          {deployError && <span style={{ color: '#D32F2F', fontSize: 12, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={deployError}>⚠️ {deployError}</span>}
           <div style={{ flex: 1 }} />
           {/* Time hint */}
           {!isMobile && task.created_at && (

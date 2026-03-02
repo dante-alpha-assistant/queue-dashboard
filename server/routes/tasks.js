@@ -221,6 +221,196 @@ router.get("/events", async (req, res) => {
   }
 });
 
+// Deploy task — manual promotion to deployed
+// Merges PR (if present), triggers ArgoCD sync, waits for sync, updates status
+router.post("/deploy/:id", async (req, res) => {
+  const GH_TOKEN = process.env.GH_TOKEN;
+  const ARGOCD_URL = process.env.ARGOCD_URL || "http://argocd-server.argocd.svc.cluster.local";
+  const ARGOCD_USERNAME = process.env.ARGOCD_USERNAME;
+  const ARGOCD_PASSWORD = process.env.ARGOCD_PASSWORD;
+  const ARGOCD_TOKEN_ENV = process.env.ARGOCD_TOKEN;
+  const ARGOCD_APP = process.env.ARGOCD_APP || "dev";
+  const SYNC_TIMEOUT = 120_000; // 2 minutes
+  const SYNC_POLL_INTERVAL = 5_000; // 5 seconds
+
+  try {
+    // 1. Fetch task and verify it's completed
+    const { data: task, error: fetchErr } = await supabase
+      .from("agent_tasks")
+      .select("*")
+      .eq("id", req.params.id)
+      .single();
+
+    if (fetchErr || !task) {
+      return res.status(404).json({ ok: false, error: "Task not found" });
+    }
+    if (task.status !== "completed") {
+      return res.status(400).json({ ok: false, error: `Task status is '${task.status}', must be 'completed' to deploy` });
+    }
+
+    // 2. Extract PR reference from task result
+    let prNumber = null;
+    let repoFullName = null;
+    if (task.result) {
+      const resultStr = typeof task.result === "string" ? task.result : JSON.stringify(task.result);
+      const prMatch = resultStr.match(/PR\s*#(\d+)/i) || resultStr.match(/#(\d+)\s*merged/i);
+      if (prMatch) prNumber = parseInt(prMatch[1]);
+      const repoMatch = resultStr.match(/(dante-alpha-assistant\/[\w-]+)/);
+      if (repoMatch) repoFullName = repoMatch[1];
+    }
+
+    // 3. If PR exists, merge it via GitHub API (squash merge, delete branch)
+    if (prNumber && GH_TOKEN) {
+      if (!repoFullName) {
+        // Try to find repo from repository relation
+        if (task.repository_id) {
+          const { data: repo } = await supabase.from("agent_repositories").select("url").eq("id", task.repository_id).single();
+          if (repo?.url) {
+            const m = repo.url.match(/github\.com\/(.+?)(?:\.git)?$/);
+            if (m) repoFullName = m[1];
+          }
+        }
+        if (!repoFullName) {
+          return res.status(400).json({ ok: false, error: "Cannot determine repository for PR merge. No repo reference found in task result." });
+        }
+      }
+
+      // Check PR status first
+      const prResp = await fetch(`https://api.github.com/repos/${repoFullName}/pulls/${prNumber}`, {
+        headers: { Authorization: `token ${GH_TOKEN}`, Accept: "application/vnd.github.v3+json" },
+      });
+      if (!prResp.ok) {
+        return res.status(400).json({ ok: false, error: `Failed to fetch PR #${prNumber} on ${repoFullName}: ${prResp.status}` });
+      }
+      const pr = await prResp.json();
+
+      if (pr.merged) {
+        // Already merged — skip merge step
+        console.log(`[DEPLOY] PR #${prNumber} on ${repoFullName} already merged, skipping merge`);
+      } else if (pr.state === "closed") {
+        return res.status(400).json({ ok: false, error: `PR #${prNumber} is closed but not merged` });
+      } else {
+        // Merge the PR (squash)
+        const mergeResp = await fetch(`https://api.github.com/repos/${repoFullName}/pulls/${prNumber}/merge`, {
+          method: "PUT",
+          headers: { Authorization: `token ${GH_TOKEN}`, Accept: "application/vnd.github.v3+json", "Content-Type": "application/json" },
+          body: JSON.stringify({ merge_method: "squash", commit_title: `${task.title} (#${prNumber})` }),
+        });
+
+        if (!mergeResp.ok) {
+          const mergeErr = await mergeResp.json().catch(() => ({}));
+          const reason = mergeErr.message || `HTTP ${mergeResp.status}`;
+          return res.status(400).json({ ok: false, error: `Merge conflict or failure on PR #${prNumber}: ${reason}` });
+        }
+
+        console.log(`[DEPLOY] Merged PR #${prNumber} on ${repoFullName} (squash)`);
+
+        // Delete the branch
+        if (pr.head?.ref) {
+          try {
+            await fetch(`https://api.github.com/repos/${repoFullName}/git/refs/heads/${pr.head.ref}`, {
+              method: "DELETE",
+              headers: { Authorization: `token ${GH_TOKEN}` },
+            });
+          } catch {} // Best effort
+        }
+      }
+    }
+
+    // 4. Trigger ArgoCD sync
+    let argoToken = ARGOCD_TOKEN_ENV;
+    let syncTriggered = false;
+
+    try {
+      if (!argoToken && ARGOCD_USERNAME && ARGOCD_PASSWORD) {
+        const sessResp = await fetch(`${ARGOCD_URL}/api/v1/session`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: ARGOCD_USERNAME, password: ARGOCD_PASSWORD }),
+        });
+        if (sessResp.ok) {
+          const sessData = await sessResp.json();
+          argoToken = sessData.token;
+        }
+      }
+
+      if (argoToken) {
+        const syncResp = await fetch(`${ARGOCD_URL}/api/v1/applications/${ARGOCD_APP}/sync`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${argoToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        syncTriggered = syncResp.ok;
+        if (!syncResp.ok) {
+          console.warn(`[DEPLOY] ArgoCD sync trigger returned ${syncResp.status} — will still poll`);
+        }
+      }
+    } catch (e) {
+      console.warn(`[DEPLOY] ArgoCD sync trigger failed: ${e.message} — will still poll`);
+    }
+
+    // 5. Poll ArgoCD for sync success (timeout 2min)
+    let syncSucceeded = false;
+    if (argoToken) {
+      const startTime = Date.now();
+      while (Date.now() - startTime < SYNC_TIMEOUT) {
+        try {
+          const appResp = await fetch(`${ARGOCD_URL}/api/v1/applications/${ARGOCD_APP}`, {
+            headers: { Authorization: `Bearer ${argoToken}` },
+          });
+          if (appResp.ok) {
+            const app = await appResp.json();
+            const syncStatus = app?.status?.sync?.status;
+            const healthStatus = app?.status?.health?.status;
+            if (syncStatus === "Synced" && (healthStatus === "Healthy" || healthStatus === "Progressing")) {
+              syncSucceeded = true;
+              break;
+            }
+          }
+        } catch {}
+        await new Promise(r => setTimeout(r, SYNC_POLL_INTERVAL));
+      }
+
+      if (!syncSucceeded) {
+        return res.status(504).json({ ok: false, error: "ArgoCD sync timed out after 2 minutes. PR was merged but sync did not complete. Check ArgoCD status manually." });
+      }
+    } else {
+      // No ArgoCD credentials — skip sync verification, just mark deployed
+      console.log(`[DEPLOY] No ArgoCD credentials configured, skipping sync verification`);
+      syncSucceeded = true;
+    }
+
+    // 6. Update task status to deployed
+    const { data: updated, error: updateErr } = await supabase
+      .from("agent_tasks")
+      .update({
+        status: "deployed",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", req.params.id)
+      .select()
+      .single();
+
+    if (updateErr) {
+      return res.status(500).json({ ok: false, error: `Failed to update task status: ${updateErr.message}` });
+    }
+
+    res.json({
+      ok: true,
+      task: updated,
+      details: {
+        pr_merged: prNumber ? `#${prNumber}` : null,
+        repo: repoFullName,
+        argocd_synced: syncSucceeded,
+        sync_triggered: syncTriggered,
+      },
+    });
+  } catch (e) {
+    console.error(`[DEPLOY] Error deploying task ${req.params.id}:`, e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 // Archive task (soft delete — never actually delete)
 router.delete("/tasks/:id", async (req, res) => {
   try {
