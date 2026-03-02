@@ -4,7 +4,6 @@ import useBreakpoint from "./hooks/useBreakpoint";
 import StatsBar from "./components/StatsBar";
 import Column from "./components/Column";
 import TaskCard from "./components/TaskCard";
-import DispatchModal from "./components/DispatchModal";
 import ChatPanel from "./components/ChatPanel";
 import TaskDetailModal from "./components/TaskDetailModal";
 import Pingboard from "./pages/Pingboard";
@@ -33,10 +32,9 @@ const BOTTOM_TABS = [
 export default function App() {
   const {
     stats, todo, assigned, inProgress, done, qa, completed, deployed, failed,
-    loading, dispatch, updateTask,
+    loading, updateTask,
     projects, selectedProject, setSelectedProject,
   } = useQueue();
-  const [showModal, setShowModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
   const [typeFilter, setTypeFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
@@ -232,15 +230,6 @@ export default function App() {
           {renderCards(colTasks)}
         </div>
 
-        {/* FAB */}
-        <button onClick={() => setShowModal(true)} style={{
-          position: "fixed", bottom: 76, right: 16, width: 56, height: 56,
-          borderRadius: 16, background: "var(--md-primary)", color: "var(--md-on-primary)",
-          border: "none", fontSize: 24, fontWeight: 300, cursor: "pointer", zIndex: 50,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: "0 3px 5px rgba(0,0,0,0.2), 0 6px 10px rgba(0,0,0,0.14), 0 1px 18px rgba(0,0,0,0.12)",
-        }}>+</button>
-
         {/* Bottom navigation */}
         <div style={{
           position: "fixed", bottom: 0, left: 0, right: 0, height: 64,
@@ -270,7 +259,6 @@ export default function App() {
         </div>
 
         <ChatPanel isMobile={isMobile} />
-        {showModal && <DispatchModal onClose={() => setShowModal(false)} dispatch={dispatch} projects={projects} isMobile={isMobile} />}
         {selectedTask && (
           <TaskDetailModal
             task={selectedTask}
@@ -313,13 +301,7 @@ export default function App() {
             }}>🤖 Pingboard</button>
           </div>
           <StatsBar stats={stats} isTablet={isTablet} />
-          <button onClick={() => setShowModal(true)} style={{
-            background: "var(--md-primary)", color: "var(--md-on-primary)",
-            border: "none", borderRadius: 12, padding: "10px 24px",
-            fontWeight: 600, fontSize: 14, cursor: "pointer",
-            fontFamily: "'Roboto', system-ui, sans-serif",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.1)", transition: "all 150ms",
-          }}>+ New Task</button>
+          
         </div>
 
         <div style={{
@@ -406,7 +388,6 @@ export default function App() {
       </div>
 
       <ChatPanel isMobile={false} />
-      {showModal && <DispatchModal onClose={() => setShowModal(false)} dispatch={dispatch} projects={projects} isMobile={false} isTablet={isTablet} />}
       {selectedTask && (
         <TaskDetailModal
           task={selectedTask}
