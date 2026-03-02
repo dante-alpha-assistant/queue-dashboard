@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import AgentPicker from './AgentPicker';
+import StatusTimeline from './StatusTimeline';
 
 /* ── Constants ────────────────────────────────────────────── */
 
@@ -736,7 +737,11 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
       {/* Timeline */}
       <div className="tdm-sidebar-card">
         <SectionLabel icon="⏱️" collapsible collapsed={collapsedSections.timeline} onToggle={() => toggleSection('timeline')}>Timeline</SectionLabel>
-        {!collapsedSections.timeline && <Timeline task={task} />}
+        {!collapsedSections.timeline && (
+          task.status_history && task.status_history.length > 0
+            ? <StatusTimeline task={task} />
+            : <Timeline task={task} />
+        )}
       </div>
 
       {/* Smart retry */}
