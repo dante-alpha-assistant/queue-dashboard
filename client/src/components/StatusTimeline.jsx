@@ -14,6 +14,7 @@ const STATUS_LABELS = {
   deployed: 'Deployed',
   failed: 'Failed',
   deprecated: 'Deprecated',
+  blocked: 'Blocked',
 };
 
 const STATUS_COLORS = {
@@ -28,6 +29,21 @@ const STATUS_COLORS = {
   deployed: '#00838F',
   failed: '#BA1A1A',
   deprecated: '#9E9E9E',
+  blocked: '#E65100',
+};
+
+const STATUS_ICONS = {
+  todo: '○',
+  assigned: '◉',
+  in_progress: '▶',
+  running: '▶',
+  done: '✓',
+  qa_testing: '🔍',
+  completed: '✓',
+  deployed: '🚀',
+  failed: '✕',
+  blocked: '⏸',
+  deprecated: '⊘',
 };
 
 const ACTIVE_STATUSES = new Set(['in_progress', 'assigned', 'running', 'qa_testing']);
@@ -61,14 +77,25 @@ function formatTotalDuration(ms) {
   return `${d}d ${rh}h`;
 }
 
-/* ── Build duration steps from status_history ───────────── */
+function formatTimestamp(iso) {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString('en-US', {
+      month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+      hour12: false,
+    });
+  } catch { return ''; }
+}
+
+/* ── Build steps from status_history ────────────────────── */
 
 function buildSteps(statusHistory, currentStatus) {
   if (!statusHistory || !Array.isArray(statusHistory) || statusHistory.length === 0) {
     return null;
   }
 
-  // Sort by timestamp
   const sorted = [...statusHistory].sort(
     (a, b) => new Date(a.at).getTime() - new Date(b.at).getTime()
   );
@@ -89,6 +116,8 @@ function buildSteps(statusHistory, currentStatus) {
       status: entry.status,
       startTime: entry.at,
       duration: endMs - startMs,
+      agent: entry.agent || null,
+      reason: entry.reason || null,
       isCurrent,
       isTerminal,
       isActive: isCurrent && ACTIVE_STATUSES.has(entry.status),
@@ -114,7 +143,7 @@ function DurationBar({ steps, totalDuration }) {
         return (
           <div
             key={i}
-            title={`${STATUS_LABELS[step.status] || step.status}: ${formatDurationDetailed(step.duration)}`}
+            title={`${STATUS_LABELS[step.status] || step.status}: ${formatDurationDetailed(step.duration)}${step.agent ? ` (${step.agent})` : ''}`}
             style={{
               width: `${pct}%`,
               background: color,
@@ -129,13 +158,128 @@ function DurationBar({ steps, totalDuration }) {
   );
 }
 
+/* ── Vertical Timeline Step ─────────────────────────────── */
+
+function TimelineStep({ step, isFirst, isLast }) {
+  const color = STATUS_COLORS[step.status] || '#79747E';
+  const label = STATUS_LABELS[step.status] || step.status;
+  const icon = STATUS_ICONS[step.status] || '•';
+
+  return (
+    <div style={{ display: 'flex', gap: 10, position: 'relative' }}>
+      {/* Vertical line + dot */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        width: 16, flexShrink: 0,
+      }}>
+        {/* Connector line above */}
+        {!isFirst && (
+          <div style={{
+            width: 2, height: 6,
+            background: 'var(--md-surface-variant, #E7E0EC)',
+          }} />
+        )}
+        {/* Status dot */}
+        <div style={{
+          width: 16, height: 16, borderRadius: '50%',
+          background: color,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+          fontSize: 8, color: 'white', fontWeight: 700,
+          animation: step.isActive ? 'tdm-live-blink 2s ease-in-out infinite' : 'none',
+          boxShadow: step.isActive ? `0 0 0 3px ${color}30` : 'none',
+        }}>
+          {step.isTerminal ? '✓' : step.status === 'failed' ? '✕' : ''}
+        </div>
+        {/* Connector line below */}
+        {!isLast && (
+          <div style={{
+            width: 2, flex: 1, minHeight: 6,
+            background: 'var(--md-surface-variant, #E7E0EC)',
+          }} />
+        )}
+      </div>
+
+      {/* Content */}
+      <div style={{
+        flex: 1, minWidth: 0, paddingBottom: isLast ? 0 : 6,
+        paddingTop: isFirst ? 0 : 0,
+      }}>
+        {/* Status + duration row */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          marginTop: -1,
+        }}>
+          <span style={{
+            fontSize: 11, fontWeight: step.isCurrent ? 700 : 600,
+            color: step.isCurrent
+              ? 'var(--md-on-surface, #1C1B1F)'
+              : 'var(--md-on-surface-variant, #49454F)',
+          }}>
+            {label}
+          </span>
+          <span style={{
+            fontFamily: "'Roboto Mono', monospace",
+            fontSize: 10, fontWeight: 600,
+            color: step.isTerminal ? '#00838F' : color,
+            fontVariantNumeric: 'tabular-nums',
+          }}>
+            {step.isTerminal ? '✅' : formatDurationDetailed(step.duration)}
+          </span>
+        </div>
+
+        {/* Timestamp + agent row */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          flexWrap: 'wrap',
+          marginTop: 1,
+        }}>
+          <span style={{
+            fontSize: 9, color: 'var(--md-outline, #79747E)',
+            fontFamily: "'Roboto Mono', monospace",
+          }}>
+            {formatTimestamp(step.startTime)}
+          </span>
+          {step.agent && (
+            <span style={{
+              fontSize: 9, fontWeight: 600,
+              color: '#6750A4',
+              background: '#6750A40D',
+              padding: '1px 5px',
+              borderRadius: 4,
+            }}>
+              {step.agent}
+            </span>
+          )}
+        </div>
+
+        {/* Reason (for blocked/failed) */}
+        {step.reason && (
+          <div style={{
+            fontSize: 10, color: step.status === 'failed' ? '#BA1A1A' : '#E65100',
+            marginTop: 2, lineHeight: 1.4,
+            fontStyle: 'italic',
+            maxWidth: '100%',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+          }}>
+            {step.reason}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── Main Component ─────────────────────────────────────── */
 
 export default function StatusTimeline({ task }) {
   const [now, setNow] = useState(Date.now());
   const isActive = ACTIVE_STATUSES.has(task.status);
 
-  // Live ticker for active tasks
   useEffect(() => {
     if (!isActive) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -144,7 +288,6 @@ export default function StatusTimeline({ task }) {
 
   const steps = buildSteps(task.status_history, task.status);
 
-  // Fallback: if no status_history, show a simple message
   if (!steps) {
     return (
       <div style={{
@@ -160,74 +303,41 @@ export default function StatusTimeline({ task }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {/* Proportional bar */}
+      {/* Proportional duration bar */}
       <DurationBar steps={steps} totalDuration={totalDuration} />
 
-      {/* Step list */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {steps.map((step, i) => {
-          const color = STATUS_COLORS[step.status] || '#79747E';
-          const label = STATUS_LABELS[step.status] || step.status;
+      {/* Vertical timeline */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+        {steps.map((step, i) => (
+          <TimelineStep
+            key={i}
+            step={step}
+            isFirst={i === 0}
+            isLast={i === steps.length - 1}
+          />
+        ))}
+      </div>
 
-          return (
-            <div key={i} style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '3px 0',
-              fontSize: 11,
-            }}>
-              {/* Color dot */}
-              <div style={{
-                width: 8, height: 8, borderRadius: '50%',
-                background: color, flexShrink: 0,
-                opacity: step.isTerminal ? 0.5 : 1,
-                animation: step.isActive ? 'tdm-live-blink 2s ease-in-out infinite' : 'none',
-              }} />
-
-              {/* Status label */}
-              <span style={{
-                flex: 1, fontWeight: step.isCurrent ? 600 : 400,
-                color: step.isCurrent
-                  ? 'var(--md-on-surface, #1C1B1F)'
-                  : 'var(--md-on-surface-variant, #49454F)',
-              }}>
-                {label}
-              </span>
-
-              {/* Duration */}
-              <span style={{
-                fontFamily: "'Roboto Mono', monospace",
-                fontSize: 10,
-                fontWeight: 600,
-                color: step.isTerminal ? '#00838F' : color,
-                fontVariantNumeric: 'tabular-nums',
-              }}>
-                {step.isTerminal ? '✅' : formatDurationDetailed(step.duration)}
-              </span>
-            </div>
-          );
-        })}
-
-        {/* Total */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '5px 0 0',
-          borderTop: '1px solid var(--md-surface-variant, #E7E0EC)',
-          marginTop: 2,
-          fontSize: 11,
+      {/* Total duration */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '5px 0 0',
+        borderTop: '1px solid var(--md-surface-variant, #E7E0EC)',
+        marginTop: 2,
+        fontSize: 11,
+      }}>
+        <div style={{ width: 16, flexShrink: 0 }} />
+        <span style={{ flex: 1, fontWeight: 700, color: 'var(--md-on-surface, #1C1B1F)' }}>
+          Total
+        </span>
+        <span style={{
+          fontFamily: "'Roboto Mono', monospace",
+          fontSize: 10, fontWeight: 700,
+          color: 'var(--md-on-surface, #1C1B1F)',
+          fontVariantNumeric: 'tabular-nums',
         }}>
-          <div style={{ width: 8, flexShrink: 0 }} />
-          <span style={{ flex: 1, fontWeight: 700, color: 'var(--md-on-surface, #1C1B1F)' }}>
-            Total
-          </span>
-          <span style={{
-            fontFamily: "'Roboto Mono', monospace",
-            fontSize: 10, fontWeight: 700,
-            color: 'var(--md-on-surface, #1C1B1F)',
-            fontVariantNumeric: 'tabular-nums',
-          }}>
-            {formatTotalDuration(totalDuration)}
-          </span>
-        </div>
+          {formatTotalDuration(totalDuration)}
+        </span>
       </div>
     </div>
   );
