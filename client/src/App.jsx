@@ -3,6 +3,7 @@ import useQueue from "./hooks/useQueue";
 import useBreakpoint from "./hooks/useBreakpoint";
 import StatsBar from "./components/StatsBar";
 import Column from "./components/Column";
+import DispatchButton from "./components/DispatchButton";
 import TaskCard from "./components/TaskCard";
 import DispatchModal from "./components/DispatchModal";
 import ChatPanel from "./components/ChatPanel";
@@ -222,6 +223,7 @@ export default function App() {
             background: `${colMeta.color}20`, color: colMeta.color,
             padding: "2px 10px", borderRadius: 10, fontSize: 12, fontWeight: 700,
           }}>{colTasks.length}</span>
+          {activeTab === "todo" && <DispatchButton />}
         </div>
 
         {/* Task list */}
@@ -380,7 +382,7 @@ export default function App() {
       <div style={{
         flex: 1, display: "flex", gap: 12, padding: "16px 24px", overflowX: "auto", minHeight: 0,
       }}>
-        <Column title="Todo" color="#79747E" count={filterByType(todo).length} isTablet={isTablet}>
+        <Column title="Todo" color="#79747E" count={filterByType(todo).length} isTablet={isTablet} headerAction={<DispatchButton />}>
           {renderCards(filterByType(todo))}
         </Column>
         <Column title="Assigned" color="#6750A4" count={filterByType(assigned).length} isTablet={isTablet}>
