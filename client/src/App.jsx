@@ -275,7 +275,7 @@ export default function App() {
           <TaskDetailModal
             task={selectedTask}
             onClose={() => setSelectedTask(null)}
-            onStatusChange={(id, updates) => { updateTask(id, updates); setSelectedTask(null); }}
+            onStatusChange={async (id, updates) => { await updateTask(id, updates); setSelectedTask(null); }}
             isMobile={isMobile}
           />
         )}
@@ -411,7 +411,7 @@ export default function App() {
         <TaskDetailModal
           task={selectedTask}
           onClose={() => setSelectedTask(null)}
-          onStatusChange={(id, updates) => { updateTask(id, updates); setSelectedTask(null); }}
+          onStatusChange={async (id, updates) => { await updateTask(id, updates); setSelectedTask(null); }}
           isMobile={false}
           isTablet={isTablet}
         />
