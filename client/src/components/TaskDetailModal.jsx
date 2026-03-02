@@ -3,8 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import AgentPicker from './AgentPicker';
-import StatusTimeline from './StatusTimeline';
-import { ProgressDetail } from './ProgressFeed';
+import { ProgressTimeline } from './ProgressFeed';
 
 /* ── Constants ────────────────────────────────────────────── */
 
@@ -563,14 +562,13 @@ function SmartRetryInfo({ metadata }) {
 
 /* ── Main Modal ───────────────────────────────────────────── */
 
-export default function TaskDetailModal({ task, onClose, onStatusChange, isMobile, isTablet, progress, monitor }) {
+export default function TaskDetailModal({ task, onClose, onStatusChange, isMobile, isTablet }) {
   const [closing, setClosing] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
   const [collapsedSections, setCollapsedSections] = useState({});
   const [idCopied, setIdCopied] = useState(false);
   const [deprecateConfirm, setDeprecateConfirm] = useState(false);
   const [deprecating, setDeprecating] = useState(false);
-  const [deprecateError, setDeprecateError] = useState(null);
   const [showAssignPicker, setShowAssignPicker] = useState(false);
   const [assigningAgent, setAssigningAgent] = useState(false);
   const [assignErr, setAssignErr] = useState(null);
@@ -596,14 +594,12 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const handleDeprecate = async () => {
     if (!deprecateConfirm) { setDeprecateConfirm(true); return; }
     setDeprecating(true);
-    setDeprecateError(null);
     try {
       await onStatusChange(task.id, { status: 'deprecated' });
       handleClose();
-    } catch (err) {
+    } catch {
       setDeprecating(false);
       setDeprecateConfirm(false);
-      setDeprecateError(err.message || "Failed to deprecate task");
     }
   };
 
@@ -735,20 +731,18 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
         </div>
       )}
 
+      {/* Activity Log (progress feed) */}
+      {Array.isArray(task.progress_log) && task.progress_log.length > 0 && (
+        <div className="tdm-sidebar-card">
+          <ProgressTimeline progressLog={task.progress_log} />
+        </div>
+      )}
+
       {/* Timeline */}
       <div className="tdm-sidebar-card">
         <SectionLabel icon="⏱️" collapsible collapsed={collapsedSections.timeline} onToggle={() => toggleSection('timeline')}>Timeline</SectionLabel>
-        {!collapsedSections.timeline && (
-          task.status_history && task.status_history.length > 0
-            ? <StatusTimeline task={task} />
-            : <Timeline task={task} />
-        )}
+        {!collapsedSections.timeline && <Timeline task={task} />}
       </div>
-
-      {/* Live Progress Feed */}
-      {isActive && (progress || monitor) && (
-        <ProgressDetail progress={progress} monitor={monitor} />
-      )}
 
       {/* Smart retry */}
       <SmartRetryInfo metadata={task.metadata} />
@@ -988,7 +982,6 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
               {deprecating ? '⏳ Deprecating…' : deprecateConfirm ? 'Mark as deprecated? This hides the task from the board.' : 'Deprecate'}
             </button>
           )}
-          {deprecateError && <span style={{color:"#D32F2F",fontSize:13,marginLeft:8}}>{deprecateError}</span>}
           <button className="tdm-action-btn" onClick={handleClose}
             style={{ background: 'var(--md-surface-container-low, #F7F2FA)', color: 'var(--md-on-surface-variant, #49454F)', border: '1px solid var(--md-surface-variant, #E7E0EC)', minHeight: isMobile ? 42 : 36 }}>
             Close

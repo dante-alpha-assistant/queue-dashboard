@@ -1,278 +1,133 @@
-import { useState, useEffect } from "react";
+import { useState } from 'react';
 
-/**
- * Compact progress indicator for TaskCard — shows current step + optional percent bar.
- */
-export function ProgressBadge({ progress, monitor }) {
-  const [pulse, setPulse] = useState(true);
+function timeAgo(isoDate) {
+  if (!isoDate) return '';
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
 
-  useEffect(() => {
-    const id = setInterval(() => setPulse((p) => !p), 1500);
-    return () => clearInterval(id);
-  }, []);
+function formatTimestamp(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
 
-  if (!progress && !monitor) return null;
-
-  const step = progress?.step;
-  const percent = progress?.percent;
-  const log = progress?.log;
-  const alive = monitor?.sessionAlive;
-
-  // Nothing useful to show
-  if (!step && percent == null && !alive) return null;
-
-  const displayText = step || log || (alive ? "Agent working…" : null);
-  if (!displayText && percent == null) return null;
+/* Compact: latest entry only (for TaskCard) */
+export function ProgressLatest({ progressLog }) {
+  if (!Array.isArray(progressLog) || progressLog.length === 0) return null;
+  const latest = progressLog[progressLog.length - 1];
+  if (!latest?.message) return null;
 
   return (
-    <div
-      style={{
-        margin: "8px 0 4px",
-        padding: "8px 12px",
-        background: "linear-gradient(135deg, #1A237E08, #6750A40A)",
-        borderRadius: 10,
-        border: "1px solid #6750A418",
-        fontSize: 12,
-        color: "var(--md-on-surface-variant, #49454F)",
-        fontFamily: "'Roboto', system-ui, sans-serif",
-        display: "flex",
-        flexDirection: "column",
-        gap: 6,
-      }}
-    >
-      {/* Step text */}
-      {displayText && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            minWidth: 0,
-          }}
-        >
-          <span
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: "50%",
-              background: "#6750A4",
-              flexShrink: 0,
-              opacity: pulse ? 1 : 0.3,
-              transition: "opacity 0.5s ease",
-            }}
-          />
-          <span
-            style={{
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              fontWeight: 500,
-              fontSize: 11,
-              letterSpacing: "0.01em",
-            }}
-          >
-            {displayText}
-          </span>
-        </div>
-      )}
-
-      {/* Progress bar */}
-      {percent != null && percent >= 0 && (
-        <div
-          style={{
-            height: 3,
-            borderRadius: 2,
-            background: "var(--md-surface-variant, #E7E0EC)",
-            overflow: "hidden",
-          }}
-        >
-          <div
-            style={{
-              height: "100%",
-              width: `${Math.min(100, Math.max(0, percent))}%`,
-              background: "linear-gradient(90deg, #6750A4, #9C27B0)",
-              borderRadius: 2,
-              transition: "width 0.6s ease",
-            }}
-          />
-        </div>
-      )}
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 6,
+      padding: '6px 0 2px',
+      fontSize: 12, color: 'var(--md-on-surface-variant, #49454F)',
+      fontFamily: "'Roboto Mono', 'SF Mono', monospace",
+    }}>
+      <span style={{
+        width: 6, height: 6, borderRadius: '50%',
+        background: '#E8A317',
+        animation: 'timeline-pulse 2s ease-in-out infinite',
+        flexShrink: 0,
+      }} />
+      <span style={{ opacity: 0.6, flexShrink: 0 }}>{timeAgo(latest.at)}: </span>
+      <span style={{
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        minWidth: 0,
+      }}>
+        {latest.message}
+      </span>
     </div>
   );
 }
 
-/**
- * Detailed progress feed for TaskDetailModal — shows full activity log.
- */
-export function ProgressDetail({ progress, monitor }) {
-  if (!progress && !monitor) return null;
+/* Full timeline (for TaskDetailModal) */
+export function ProgressTimeline({ progressLog }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!Array.isArray(progressLog) || progressLog.length === 0) return null;
 
-  const step = progress?.step;
-  const percent = progress?.percent;
-  const log = progress?.log;
-  const alive = monitor?.sessionAlive;
-  const elapsed = monitor?.elapsed;
-
-  if (!step && percent == null && !log && alive == null) return null;
-
-  const formatElapsed = (ms) => {
-    if (!ms) return null;
-    const s = Math.floor(ms / 1000);
-    if (s < 60) return `${s}s`;
-    const m = Math.floor(s / 60);
-    return m < 60 ? `${m}m ${s % 60}s` : `${Math.floor(m / 60)}h ${m % 60}m`;
-  };
+  const entries = [...progressLog].reverse(); // newest first
+  const visible = expanded ? entries : entries.slice(0, 5);
+  const hasMore = entries.length > 5;
 
   return (
-    <div
-      style={{
-        margin: "12px 0",
-        padding: "14px 16px",
-        background: "linear-gradient(135deg, #1A237E06, #6750A40C)",
-        borderRadius: 12,
-        border: "1px solid #6750A420",
-      }}
-    >
-      {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 10,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            fontSize: 13,
-            fontWeight: 600,
-            color: "#6750A4",
-          }}
-        >
-          <span
-            style={{
-              display: "inline-block",
-              animation: alive !== false ? "spin 2s linear infinite" : "none",
-            }}
-          >
-            {alive !== false ? "⚙️" : "⏸️"}
-          </span>
-          Live Activity
-          {alive !== false && (
-            <span
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                background: "#4CAF50",
-                animation: "timeline-pulse 2s ease-in-out infinite",
-              }}
-            />
-          )}
-        </div>
-        {elapsed != null && (
-          <span
-            style={{
-              fontSize: 11,
-              color: "var(--md-outline, #79747E)",
-              fontFamily: "'Roboto Mono', monospace",
-            }}
-          >
-            {formatElapsed(elapsed)}
-          </span>
-        )}
+    <div style={{
+      margin: '16px 0',
+      background: 'var(--md-surface-container-low, #F7F2FA)',
+      borderRadius: 12,
+      padding: '12px 16px',
+    }}>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        marginBottom: 10,
+      }}>
+        <span style={{
+          fontSize: 13, fontWeight: 600,
+          color: 'var(--md-on-surface, #1C1B1F)',
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+          </svg>
+          Activity Log
+          <span style={{
+            fontSize: 11, fontWeight: 500, color: 'var(--md-outline, #79747E)',
+          }}>({progressLog.length})</span>
+        </span>
       </div>
 
-      {/* Progress bar */}
-      {percent != null && percent >= 0 && (
-        <div style={{ marginBottom: 10 }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: 11,
-              color: "var(--md-on-surface-variant, #49454F)",
-              marginBottom: 4,
-            }}
-          >
-            <span>Progress</span>
-            <span style={{ fontWeight: 600, fontFamily: "'Roboto Mono', monospace" }}>
-              {Math.round(percent)}%
-            </span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+        {visible.map((entry, i) => (
+          <div key={i} style={{
+            display: 'flex', alignItems: 'flex-start', gap: 10,
+            padding: '6px 0',
+            borderLeft: '2px solid var(--md-surface-variant, #E7E0EC)',
+            marginLeft: 4,
+            paddingLeft: 12,
+          }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: i === 0 ? '#E8A317' : 'var(--md-outline-variant, #CAC4D0)',
+              flexShrink: 0, marginTop: 4, marginLeft: -17,
+              animation: i === 0 ? 'timeline-pulse 2s ease-in-out infinite' : 'none',
+            }} />
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <span style={{
+                fontSize: 12, color: 'var(--md-on-surface, #1C1B1F)',
+                lineHeight: 1.4, wordBreak: 'break-word',
+              }}>
+                {entry.message}
+              </span>
+              <span style={{
+                fontSize: 10, color: 'var(--md-outline, #79747E)',
+                marginLeft: 8, whiteSpace: 'nowrap',
+                fontFamily: "'Roboto Mono', monospace",
+              }}>
+                {formatTimestamp(entry.at)}
+              </span>
+            </div>
           </div>
-          <div
-            style={{
-              height: 6,
-              borderRadius: 3,
-              background: "var(--md-surface-variant, #E7E0EC)",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                height: "100%",
-                width: `${Math.min(100, Math.max(0, percent))}%`,
-                background: "linear-gradient(90deg, #6750A4, #9C27B0)",
-                borderRadius: 3,
-                transition: "width 0.6s ease",
-              }}
-            />
-          </div>
-        </div>
-      )}
+        ))}
+      </div>
 
-      {/* Current step */}
-      {step && (
-        <div
+      {hasMore && (
+        <button
+          onClick={() => setExpanded(!expanded)}
           style={{
-            display: "flex",
-            alignItems: "flex-start",
-            gap: 8,
-            fontSize: 13,
-            color: "var(--md-on-surface, #1C1B1F)",
-            marginBottom: log ? 8 : 0,
+            marginTop: 8, background: 'none', border: 'none',
+            color: 'var(--md-primary, #6750A4)', cursor: 'pointer',
+            fontSize: 12, fontWeight: 600, padding: '4px 0',
+            fontFamily: "'Roboto', system-ui, sans-serif",
           }}
         >
-          <span style={{ color: "#6750A4", fontWeight: 600, flexShrink: 0 }}>▸</span>
-          <span style={{ fontWeight: 500 }}>{step}</span>
-        </div>
-      )}
-
-      {/* Log output */}
-      {log && (
-        <div
-          style={{
-            padding: "8px 10px",
-            background: "#1C1B1F",
-            borderRadius: 8,
-            fontSize: 11,
-            fontFamily: "'Roboto Mono', 'SF Mono', monospace",
-            color: "#E0E0E0",
-            lineHeight: 1.5,
-            maxHeight: 120,
-            overflow: "auto",
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-all",
-          }}
-        >
-          {log}
-        </div>
-      )}
-
-      {/* Session status when no progress data */}
-      {!step && !log && percent == null && alive != null && (
-        <div
-          style={{
-            fontSize: 12,
-            color: alive ? "#2E7D32" : "#79747E",
-            fontStyle: "italic",
-          }}
-        >
-          {alive ? "Session active — agent is working" : "Session not detected"}
-        </div>
+          {expanded ? '▲ Show less' : `▼ Show all ${entries.length} entries`}
+        </button>
       )}
     </div>
   );

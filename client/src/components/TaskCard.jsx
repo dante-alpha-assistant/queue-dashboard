@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import AgentPicker from './AgentPicker';
-import { ProgressBadge } from './ProgressFeed';
+import { ProgressLatest } from './ProgressFeed';
 
 const AGENT_ICONS = { neo: "🕶️", mu: "🔧", beta: "⚡", alpha: "🧠", flow: "🌊", ifra: "🛠️" };
 const AGENT_ROLES = { neo: "Builder", alpha: "Leader", beta: "QA", mu: "Builder", flow: "Orchestrator", ifra: "Ops" };
@@ -347,7 +347,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
 }
 
 /* ── Task Card ────────────────────────────────────────────── */
-export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, progress, monitor }) {
+export default function TaskCard({ task, onStatusChange, onCardClick, isMobile }) {
   const agent = task.assigned_agent?.toLowerCase();
   const icon = AGENT_ICONS[agent] || "🤖";
   const role = AGENT_ROLES[agent] || "Agent";
@@ -426,8 +426,8 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
         {/* Pipeline Stepper */}
         <PipelineStepper stage={task.stage} isMobile={isMobile} />
 
-        {/* Live Progress */}
-        {isActive && <ProgressBadge progress={progress} monitor={monitor} />}
+        {/* Live progress (active tasks only) */}
+        {isActive && <ProgressLatest progressLog={task.progress_log} />}
 
         {/* Agent info row */}
         <div style={{
