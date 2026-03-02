@@ -4,9 +4,7 @@ import useBreakpoint from "./hooks/useBreakpoint";
 import useTaskEvents from "./hooks/useTaskEvents";
 import StatsBar from "./components/StatsBar";
 import Column from "./components/Column";
-import DispatchButton from "./components/DispatchButton";
 import TaskCard from "./components/TaskCard";
-import DispatchModal from "./components/DispatchModal";
 import ChatPanel from "./components/ChatPanel";
 import TaskDetailModal from "./components/TaskDetailModal";
 import Pingboard from "./pages/Pingboard";
@@ -16,7 +14,6 @@ const MOBILE_TABS = [
   { key: "todo", label: "Todo", icon: "📋" },
   { key: "assigned", label: "Active", icon: "👤" },
   { key: "in_progress", label: "Active", icon: "⚡" },
-  { key: "blocked", label: "Blocked", icon: "🚫" },
   { key: "qa", label: "QA", icon: "🧪" },
   { key: "completed", label: "Done", icon: "✅" },
   { key: "deployed", label: "Deployed", icon: "🚀" },
@@ -27,7 +24,6 @@ const MOBILE_TABS = [
 const BOTTOM_TABS = [
   { key: "todo", label: "Todo", icon: "📋", color: "#79747E" },
   { key: "active", label: "Active", icon: "⚡", color: "#E8A317" },
-  { key: "blocked", label: "Blocked", icon: "🚫", color: "#D84315" },
   { key: "qa", label: "QA", icon: "🧪", color: "#7B5EA7" },
   { key: "completed", label: "Done", icon: "✅", color: "#1B5E20" },
   { key: "deployed", label: "Deployed", icon: "🚀", color: "#00897B" },
@@ -36,11 +32,10 @@ const BOTTOM_TABS = [
 
 export default function App() {
   const {
-    stats, todo, assigned, inProgress, done, qa, completed, deployed, blocked, failed,
-    loading, dispatch, updateTask,
+    stats, todo, assigned, inProgress, done, qa, completed, deployed, failed,
+    loading, updateTask,
     projects, selectedProject, setSelectedProject,
   } = useQueue();
-  const [showModal, setShowModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
   const [typeFilter, setTypeFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
@@ -108,7 +103,7 @@ export default function App() {
     );
   }
 
-  const allTasksRaw = [...todo, ...assigned, ...inProgress, ...blocked, ...done, ...qa, ...completed, ...deployed, ...failed];
+  const allTasksRaw = [...todo, ...assigned, ...inProgress, ...done, ...qa, ...completed, ...deployed, ...failed];
   const allTasks = filterTasksByTime(allTasksRaw, timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
   const activeTypes = ["all", ...new Set(allTasks.map(t => t.type).filter(Boolean))];
   const activeStages = ["all", ...new Set(allTasks.map(t => t.stage).filter(Boolean))];
@@ -124,7 +119,6 @@ export default function App() {
     switch (activeTab) {
       case "todo": return filterByType(todo);
       case "active": return [...filterByType(assigned), ...filterByType(inProgress)];
-      case "blocked": return filterByType(blocked);
       case "qa": return filterByType(qa);
       case "completed": return filterByType(completed);
       case "deployed": return filterByType(deployed);
@@ -137,7 +131,6 @@ export default function App() {
     switch (activeTab) {
       case "todo": return { title: "Todo", color: "#79747E" };
       case "active": return { title: "Active", color: "#E8A317" };
-      case "blocked": return { title: "Blocked", color: "#D84315" };
       case "qa": return { title: "QA Testing", color: "#7B5EA7" };
       case "completed": return { title: "Completed", color: "#1B5E20" };
       case "deployed": return { title: "Deployed", color: "#00897B" };
@@ -229,7 +222,6 @@ export default function App() {
             background: `${colMeta.color}20`, color: colMeta.color,
             padding: "2px 10px", borderRadius: 10, fontSize: 12, fontWeight: 700,
           }}>{colTasks.length}</span>
-          {activeTab === "todo" && <DispatchButton />}
         </div>
 
         {/* Task list */}
@@ -278,7 +270,6 @@ export default function App() {
         </div>
 
         <ChatPanel isMobile={isMobile} />
-        {showModal && <DispatchModal onClose={() => setShowModal(false)} dispatch={dispatch} projects={projects} isMobile={isMobile} />}
         {selectedTask && (
           <TaskDetailModal
             task={selectedTask}
@@ -323,13 +314,6 @@ export default function App() {
             }}>🤖 Pingboard</button>
           </div>
           <StatsBar stats={stats} isTablet={isTablet} />
-          <button onClick={() => setShowModal(true)} style={{
-            background: "var(--md-primary)", color: "var(--md-on-primary)",
-            border: "none", borderRadius: 12, padding: "10px 24px",
-            fontWeight: 600, fontSize: 14, cursor: "pointer",
-            fontFamily: "'Roboto', system-ui, sans-serif",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.1)", transition: "all 150ms",
-          }}>+ New Task</button>
         </div>
 
         <div style={{
@@ -390,7 +374,7 @@ export default function App() {
       <div style={{
         flex: 1, display: "flex", gap: 12, padding: "16px 24px", overflowX: "auto", minHeight: 0,
       }}>
-        <Column title="Todo" color="#79747E" count={filterByType(todo).length} isTablet={isTablet} headerAction={<DispatchButton />}>
+        <Column title="Todo" color="#79747E" count={filterByType(todo).length} isTablet={isTablet}>
           {renderCards(filterByType(todo))}
         </Column>
         <Column title="Assigned" color="#6750A4" count={filterByType(assigned).length} isTablet={isTablet}>
@@ -398,9 +382,6 @@ export default function App() {
         </Column>
         <Column title="In Progress" color="#E8A317" count={filterByType(inProgress).length} isTablet={isTablet}>
           {renderCards(filterByType(inProgress))}
-        </Column>
-        <Column title="Blocked" color="#D84315" count={filterByType(blocked).length} isTablet={isTablet}>
-          {renderCards(filterByType(blocked))}
         </Column>
         <Column title="QA Testing" color="#7B5EA7" count={filterByType(qa).length} isTablet={isTablet}>
           {renderCards(filterByType(qa).slice(0, 30))}
@@ -419,7 +400,6 @@ export default function App() {
       </div>
 
       <ChatPanel isMobile={false} />
-      {showModal && <DispatchModal onClose={() => setShowModal(false)} dispatch={dispatch} projects={projects} isMobile={false} isTablet={isTablet} />}
       {selectedTask && (
         <TaskDetailModal
           task={selectedTask}
