@@ -28,7 +28,7 @@ const STAGE_COLORS = {
 const STAGES = ["refinery", "foundry", "builder", "inspector", "deployer"];
 const STAGE_LABELS = { refinery: "Refine", foundry: "Found", builder: "Build", inspector: "Inspect", deployer: "Deploy" };
 const STAGE_SHORT = { refinery: "REF", foundry: "FND", builder: "BLD", inspector: "INS", deployer: "DEP" };
-const ACTIVE_STATUSES = new Set(["in_progress", "assigned", "running", "qa_testing"]);
+const ACTIVE_STATUSES = new Set(["in_progress", "assigned", "running", "qa_testing", "completed"]);
 
 function formatDuration(ms) {
   if (!ms || ms < 0) return "0s";
@@ -110,7 +110,7 @@ function PipelineStepper({ stage, isMobile }) {
 }
 
 /* ── Duration Ticker ──────────────────────────────────────── */
-const TERMINAL_STATUSES = new Set(["deployed", "completed", "done", "failed", "cancelled"]);
+const TERMINAL_STATUSES = new Set(["deployed", "done", "failed", "cancelled"]);
 
 function DurationTicker({ updatedAt, startedAt, completedAt, active, status }) {
   const [now, setNow] = useState(Date.now());
@@ -124,10 +124,22 @@ function DurationTicker({ updatedAt, startedAt, completedAt, active, status }) {
   const stateEnteredAt = startedAt || updatedAt;
   if (!stateEnteredAt) return null;
 
-  // Terminal: frozen duration; Active: live ticker from state entry
+  // Completed: live ticker counting time waiting for deploy (from completed_at)
+  // Deployed: frozen duration from completed_at to updated_at (deploy time)
+  // Other terminal: frozen at completion
+  // Active: live ticker from state entry
   const isTerminal = TERMINAL_STATUSES.has(status);
   let elapsed;
-  if (isTerminal) {
+  if (status === "completed") {
+    // Live ticker: time since task was completed, waiting for deploy
+    const from = completedAt ? new Date(completedAt).getTime() : new Date(updatedAt).getTime();
+    elapsed = now - from;
+  } else if (status === "deployed") {
+    // Frozen: show how long it waited between completion and deployment
+    const from = completedAt ? new Date(completedAt).getTime() : new Date(stateEnteredAt).getTime();
+    const end = new Date(updatedAt).getTime();
+    elapsed = end - from;
+  } else if (isTerminal) {
     const end = completedAt ? new Date(completedAt).getTime() : new Date(updatedAt).getTime();
     elapsed = end - new Date(stateEnteredAt).getTime();
   } else if (active) {
