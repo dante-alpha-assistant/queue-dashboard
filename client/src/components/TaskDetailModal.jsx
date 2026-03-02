@@ -568,6 +568,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const [idCopied, setIdCopied] = useState(false);
   const [deprecateConfirm, setDeprecateConfirm] = useState(false);
   const [deprecating, setDeprecating] = useState(false);
+  const [deprecateError, setDeprecateError] = useState(null);
   const [showAssignPicker, setShowAssignPicker] = useState(false);
   const [assigningAgent, setAssigningAgent] = useState(false);
   const [assignErr, setAssignErr] = useState(null);
@@ -593,12 +594,14 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const handleDeprecate = async () => {
     if (!deprecateConfirm) { setDeprecateConfirm(true); return; }
     setDeprecating(true);
+    setDeprecateError(null);
     try {
       await onStatusChange(task.id, { status: 'deprecated' });
       handleClose();
-    } catch {
+    } catch (err) {
       setDeprecating(false);
       setDeprecateConfirm(false);
+      setDeprecateError(err.message || "Failed to deprecate task");
     }
   };
 
@@ -974,6 +977,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
               {deprecating ? '⏳ Deprecating…' : deprecateConfirm ? 'Mark as deprecated? This hides the task from the board.' : 'Deprecate'}
             </button>
           )}
+          {deprecateError && <span style={{color:"#D32F2F",fontSize:13,marginLeft:8}}>{deprecateError}</span>}
           <button className="tdm-action-btn" onClick={handleClose}
             style={{ background: 'var(--md-surface-container-low, #F7F2FA)', color: 'var(--md-on-surface-variant, #49454F)', border: '1px solid var(--md-surface-variant, #E7E0EC)', minHeight: isMobile ? 42 : 36 }}>
             Close
