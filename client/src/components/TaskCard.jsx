@@ -6,12 +6,12 @@ const AGENT_ROLES = { neo: "Builder", alpha: "Leader", beta: "QA", mu: "Builder"
 const STATUS_COLORS = {
   todo: "#79747E", assigned: "#6750A4", in_progress: "#E8A317", running: "#E8A317",
   done: "#386A20", failed: "#BA1A1A", qa: "#5E35B1", qa_testing: "#5E35B1",
-  completed: "#1B5E20", deployed: "#00838F",
+  completed: "#1B5E20", deployed: "#00838F", blocked: "#D84315",
 };
 const STATUS_BG = {
   todo: "#79747E14", assigned: "#6750A414", in_progress: "#E8A31714", running: "#E8A31714",
   done: "#386A2014", failed: "#BA1A1A14", qa: "#5E35B114", qa_testing: "#5E35B114",
-  completed: "#1B5E2014", deployed: "#00838F14",
+  completed: "#1B5E2014", deployed: "#00838F14", blocked: "#D8431514",
 };
 const PRIORITY_MAP = {
   urgent: { color: "#D32F2F", bg: "#D32F2F14", label: "Urgent", icon: "🔴" },
@@ -170,6 +170,8 @@ function ActionBar({ task, onStatusChange, isMobile }) {
   const [showPicker, setShowPicker] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState(null);
+  const [humanInput, setHumanInput] = useState("");
+  const [unblocking, setUnblocking] = useState(false);
 
   const btnBase = {
     fontSize: 12, border: "none", padding: isMobile ? "8px 18px" : "7px 16px",
@@ -238,6 +240,75 @@ function ActionBar({ task, onStatusChange, isMobile }) {
             onSelect={handleAssign}
             onCancel={() => setShowPicker(false)}
           />
+        )}
+      </div>
+    );
+  }
+
+  if (task.status === "blocked") {
+    const handleUnblock = async (e) => {
+      e.stopPropagation();
+      setUnblocking(true);
+      try {
+        await onStatusChange?.(task.id, { status: "todo", human_input: humanInput || null, assigned_agent: null });
+        setHumanInput("");
+      } catch (err) {
+        setAssignError(err.message || "Unblock failed");
+        setTimeout(() => setAssignError(null), 3000);
+      } finally {
+        setUnblocking(false);
+      }
+    };
+
+    return (
+      <div style={{
+        padding: "10px 16px 12px",
+        borderTop: "1px solid var(--md-surface-variant, #E7E0EC)",
+      }} onClick={e => e.stopPropagation()}>
+        {task.blocked_reason && (
+          <div style={{
+            fontSize: 12, color: "#D84315", fontWeight: 500, marginBottom: 8,
+            display: "flex", alignItems: "flex-start", gap: 6,
+          }}>
+            <span>🚫</span>
+            <span>{task.blocked_reason}</span>
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input
+            type="text"
+            placeholder="Response / instructions for agent..."
+            value={humanInput}
+            onChange={e => setHumanInput(e.target.value)}
+            onClick={e => e.stopPropagation()}
+            style={{
+              flex: 1, padding: isMobile ? "10px 12px" : "7px 12px", borderRadius: 8,
+              border: "1px solid var(--md-surface-variant, #E7E0EC)",
+              background: "var(--md-surface, #FFFBFE)",
+              color: "var(--md-on-surface, #1C1B1F)",
+              fontSize: 13, fontFamily: "'Roboto', system-ui, sans-serif",
+              outline: "none", minHeight: isMobile ? 44 : 34,
+            }}
+            onKeyDown={e => { if (e.key === "Enter") handleUnblock(e); }}
+          />
+          <button
+            onClick={handleUnblock}
+            disabled={unblocking}
+            style={{
+              ...btnBase,
+              background: unblocking ? "var(--md-outline, #79747E)" : "#2E7D32",
+              color: "#fff",
+              opacity: unblocking ? 0.7 : 1,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {unblocking ? "⏳" : "✅"} Unblock
+          </button>
+        </div>
+        {assignError && (
+          <span style={{ fontSize: 12, color: "#BA1A1A", fontWeight: 500, marginTop: 6, display: "block" }}>
+            ⚠️ {assignError}
+          </span>
         )}
       </div>
     );
