@@ -16,6 +16,7 @@ const MOBILE_TABS = [
   { key: "todo", label: "Todo", icon: "📋" },
   { key: "assigned", label: "Active", icon: "👤" },
   { key: "in_progress", label: "Active", icon: "⚡" },
+  { key: "done", label: "Awaiting QA", icon: "⏳" },
   { key: "blocked", label: "Blocked", icon: "🚫" },
   { key: "qa", label: "QA", icon: "🧪" },
   { key: "completed", label: "Done", icon: "✅" },
@@ -27,6 +28,7 @@ const MOBILE_TABS = [
 const BOTTOM_TABS = [
   { key: "todo", label: "Todo", icon: "📋", color: "#79747E" },
   { key: "active", label: "Active", icon: "⚡", color: "#E8A317" },
+  { key: "done", label: "Awaiting QA", icon: "⏳", color: "#5C6BC0" },
   { key: "blocked", label: "Blocked", icon: "🚫", color: "#D84315" },
   { key: "qa", label: "QA", icon: "🧪", color: "#7B5EA7" },
   { key: "completed", label: "Done", icon: "✅", color: "#1B5E20" },
@@ -124,6 +126,7 @@ export default function App() {
     switch (activeTab) {
       case "todo": return filterByType(todo);
       case "active": return [...filterByType(assigned), ...filterByType(inProgress)];
+      case "done": return filterByType(done);
       case "blocked": return filterByType(blocked);
       case "qa": return filterByType(qa);
       case "completed": return filterByType(completed);
@@ -137,6 +140,7 @@ export default function App() {
     switch (activeTab) {
       case "todo": return { title: "Todo", color: "#79747E" };
       case "active": return { title: "Active", color: "#E8A317" };
+      case "done": return { title: "Done (Awaiting QA)", color: "#5C6BC0" };
       case "blocked": return { title: "Blocked", color: "#D84315" };
       case "qa": return { title: "QA Testing", color: "#7B5EA7" };
       case "completed": return { title: "Completed", color: "#1B5E20" };
@@ -398,6 +402,9 @@ export default function App() {
         </Column>
         <Column title="In Progress" color="#E8A317" count={filterByType(inProgress).length} isTablet={isTablet}>
           {renderCards(filterByType(inProgress))}
+        </Column>
+        <Column title="Done (Awaiting QA)" color="#5C6BC0" count={filterByType(done).length} isTablet={isTablet}>
+          {renderCards(filterByType(done))}
         </Column>
         <Column title="Blocked" color="#D84315" count={filterByType(blocked).length} isTablet={isTablet}>
           {renderCards(filterByType(blocked))}
