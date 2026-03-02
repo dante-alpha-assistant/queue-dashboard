@@ -263,7 +263,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
       e.stopPropagation();
       setUnblocking(true);
       try {
-        await onStatusChange?.(task.id, { status: "todo", human_input: humanInput || null, assigned_agent: null });
+        await onStatusChange?.(task.id, { status: "todo", human_input: humanInput || null, assigned_agent: null, dispatch_retries: 0, idle_retries: 0 });
         setHumanInput("");
       } catch (err) {
         setAssignError(err.message || "Unblock failed");

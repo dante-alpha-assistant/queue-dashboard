@@ -51,13 +51,19 @@ export default function useQueue() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updates),
     });
-    if (!res.ok) throw new Error("Update failed");
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody?.message || errBody?.error || `Update failed (${res.status})`);
+    }
     await fetchAll();
   }, [fetchAll]);
 
   const deleteTask = useCallback(async (id) => {
     const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
-    if (!res.ok) throw new Error("Delete failed");
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody?.message || errBody?.error || `Delete failed (${res.status})`);
+    }
     await fetchAll();
   }, [fetchAll]);
 
