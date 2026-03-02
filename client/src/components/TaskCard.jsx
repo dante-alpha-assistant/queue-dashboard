@@ -6,12 +6,12 @@ const AGENT_ROLES = { neo: "Builder", alpha: "Leader", beta: "QA", mu: "Builder"
 const STATUS_COLORS = {
   todo: "#79747E", assigned: "#6750A4", in_progress: "#E8A317", running: "#E8A317",
   done: "#386A20", failed: "#BA1A1A", qa: "#5E35B1", qa_testing: "#5E35B1",
-  completed: "#1B5E20", deployed: "#00838F",
+  completed: "#1B5E20", deployed: "#00838F", blocked: "#E65100",
 };
 const STATUS_BG = {
   todo: "#79747E14", assigned: "#6750A414", in_progress: "#E8A31714", running: "#E8A31714",
   done: "#386A2014", failed: "#BA1A1A14", qa: "#5E35B114", qa_testing: "#5E35B114",
-  completed: "#1B5E2014", deployed: "#00838F14",
+  completed: "#1B5E2014", deployed: "#00838F14", blocked: "#E6510014",
 };
 const PRIORITY_MAP = {
   urgent: { color: "#D32F2F", bg: "#D32F2F14", label: "Urgent", icon: "🔴" },
@@ -264,6 +264,78 @@ function ActionBar({ task, onStatusChange, isMobile }) {
 
 /* ── Task Card ────────────────────────────────────────────── */
 export default function TaskCard({ task, onStatusChange, onCardClick, isMobile }) {
+
+/* ── Blocked Card UI (unblock with human input) ──────────── */
+function BlockedUI({ task, onStatusChange }) {
+  const [humanInput, setHumanInput] = useState("");
+  const [unblocking, setUnblocking] = useState(false);
+
+  const handleUnblock = async (e) => {
+    e.stopPropagation();
+    setUnblocking(true);
+    try {
+      await onStatusChange?.(task.id, {
+        status: "todo",
+        human_input: humanInput || null,
+        blocked_reason: null,
+        assigned_agent: null,
+      });
+    } catch (err) {
+      console.error("Unblock failed:", err);
+    } finally {
+      setUnblocking(false);
+    }
+  };
+
+  return (
+    <div style={{
+      padding: "12px 16px",
+      background: "#FFF3E0",
+      borderTop: "1px solid #FFE0B2",
+    }} onClick={e => e.stopPropagation()}>
+      {task.blocked_reason && (
+        <div style={{
+          fontSize: 13, fontWeight: 600, color: "#BF360C",
+          marginBottom: 10, lineHeight: 1.5,
+          display: "flex", alignItems: "flex-start", gap: 8,
+        }}>
+          <span style={{ flexShrink: 0 }}>🚫</span>
+          <span>{task.blocked_reason}</span>
+        </div>
+      )}
+      <textarea
+        value={humanInput}
+        onChange={e => setHumanInput(e.target.value)}
+        placeholder="Provide instructions to unblock this task..."
+        rows={3}
+        style={{
+          width: "100%", padding: "10px 12px", borderRadius: 10,
+          border: "1px solid #FFB74D", background: "#FFFFFF",
+          color: "#1C1B1F", fontSize: 13, fontFamily: "'Roboto', system-ui, sans-serif",
+          resize: "vertical", outline: "none", boxSizing: "border-box",
+        }}
+        onFocus={e => e.target.style.borderColor = "#E65100"}
+        onBlur={e => e.target.style.borderColor = "#FFB74D"}
+      />
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+        <button
+          onClick={handleUnblock}
+          disabled={unblocking}
+          style={{
+            fontSize: 12, fontWeight: 600, padding: "8px 20px",
+            borderRadius: 100, border: "none", cursor: unblocking ? "default" : "pointer",
+            background: unblocking ? "#BDBDBD" : "#E65100", color: "#fff",
+            fontFamily: "'Roboto', system-ui, sans-serif",
+            display: "inline-flex", alignItems: "center", gap: 6,
+            transition: "all 150ms ease",
+          }}
+        >
+          {unblocking ? "⏳ Unblocking..." : "🔓 Unblock"}
+        </button>
+      </div>
+    </div>
+  );
+}
   const agent = task.assigned_agent?.toLowerCase();
   const icon = AGENT_ICONS[agent] || "🤖";
   const role = AGENT_ROLES[agent] || "Agent";
@@ -281,10 +353,10 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile }
 
   return (
     <div onClick={() => onCardClick?.(task)} style={{
-      background: "var(--md-surface, #FFFBFE)",
       borderRadius: 16,
-      border: "1px solid var(--md-surface-variant, #E7E0EC)",
       borderLeft: `4px solid ${statusColor}`,
+      border: task.status === 'blocked' ? '2px solid #E65100' : '1px solid var(--md-surface-variant, #E7E0EC)',
+      background: task.status === 'blocked' ? '#FFF8E1' : 'var(--md-surface, #FFFBFE)',
       marginBottom: 12,
       transition: "box-shadow 200ms ease, transform 100ms ease",
       cursor: "pointer",
@@ -426,6 +498,11 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile }
       )}
 
       {/* ── Action Bar (always visible) ─────────────────── */}
+      {/* ── Blocked: unblock UI ──────────────────── */}
+      {task.status === "blocked" && (
+        <BlockedUI task={task} onStatusChange={onStatusChange} />
+      )}
+
       <ActionBar
         task={task}
         onStatusChange={onStatusChange}

@@ -1,4 +1,4 @@
-export default function Column({ title, color, count, children, isTablet, collapsible, collapsed, onToggleCollapse }) {
+export default function Column({ title, icon, color, count, children, isTablet, collapsible, collapsed, onToggleCollapse }) {
   if (collapsible && collapsed) {
     return (
       <div
@@ -59,7 +59,7 @@ export default function Column({ title, color, count, children, isTablet, collap
       }} onClick={collapsible ? onToggleCollapse : undefined}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
-          <span style={{ fontWeight: 600, fontSize: 13, color: "var(--md-on-background)" }}>{title}</span>
+          <span style={{ fontWeight: 600, fontSize: 13, color: "var(--md-on-background)" }}>{icon && <span style={{ marginRight: 4 }}>{icon}</span>}{title}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{
