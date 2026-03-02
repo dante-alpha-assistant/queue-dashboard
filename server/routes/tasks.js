@@ -129,7 +129,11 @@ router.post("/tasks", async (req, res) => {
 // Update task (status changes, assign agent, etc.)
 router.patch("/tasks/:id", async (req, res) => {
   try {
-    const updates = { ...req.body, updated_at: new Date().toISOString() };
+    const allowed = ['status', 'assigned_agent', 'priority', 'title', 'description', 'prompt', 'type', 'error', 'result', 'blocked_reason', 'human_input', 'stage', 'acceptance_criteria', 'project_id', 'repository_id', 'dispatched_by'];
+    const updates = { updated_at: new Date().toISOString() };
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
     if (updates.status === "done" || updates.status === "failed") {
       updates.completed_at = new Date().toISOString();
     }
@@ -152,9 +156,13 @@ router.patch("/tasks/:id", async (req, res) => {
       .eq("id", req.params.id)
       .select()
       .single();
-    if (error) throw error;
+    if (error) {
+      console.error("PATCH /tasks/:id Supabase error:", error);
+      throw error;
+    }
     res.json(data);
   } catch (e) {
+    console.error("PATCH /tasks/:id error:", e.message);
     res.status(500).json({ error: e.message });
   }
 });
