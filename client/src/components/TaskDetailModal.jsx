@@ -31,6 +31,7 @@ const STATUS_CONFIG = {
   completed:   { bg: "#1B5E2014", color: "#1B5E20", label: "Completed",   accent: "#1B5E20" },
   failed:      { bg: "#BA1A1A14", color: "#BA1A1A", label: "Failed",      accent: "#BA1A1A" },
   deployed:    { bg: "#00838F14", color: "#00838F", label: "Deployed",    accent: "#00838F" },
+  blocked:     { bg: "#E6510014", color: "#E65100", label: "Blocked",     accent: "#E65100" },
   deprecated:  { bg: "#9E9E9E14", color: "#9E9E9E", label: "Deprecated",  accent: "#9E9E9E" },
 };
 
@@ -55,7 +56,7 @@ const ACTIVE_STATUSES = new Set(["in_progress", "assigned", "running", "qa_testi
 const HAS_MARKDOWN = /[#*`\[|]/;
 
 const TIMELINE_STEPS = [
-  { key: 'created', label: 'Created', statuses: ['todo', 'assigned', 'in_progress', 'running', 'done', 'completed', 'failed', 'qa', 'deployed'] },
+  { key: 'created', label: 'Created', statuses: ['todo', 'assigned', 'in_progress', 'running', 'done', 'completed', 'failed', 'qa', 'deployed', 'blocked'] },
   { key: 'assigned', label: 'Assigned', statuses: ['assigned', 'in_progress', 'running', 'done', 'completed', 'failed', 'qa', 'deployed'] },
   { key: 'in_progress', label: 'Working', statuses: ['in_progress', 'running', 'done', 'completed', 'failed', 'qa', 'deployed'] },
   { key: 'done', label: 'Done', statuses: ['done', 'completed', 'failed', 'qa', 'deployed'] },
@@ -938,6 +939,38 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
                 />
               )}
               {assignErr && <span style={{ position: 'absolute', bottom: -20, left: 0, fontSize: 11, color: '#BA1A1A', whiteSpace: 'nowrap' }}>⚠️ {assignErr}</span>}
+            </div>
+          )}
+          
+          {task.status === "blocked" && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+              {task.blocked_reason && (
+                <div style={{
+                  background: '#FFF3E0', border: '1px solid #FFB74D', borderRadius: 8,
+                  padding: '10px 14px', fontSize: 13, color: '#E65100', lineHeight: 1.5,
+                }}>
+                  <strong>🚫 Blocked:</strong> {task.blocked_reason}
+                </div>
+              )}
+              <textarea
+                id={`modal-unblock-input-${task.id}`}
+                placeholder="Provide guidance to unblock this task..."
+                style={{
+                  width: '100%', minHeight: 80, padding: '10px 14px', borderRadius: 8,
+                  border: '1px solid #FFB74D', background: '#FFF8E1', color: '#333',
+                  fontSize: 13, fontFamily: "'Roboto', system-ui, sans-serif",
+                  resize: 'vertical', outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+              <button className="tdm-action-btn"
+                onClick={() => {
+                  const input = document.getElementById(`modal-unblock-input-${task.id}`);
+                  const val = input ? input.value : '';
+                  onStatusChange(task.id, { status: 'todo', human_input: val || null, blocked_reason: null, assigned_agent: null });
+                }}
+                style={{ background: '#E65100', color: '#fff', minHeight: isMobile ? 42 : 36, width: '100%', justifyContent: 'center' }}>
+                ✅ Unblock & Return to Todo
+              </button>
             </div>
           )}
           {task.status === "failed" && (

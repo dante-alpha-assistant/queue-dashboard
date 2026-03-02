@@ -18,6 +18,7 @@ const MOBILE_TABS = [
   { key: "completed", label: "Done", icon: "✅" },
   { key: "deployed", label: "Deployed", icon: "🚀" },
   { key: "failed", label: "Failed", icon: "❌" },
+  { key: "blocked", label: "Blocked", icon: "🚫" },
 ];
 
 // Merged tabs for bottom nav (assigned + in_progress = Active)
@@ -27,12 +28,13 @@ const BOTTOM_TABS = [
   { key: "qa", label: "QA", icon: "🧪", color: "#7B5EA7" },
   { key: "completed", label: "Done", icon: "✅", color: "#1B5E20" },
   { key: "deployed", label: "Deployed", icon: "🚀", color: "#00897B" },
+  { key: "blocked", label: "Blocked", icon: "🚫", color: "#E65100" },
   { key: "failed", label: "Failed", icon: "❌", color: "#BA1A1A" },
 ];
 
 export default function App() {
   const {
-    stats, todo, assigned, inProgress, done, qa, completed, deployed, failed,
+    stats, todo, assigned, inProgress, done, qa, completed, deployed, failed, blocked,
     loading, dispatch, updateTask,
     projects, selectedProject, setSelectedProject,
   } = useQueue();
@@ -40,6 +42,7 @@ export default function App() {
   const [selectedTask, setSelectedTask] = useState(null);
   const [typeFilter, setTypeFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("todo");
   const [view, setView] = useState("board");
   const [timeFilter, setTimeFilter] = useState({ range: "today", customFrom: "", customTo: "" });
@@ -103,7 +106,7 @@ export default function App() {
     );
   }
 
-  const allTasksRaw = [...todo, ...assigned, ...inProgress, ...done, ...qa, ...completed, ...deployed, ...failed];
+  const allTasksRaw = [...todo, ...assigned, ...inProgress, ...done, ...qa, ...completed, ...deployed, ...failed, ...blocked];
   const allTasks = filterTasksByTime(allTasksRaw, timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
   const activeTypes = ["all", ...new Set(allTasks.map(t => t.type).filter(Boolean))];
   const activeStages = ["all", ...new Set(allTasks.map(t => t.stage).filter(Boolean))];
@@ -111,6 +114,7 @@ export default function App() {
     let filtered = filterTasksByTime(tasks, timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
     if (typeFilter !== "all") filtered = filtered.filter(t => t.type === typeFilter);
     if (stageFilter !== "all") filtered = filtered.filter(t => t.stage === stageFilter);
+    if (statusFilter !== "all") filtered = filtered.filter(t => t.status === statusFilter);
     return filtered;
   };
   const filterByType = filterTasks;
@@ -123,6 +127,7 @@ export default function App() {
       case "completed": return filterByType(completed);
       case "deployed": return filterByType(deployed);
       case "failed": return filterByType(failed);
+      case "blocked": return filterByType(blocked);
       default: return filterByType(todo);
     }
   };
@@ -135,6 +140,7 @@ export default function App() {
       case "completed": return { title: "Completed", color: "#1B5E20" };
       case "deployed": return { title: "Deployed", color: "#00897B" };
       case "failed": return { title: "Failed", color: "#BA1A1A" };
+      case "blocked": return { title: "🚫 Blocked", color: "#E65100" };
       default: return { title: "Todo", color: "#79747E" };
     }
   };
@@ -388,6 +394,9 @@ export default function App() {
         </Column>
         <Column title="In Progress" color="#E8A317" count={filterByType(inProgress).length} isTablet={isTablet}>
           {renderCards(filterByType(inProgress))}
+        </Column>
+        <Column title="🚫 Blocked" color="#E65100" count={filterByType(blocked).length} isTablet={isTablet}>
+          {renderCards(filterByType(blocked))}
         </Column>
         <Column title="QA Testing" color="#7B5EA7" count={filterByType(qa).length} isTablet={isTablet}>
           {renderCards(filterByType(qa).slice(0, 30))}

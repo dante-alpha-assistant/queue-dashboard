@@ -6,12 +6,12 @@ const AGENT_ROLES = { neo: "Builder", alpha: "Leader", beta: "QA", mu: "Builder"
 const STATUS_COLORS = {
   todo: "#79747E", assigned: "#6750A4", in_progress: "#E8A317", running: "#E8A317",
   done: "#386A20", failed: "#BA1A1A", qa: "#5E35B1", qa_testing: "#5E35B1",
-  completed: "#1B5E20", deployed: "#00838F",
+  completed: "#1B5E20", deployed: "#00838F", blocked: "#E65100",
 };
 const STATUS_BG = {
   todo: "#79747E14", assigned: "#6750A414", in_progress: "#E8A31714", running: "#E8A31714",
   done: "#386A2014", failed: "#BA1A1A14", qa: "#5E35B114", qa_testing: "#5E35B114",
-  completed: "#1B5E2014", deployed: "#00838F14",
+  completed: "#1B5E2014", deployed: "#00838F14", blocked: "#E6510014",
 };
 const PRIORITY_MAP = {
   urgent: { color: "#D32F2F", bg: "#D32F2F14", label: "Urgent", icon: "🔴" },
@@ -211,6 +211,52 @@ function ActionBar({ task, onStatusChange, isMobile }) {
     );
   }
 
+  
+  if (task.status === "blocked") {
+    // Blocked tasks get unblock UI directly in ActionBar
+    actions.push(
+      <div key="unblock" style={{ width: "100%" }} onClick={e => e.stopPropagation()}>
+        {task.blocked_reason && (
+          <div style={{
+            background: "#FFF3E0", border: "1px solid #FFB74D", borderRadius: 8,
+            padding: "8px 12px", marginBottom: 8, fontSize: 12, color: "#E65100",
+            lineHeight: 1.5,
+          }}>
+            <strong>🚫 Blocked:</strong> {task.blocked_reason}
+          </div>
+        )}
+        <textarea
+          id={`unblock-input-${task.id}`}
+          placeholder="Provide guidance to unblock this task..."
+          onClick={e => e.stopPropagation()}
+          style={{
+            width: "100%", minHeight: 60, padding: "8px 12px", borderRadius: 8,
+            border: "1px solid #FFB74D", background: "#FFF8E1", color: "#333",
+            fontSize: 13, fontFamily: "'Roboto', system-ui, sans-serif",
+            resize: "vertical", outline: "none", boxSizing: "border-box",
+          }}
+          onFocus={e => { e.target.style.borderColor = "#E65100"; }}
+          onBlur={e => { e.target.style.borderColor = "#FFB74D"; }}
+        />
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            const input = document.getElementById(`unblock-input-${task.id}`);
+            const val = input ? input.value : "";
+            onStatusChange?.(task.id, { status: "todo", human_input: val || null, blocked_reason: null, assigned_agent: null });
+          }}
+          style={{
+            ...btnBase,
+            background: "#E65100", color: "#fff", marginTop: 8,
+            width: "100%", justifyContent: "center",
+          }}
+        >
+          ✅ Unblock & Return to Todo
+        </button>
+      </div>
+    );
+  }
+
   if (task.status === "todo") {
     actions.push(
       <div key="assign" style={{ position: "relative" }}>
@@ -281,10 +327,10 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile }
 
   return (
     <div onClick={() => onCardClick?.(task)} style={{
-      background: "var(--md-surface, #FFFBFE)",
+      background: task.status === "blocked" ? "#FFF8E1" : "var(--md-surface, #FFFBFE)",
       borderRadius: 16,
       border: "1px solid var(--md-surface-variant, #E7E0EC)",
-      borderLeft: `4px solid ${statusColor}`,
+      borderLeft: task.status === "blocked" ? "4px solid #E65100" : `4px solid ${statusColor}`,
       marginBottom: 12,
       transition: "box-shadow 200ms ease, transform 100ms ease",
       cursor: "pointer",
