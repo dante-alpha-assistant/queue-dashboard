@@ -51,7 +51,11 @@ export default function useQueue() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updates),
     });
-    if (!res.ok) throw new Error("Update failed");
+    if (!res.ok) {
+      let msg = `Update failed (${res.status})`;
+      try { const body = await res.json(); if (body.error) msg = body.error; } catch {}
+      throw new Error(msg);
+    }
     await fetchAll();
   }, [fetchAll]);
 
