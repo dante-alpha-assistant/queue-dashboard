@@ -153,9 +153,13 @@ router.patch("/tasks/:id", async (req, res) => {
       .select()
       .single();
     if (error) throw error;
+    if (!data) {
+      return res.status(404).json({ error: "Task not found" });
+    }
     res.json(data);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    const status = e.code === "PGRST116" ? 404 : 500;
+    res.status(status).json({ error: e.message, code: e.code });
   }
 });
 
