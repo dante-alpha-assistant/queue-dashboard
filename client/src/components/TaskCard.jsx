@@ -110,7 +110,7 @@ function PipelineStepper({ stage, isMobile }) {
 }
 
 /* ── Duration Ticker ──────────────────────────────────────── */
-const TERMINAL_STATUSES = new Set(["deployed", "done", "failed", "cancelled"]);
+const TERMINAL_STATUSES = new Set(["deployed", "failed", "cancelled"]);
 
 function DurationTicker({ updatedAt, startedAt, completedAt, active, status }) {
   const [now, setNow] = useState(Date.now());
@@ -388,6 +388,13 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile }
             color={statusColor}
             bg={STATUS_BG[task.status] || `${statusColor}14`}
           />
+          {task.status === "qa_testing" && (
+            <Badge
+              label={task.qa_agent ? `🔍 ${task.qa_agent}` : "⏳ Waiting"}
+              color={task.qa_agent ? "#5E35B1" : "#79747E"}
+              bg={task.qa_agent ? "#5E35B114" : "#79747E14"}
+            />
+          )}
           <Badge label={task.type} color={typeColor} />
           {priority && (
             <Badge label={priority.label} color={priority.color} bg={priority.bg} />

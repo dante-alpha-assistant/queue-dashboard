@@ -955,7 +955,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
               Retry
             </button>
           )}
-          {(task.status === "done" || task.status === "completed") && (
+          {(task.status === "completed") && (
             <button className="tdm-action-btn" onClick={() => onStatusChange(task.id, { status: "todo" })}
               style={{ background: 'var(--md-surface-container-low, #F7F2FA)', color: 'var(--md-on-surface-variant, #49454F)', border: '1px solid var(--md-surface-variant, #E7E0EC)', minHeight: isMobile ? 42 : 36 }}>
               Reopen
