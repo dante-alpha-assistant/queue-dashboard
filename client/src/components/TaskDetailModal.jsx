@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import AgentPicker from './AgentPicker';
 import StatusTimeline from './StatusTimeline';
+import { ProgressDetail } from './ProgressFeed';
 
 /* ── Constants ────────────────────────────────────────────── */
 
@@ -562,7 +563,7 @@ function SmartRetryInfo({ metadata }) {
 
 /* ── Main Modal ───────────────────────────────────────────── */
 
-export default function TaskDetailModal({ task, onClose, onStatusChange, isMobile, isTablet }) {
+export default function TaskDetailModal({ task, onClose, onStatusChange, isMobile, isTablet, progress, monitor }) {
   const [closing, setClosing] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
   const [collapsedSections, setCollapsedSections] = useState({});
@@ -743,6 +744,11 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
             : <Timeline task={task} />
         )}
       </div>
+
+      {/* Live Progress Feed */}
+      {isActive && (progress || monitor) && (
+        <ProgressDetail progress={progress} monitor={monitor} />
+      )}
 
       {/* Smart retry */}
       <SmartRetryInfo metadata={task.metadata} />

@@ -159,6 +159,68 @@ router.patch("/tasks/:id", async (req, res) => {
   }
 });
 
+// SSE proxy — stream events from task-dispatcher
+router.get("/events", async (req, res) => {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+
+  // Keep-alive
+  const keepAlive = setInterval(() => {
+    try { res.write(":keepalive\n\n"); } catch {}
+  }, 15000);
+
+  let upstream;
+  try {
+    const upstreamUrl = `${DISPATCHER_URL.replace('/api', '')}/events`;
+    const controller = new AbortController();
+    const upstreamResp = await fetch(upstreamUrl, {
+      headers: { "Accept": "text/event-stream" },
+      signal: controller.signal,
+    });
+
+    if (!upstreamResp.ok || !upstreamResp.body) {
+      res.write(`event: error\ndata: ${JSON.stringify({ error: "Cannot connect to dispatcher" })}\n\n`);
+      clearInterval(keepAlive);
+      res.end();
+      return;
+    }
+
+    upstream = upstreamResp.body;
+    const reader = upstream.getReader();
+    const decoder = new TextDecoder();
+
+    const pump = async () => {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(decoder.decode(value, { stream: true }));
+        }
+      } catch (e) {
+        // Connection closed
+      }
+      clearInterval(keepAlive);
+      try { res.end(); } catch {}
+    };
+
+    pump();
+
+    req.on("close", () => {
+      clearInterval(keepAlive);
+      try { controller.abort(); } catch {}
+      try { reader.cancel(); } catch {}
+    });
+  } catch (e) {
+    res.write(`event: error\ndata: ${JSON.stringify({ error: e.message })}\n\n`);
+    clearInterval(keepAlive);
+    res.end();
+  }
+});
+
 // Archive task (soft delete — never actually delete)
 router.delete("/tasks/:id", async (req, res) => {
   try {

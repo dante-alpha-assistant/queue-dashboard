@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import useQueue from "./hooks/useQueue";
 import useBreakpoint from "./hooks/useBreakpoint";
+import useTaskEvents from "./hooks/useTaskEvents";
 import StatsBar from "./components/StatsBar";
 import Column from "./components/Column";
 import DispatchButton from "./components/DispatchButton";
@@ -47,6 +48,7 @@ export default function App() {
   const [view, setView] = useState("board");
   const [timeFilter, setTimeFilter] = useState({ range: "today", customFrom: "", customTo: "" });
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
+  const { progress: taskProgress, monitor: taskMonitor, connected: sseConnected } = useTaskEvents();
 
   // Collapsible columns for Deployed and Failed
   const COLLAPSIBLE_COLUMNS = ["deployed", "failed"];
@@ -145,7 +147,7 @@ export default function App() {
   };
 
   const renderCards = (tasks) =>
-    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={setSelectedTask} isMobile={isMobile} />);
+    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={setSelectedTask} isMobile={isMobile} progress={taskProgress[t.id]} monitor={taskMonitor[t.id]} />);
 
   // MOBILE LAYOUT
   if (isMobile) {
@@ -283,6 +285,8 @@ export default function App() {
             onClose={() => setSelectedTask(null)}
             onStatusChange={async (id, updates) => { await updateTask(id, updates); setSelectedTask(null); }}
             isMobile={isMobile}
+            progress={selectedTask ? taskProgress[selectedTask.id] : null}
+            monitor={selectedTask ? taskMonitor[selectedTask.id] : null}
           />
         )}
       </div>
@@ -423,6 +427,8 @@ export default function App() {
           onStatusChange={async (id, updates) => { await updateTask(id, updates); setSelectedTask(null); }}
           isMobile={false}
           isTablet={isTablet}
+          progress={selectedTask ? taskProgress[selectedTask.id] : null}
+          monitor={selectedTask ? taskMonitor[selectedTask.id] : null}
         />
       )}
     </div>
