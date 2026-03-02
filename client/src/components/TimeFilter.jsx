@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 
 const ACTIVE_STATUSES = new Set(["todo", "assigned", "in_progress", "qa", "qa_testing"]);
-const TERMINAL_STATUSES = new Set(["deployed", "completed", "failed", "done"]);
+const TERMINAL_STATUSES = new Set(["deployed", "completed", "failed"]);
 
 const PRESETS = [
   { key: "today", label: "Today" },

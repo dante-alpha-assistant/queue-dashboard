@@ -130,7 +130,7 @@ router.post("/tasks", async (req, res) => {
 router.patch("/tasks/:id", async (req, res) => {
   try {
     const updates = { ...req.body, updated_at: new Date().toISOString() };
-    if (updates.status === "done" || updates.status === "failed") {
+    if (updates.status === "completed" || updates.status === "failed") {
       updates.completed_at = new Date().toISOString();
     }
     if (updates.status === "in_progress") {
