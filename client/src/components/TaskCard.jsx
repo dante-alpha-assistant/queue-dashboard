@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import AgentPicker from './AgentPicker';
 
 const AGENT_ICONS = { neo: "🕶️", mu: "🔧", beta: "⚡", alpha: "🧠", flow: "🌊", ifra: "🛠️" };
 const AGENT_ROLES = { neo: "Builder", alpha: "Leader", beta: "QA", mu: "Builder", flow: "Orchestrator", ifra: "Ops" };
@@ -166,6 +167,10 @@ function Badge({ label, color, bg, style: extraStyle }) {
 
 /* ── Action Bar ───────────────────────────────────────────── */
 function ActionBar({ task, onStatusChange, isMobile }) {
+  const [showPicker, setShowPicker] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+  const [assignError, setAssignError] = useState(null);
+
   const btnBase = {
     fontSize: 12, border: "none", padding: isMobile ? "8px 18px" : "7px 16px",
     borderRadius: 100, cursor: "pointer", fontWeight: 600,
@@ -173,6 +178,20 @@ function ActionBar({ task, onStatusChange, isMobile }) {
     minHeight: isMobile ? 44 : 34, letterSpacing: "0.02em",
     transition: "all 150ms ease",
     display: "inline-flex", alignItems: "center", gap: 6,
+  };
+
+  const handleAssign = async (agentId) => {
+    setShowPicker(false);
+    setAssigning(true);
+    setAssignError(null);
+    try {
+      await onStatusChange?.(task.id, { status: "assigned", assigned_agent: agentId });
+    } catch (e) {
+      setAssignError(e.message || "Assignment failed");
+      setTimeout(() => setAssignError(null), 3000);
+    } finally {
+      setAssigning(false);
+    }
   };
 
   const actions = [];
@@ -194,29 +213,50 @@ function ActionBar({ task, onStatusChange, isMobile }) {
 
   if (task.status === "todo") {
     actions.push(
-      <button
-        key="assign"
-        onClick={(e) => { e.stopPropagation(); onStatusChange?.(task.id, { status: "assigned", assigned_agent: task.assigned_agent || "neo" }); }}
-        style={{ ...btnBase, background: "var(--md-primary, #6750A4)", color: "var(--md-on-primary, #fff)" }}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="23" y1="11" x2="17" y2="11" />
-        </svg>
-        Assign
-      </button>
+      <div key="assign" style={{ position: "relative" }}>
+        <button
+          onClick={(e) => { e.stopPropagation(); setShowPicker(!showPicker); }}
+          disabled={assigning}
+          style={{
+            ...btnBase,
+            background: assigning ? "var(--md-outline, #79747E)" : "var(--md-primary, #6750A4)",
+            color: "var(--md-on-primary, #fff)",
+            opacity: assigning ? 0.7 : 1,
+          }}
+        >
+          {assigning ? (
+            <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⏳</span>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="23" y1="11" x2="17" y2="11" />
+            </svg>
+          )}
+          {assigning ? "Assigning…" : "Assign"}
+        </button>
+        {showPicker && (
+          <AgentPicker
+            onSelect={handleAssign}
+            onCancel={() => setShowPicker(false)}
+          />
+        )}
+      </div>
     );
   }
 
-  /* Delete removed — tasks are immutable history */
-
-  if (actions.length === 0) return null;
+  if (actions.length === 0 && !assignError) return null;
 
   return (
     <div style={{
       display: "flex", gap: 8, padding: "10px 16px 12px",
       justifyContent: "flex-end", alignItems: "center",
       borderTop: "1px solid var(--md-surface-variant, #E7E0EC)",
+      flexWrap: "wrap",
     }}>
+      {assignError && (
+        <span style={{ fontSize: 12, color: "#BA1A1A", fontWeight: 500, marginRight: "auto" }}>
+          ⚠️ {assignError}
+        </span>
+      )}
       {actions}
     </div>
   );

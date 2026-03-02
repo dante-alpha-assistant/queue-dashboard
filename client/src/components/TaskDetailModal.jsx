@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
+import AgentPicker from './AgentPicker';
 
 /* ── Constants ────────────────────────────────────────────── */
 
@@ -567,6 +568,9 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const [idCopied, setIdCopied] = useState(false);
   const [deprecateConfirm, setDeprecateConfirm] = useState(false);
   const [deprecating, setDeprecating] = useState(false);
+  const [showAssignPicker, setShowAssignPicker] = useState(false);
+  const [assigningAgent, setAssigningAgent] = useState(false);
+  const [assignErr, setAssignErr] = useState(null);
 
   useEffect(() => { ensureModalStyles(); }, []);
   useEffect(() => {
@@ -906,11 +910,35 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
           display: 'flex', gap: 6, alignItems: 'center',
         }}>
           {task.status === "todo" && (
-            <button className="tdm-action-btn" onClick={() => onStatusChange(task.id, { status: "assigned", assigned_agent: task.assigned_agent || "neo" })}
-              style={{ background: 'var(--md-primary, #6750A4)', color: 'var(--md-on-primary, #fff)', minHeight: isMobile ? 42 : 36 }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="23" y1="11" x2="17" y2="11" /></svg>
-              Assign
-            </button>
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <button className="tdm-action-btn" disabled={assigningAgent}
+                onClick={() => setShowAssignPicker(!showAssignPicker)}
+                style={{ background: assigningAgent ? 'var(--md-outline, #79747E)' : 'var(--md-primary, #6750A4)', color: 'var(--md-on-primary, #fff)', minHeight: isMobile ? 42 : 36, opacity: assigningAgent ? 0.7 : 1 }}>
+                {assigningAgent ? <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⏳</span> : (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="23" y1="11" x2="17" y2="11" /></svg>
+                )}
+                {assigningAgent ? 'Assigning…' : 'Assign'}
+              </button>
+              {showAssignPicker && (
+                <AgentPicker
+                  onSelect={async (agentId) => {
+                    setShowAssignPicker(false);
+                    setAssigningAgent(true);
+                    setAssignErr(null);
+                    try {
+                      await onStatusChange(task.id, { status: 'assigned', assigned_agent: agentId });
+                    } catch (e) {
+                      setAssignErr(e.message || 'Assignment failed');
+                      setTimeout(() => setAssignErr(null), 3000);
+                    } finally {
+                      setAssigningAgent(false);
+                    }
+                  }}
+                  onCancel={() => setShowAssignPicker(false)}
+                />
+              )}
+              {assignErr && <span style={{ position: 'absolute', bottom: -20, left: 0, fontSize: 11, color: '#BA1A1A', whiteSpace: 'nowrap' }}>⚠️ {assignErr}</span>}
+            </div>
           )}
           {task.status === "failed" && (
             <button className="tdm-action-btn" onClick={() => onStatusChange(task.id, { status: "todo" })}
