@@ -18,6 +18,7 @@ const MOBILE_TABS = [
   { key: "blocked", label: "Blocked", icon: "🚫" },
   { key: "qa", label: "QA", icon: "🧪" },
   { key: "completed", label: "Done", icon: "✅" },
+  { key: "done", label: "Closed", icon: "📦" },
   { key: "deployed", label: "Deployed", icon: "🚀" },
   { key: "failed", label: "Failed", icon: "❌" },
 ];
@@ -29,6 +30,7 @@ const BOTTOM_TABS = [
   { key: "blocked", label: "Blocked", icon: "🚫", color: "#D84315" },
   { key: "qa", label: "QA", icon: "🧪", color: "#7B5EA7" },
   { key: "completed", label: "Done", icon: "✅", color: "#1B5E20" },
+  { key: "done", label: "Closed", icon: "📦", color: "#386A20" },
   { key: "deployed", label: "Deployed", icon: "🚀", color: "#00897B" },
   { key: "failed", label: "Failed", icon: "❌", color: "#BA1A1A" },
 ];
@@ -49,14 +51,14 @@ export default function App() {
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
 
   // Collapsible columns for Deployed and Failed
-  const COLLAPSIBLE_COLUMNS = ["deployed", "failed"];
+  const COLLAPSIBLE_COLUMNS = ["done", "deployed", "failed"];
   const [collapsedCols, setCollapsedCols] = useState(() => {
     try {
       const saved = localStorage.getItem("collapsed-columns");
       if (saved) return JSON.parse(saved);
     } catch {}
     // Default: deployed and failed are collapsed
-    return { deployed: true, failed: true };
+    return { done: true, deployed: true, failed: true };
   });
   const toggleCollapse = useCallback((col) => {
     setCollapsedCols(prev => {
@@ -125,6 +127,7 @@ export default function App() {
       case "blocked": return filterByType(blocked);
       case "qa": return filterByType(qa);
       case "completed": return filterByType(completed);
+      case "done": return filterByType(done);
       case "deployed": return filterByType(deployed);
       case "failed": return filterByType(failed);
       default: return filterByType(todo);
@@ -138,6 +141,7 @@ export default function App() {
       case "blocked": return { title: "Blocked", color: "#D84315" };
       case "qa": return { title: "QA Testing", color: "#7B5EA7" };
       case "completed": return { title: "Completed", color: "#1B5E20" };
+      case "done": return { title: "Closed", color: "#386A20" };
       case "deployed": return { title: "Deployed", color: "#00897B" };
       case "failed": return { title: "Failed", color: "#BA1A1A" };
       default: return { title: "Todo", color: "#79747E" };
@@ -403,6 +407,10 @@ export default function App() {
         </Column>
         <Column title="Completed" color="#1B5E20" count={filterByType(completed).length} isTablet={isTablet}>
           {renderCards(filterByType(completed).slice(0, 20))}
+        </Column>
+        <Column title="Closed" color="#386A20" count={filterByType(done).length} isTablet={isTablet}
+          collapsible collapsed={!!collapsedCols.done} onToggleCollapse={() => toggleCollapse("done")}>
+          {renderCards(filterByType(done).slice(0, 20))}
         </Column>
         <Column title="Deployed" color="#00897B" count={filterByType(deployed).length} isTablet={isTablet}
           collapsible collapsed={!!collapsedCols.deployed} onToggleCollapse={() => toggleCollapse("deployed")}>
