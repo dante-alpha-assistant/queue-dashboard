@@ -3,19 +3,6 @@ import supabase from "../supabase.js";
 
 export const router = Router();
 
-const DISPATCHER_URL = process.env.DISPATCHER_URL || "http://task-dispatcher.agents.svc.cluster.local:8080";
-
-// Manual dispatch — proxy to task-dispatcher
-router.post("/dispatch", async (req, res) => {
-  try {
-    const resp = await fetch(`${DISPATCHER_URL}/api/dispatch`, { method: "POST" });
-    const data = await resp.json();
-    res.json(data);
-  } catch (e) {
-    res.status(502).json({ ok: false, error: `Dispatcher unreachable: ${e.message}` });
-  }
-});
-
 // Projects
 router.get("/projects", async (req, res) => {
   try {
@@ -140,7 +127,17 @@ router.patch("/tasks/:id", async (req, res) => {
       updates.started_at = null;
       updates.completed_at = null;
       updates.error = null;
-      updates.blocked_reason = null;
+      // When unblocking, append human_input to description
+      if (updates.human_input) {
+        const { data: current } = await supabase
+          .from("agent_tasks")
+          .select("description")
+          .eq("id", req.params.id)
+          .single();
+        if (current) {
+          updates.description = (current.description || "") + "\n\n---\n**Human Input:** " + updates.human_input;
+        }
+      }
     }
     if (updates.status === "deprecated") {
       updates.completed_at = updates.completed_at || new Date().toISOString();

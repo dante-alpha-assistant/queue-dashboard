@@ -4,11 +4,11 @@ import useBreakpoint from "./hooks/useBreakpoint";
 import useTaskEvents from "./hooks/useTaskEvents";
 import StatsBar from "./components/StatsBar";
 import Column from "./components/Column";
-import DispatchButton from "./components/DispatchButton";
 import TaskCard from "./components/TaskCard";
 import DispatchModal from "./components/DispatchModal";
 import ChatPanel from "./components/ChatPanel";
 import TaskDetailModal from "./components/TaskDetailModal";
+import BlockedTaskCard from "./components/BlockedTaskCard";
 import Pingboard from "./pages/Pingboard";
 import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
 
@@ -16,7 +16,6 @@ const MOBILE_TABS = [
   { key: "todo", label: "Todo", icon: "📋" },
   { key: "assigned", label: "Active", icon: "👤" },
   { key: "in_progress", label: "Active", icon: "⚡" },
-  { key: "blocked", label: "Blocked", icon: "🚫" },
   { key: "qa", label: "QA", icon: "🧪" },
   { key: "completed", label: "Done", icon: "✅" },
   { key: "deployed", label: "Deployed", icon: "🚀" },
@@ -27,7 +26,7 @@ const MOBILE_TABS = [
 const BOTTOM_TABS = [
   { key: "todo", label: "Todo", icon: "📋", color: "#79747E" },
   { key: "active", label: "Active", icon: "⚡", color: "#E8A317" },
-  { key: "blocked", label: "Blocked", icon: "🚫", color: "#D84315" },
+  { key: "blocked", label: "Blocked", icon: "🚫", color: "#E65100" },
   { key: "qa", label: "QA", icon: "🧪", color: "#7B5EA7" },
   { key: "completed", label: "Done", icon: "✅", color: "#1B5E20" },
   { key: "deployed", label: "Deployed", icon: "🚀", color: "#00897B" },
@@ -36,7 +35,7 @@ const BOTTOM_TABS = [
 
 export default function App() {
   const {
-    stats, todo, assigned, inProgress, done, qa, completed, deployed, blocked, failed,
+    stats, todo, assigned, inProgress, done, qa, completed, deployed, failed, blocked,
     loading, dispatch, updateTask,
     projects, selectedProject, setSelectedProject,
   } = useQueue();
@@ -108,7 +107,7 @@ export default function App() {
     );
   }
 
-  const allTasksRaw = [...todo, ...assigned, ...inProgress, ...blocked, ...done, ...qa, ...completed, ...deployed, ...failed];
+  const allTasksRaw = [...todo, ...assigned, ...inProgress, ...done, ...qa, ...completed, ...deployed, ...failed, ...blocked];
   const allTasks = filterTasksByTime(allTasksRaw, timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
   const activeTypes = ["all", ...new Set(allTasks.map(t => t.type).filter(Boolean))];
   const activeStages = ["all", ...new Set(allTasks.map(t => t.stage).filter(Boolean))];
@@ -124,11 +123,11 @@ export default function App() {
     switch (activeTab) {
       case "todo": return filterByType(todo);
       case "active": return [...filterByType(assigned), ...filterByType(inProgress)];
-      case "blocked": return filterByType(blocked);
       case "qa": return filterByType(qa);
       case "completed": return filterByType(completed);
       case "deployed": return filterByType(deployed);
       case "failed": return filterByType(failed);
+      case "blocked": return filterByType(blocked);
       default: return filterByType(todo);
     }
   };
@@ -137,11 +136,11 @@ export default function App() {
     switch (activeTab) {
       case "todo": return { title: "Todo", color: "#79747E" };
       case "active": return { title: "Active", color: "#E8A317" };
-      case "blocked": return { title: "Blocked", color: "#D84315" };
       case "qa": return { title: "QA Testing", color: "#7B5EA7" };
       case "completed": return { title: "Completed", color: "#1B5E20" };
       case "deployed": return { title: "Deployed", color: "#00897B" };
       case "failed": return { title: "Failed", color: "#BA1A1A" };
+      case "blocked": return { title: "Blocked", color: "#E65100" };
       default: return { title: "Todo", color: "#79747E" };
     }
   };
@@ -229,7 +228,6 @@ export default function App() {
             background: `${colMeta.color}20`, color: colMeta.color,
             padding: "2px 10px", borderRadius: 10, fontSize: 12, fontWeight: 700,
           }}>{colTasks.length}</span>
-          {activeTab === "todo" && <DispatchButton />}
         </div>
 
         {/* Task list */}
@@ -237,7 +235,7 @@ export default function App() {
           {colTasks.length === 0 && (
             <div style={{ textAlign: "center", color: "var(--md-on-surface-variant)", padding: 40, fontSize: 13 }}>No tasks</div>
           )}
-          {renderCards(colTasks)}
+          {activeTab === "blocked" ? colTasks.map(t => <BlockedTaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={setSelectedTask} isMobile={isMobile} />) : renderCards(colTasks)}
         </div>
 
         {/* FAB */}
@@ -383,6 +381,24 @@ export default function App() {
             </div>
           </>)}
           <div style={{ width: 1, height: 24, background: "var(--md-surface-variant)" }} />
+
+          <div style={{ width: 1, height: 24, background: "var(--md-surface-variant)" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Status</span>
+            <div style={{ display: "flex", gap: 4 }}>
+              {blocked.length > 0 && (
+                <button onClick={() => { const el = document.querySelector('[data-col=blocked]'); if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'center' }); }} style={{
+                  padding: "4px 12px", borderRadius: 16, fontSize: 12, fontWeight: 600,
+                  border: "2px solid #E65100",
+                  background: "#FFF3E0",
+                  color: "#E65100",
+                  cursor: "pointer",
+                  fontFamily: "'Roboto', system-ui, sans-serif", transition: "all 150ms",
+                  animation: "blocked-pulse 2s ease-in-out infinite",
+                }}>🚫 Blocked ({blocked.length})</button>
+              )}
+            </div>
+          </div>
           <TimeFilter allTasks={allTasksRaw} value={timeFilter} onChange={setTimeFilter} isMobile={false} />
         </div>
       </div>
@@ -390,7 +406,7 @@ export default function App() {
       <div style={{
         flex: 1, display: "flex", gap: 12, padding: "16px 24px", overflowX: "auto", minHeight: 0,
       }}>
-        <Column title="Todo" color="#79747E" count={filterByType(todo).length} isTablet={isTablet} headerAction={<DispatchButton />}>
+        <Column title="Todo" color="#79747E" count={filterByType(todo).length} isTablet={isTablet}>
           {renderCards(filterByType(todo))}
         </Column>
         <Column title="Assigned" color="#6750A4" count={filterByType(assigned).length} isTablet={isTablet}>
@@ -399,8 +415,8 @@ export default function App() {
         <Column title="In Progress" color="#E8A317" count={filterByType(inProgress).length} isTablet={isTablet}>
           {renderCards(filterByType(inProgress))}
         </Column>
-        <Column title="Blocked" color="#D84315" count={filterByType(blocked).length} isTablet={isTablet}>
-          {renderCards(filterByType(blocked))}
+        <Column title="Blocked" color="#E65100" count={filterByType(blocked).length} isTablet={isTablet}>
+          {filterByType(blocked).map(t => <BlockedTaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={setSelectedTask} isMobile={isMobile} />)}
         </Column>
         <Column title="QA Testing" color="#7B5EA7" count={filterByType(qa).length} isTablet={isTablet}>
           {renderCards(filterByType(qa).slice(0, 30))}
