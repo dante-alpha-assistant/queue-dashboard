@@ -38,7 +38,7 @@ router.get("/stats", async (req, res) => {
     if (req.query.project_id) query = query.eq("project_id", req.query.project_id);
     const { data, error } = await query;
     if (error) throw error;
-    const stats = { todo: 0, assigned: 0, in_progress: 0, done: 0, qa: 0, qa_testing: 0, completed: 0, failed: 0, deployed: 0 };
+    const stats = { todo: 0, assigned: 0, in_progress: 0, done: 0, qa: 0, qa_testing: 0, completed: 0, failed: 0, deployed: 0, blocked: 0 };
     data.forEach((t) => { if (t.status !== "deprecated" && stats[t.status] !== undefined) stats[t.status]++; });
     res.json(stats);
   } catch (e) {
@@ -62,7 +62,7 @@ router.get("/tasks", async (req, res) => {
 
 
     const { since, until } = req.query;
-    const ALWAYS_INCLUDE_STATUSES = ["todo", "assigned", "in_progress", "qa_testing"];
+    const ALWAYS_INCLUDE_STATUSES = ["todo", "assigned", "in_progress", "qa_testing", "blocked"];
 
     if (since || until) {
       // Build an OR filter: (created_at within range) OR (status in always-include list)
@@ -127,6 +127,7 @@ router.patch("/tasks/:id", async (req, res) => {
       updates.started_at = null;
       updates.completed_at = null;
       updates.error = null;
+      updates.blocked_reason = null;
     }
     if (updates.status === "deprecated") {
       updates.completed_at = updates.completed_at || new Date().toISOString();

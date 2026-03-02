@@ -14,6 +14,7 @@ const MOBILE_TABS = [
   { key: "todo", label: "Todo", icon: "📋" },
   { key: "assigned", label: "Active", icon: "👤" },
   { key: "in_progress", label: "Active", icon: "⚡" },
+  { key: "blocked", label: "Blocked", icon: "🚫" },
   { key: "qa", label: "QA", icon: "🧪" },
   { key: "completed", label: "Done", icon: "✅" },
   { key: "deployed", label: "Deployed", icon: "🚀" },
@@ -24,6 +25,7 @@ const MOBILE_TABS = [
 const BOTTOM_TABS = [
   { key: "todo", label: "Todo", icon: "📋", color: "#79747E" },
   { key: "active", label: "Active", icon: "⚡", color: "#E8A317" },
+  { key: "blocked", label: "Blocked", icon: "🚫", color: "#D84315" },
   { key: "qa", label: "QA", icon: "🧪", color: "#7B5EA7" },
   { key: "completed", label: "Done", icon: "✅", color: "#1B5E20" },
   { key: "deployed", label: "Deployed", icon: "🚀", color: "#00897B" },
@@ -32,7 +34,7 @@ const BOTTOM_TABS = [
 
 export default function App() {
   const {
-    stats, todo, assigned, inProgress, done, qa, completed, deployed, failed,
+    stats, todo, assigned, inProgress, done, qa, completed, deployed, blocked, failed,
     loading, dispatch, updateTask,
     projects, selectedProject, setSelectedProject,
   } = useQueue();
@@ -103,7 +105,7 @@ export default function App() {
     );
   }
 
-  const allTasksRaw = [...todo, ...assigned, ...inProgress, ...done, ...qa, ...completed, ...deployed, ...failed];
+  const allTasksRaw = [...todo, ...assigned, ...inProgress, ...blocked, ...done, ...qa, ...completed, ...deployed, ...failed];
   const allTasks = filterTasksByTime(allTasksRaw, timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
   const activeTypes = ["all", ...new Set(allTasks.map(t => t.type).filter(Boolean))];
   const activeStages = ["all", ...new Set(allTasks.map(t => t.stage).filter(Boolean))];
@@ -119,6 +121,7 @@ export default function App() {
     switch (activeTab) {
       case "todo": return filterByType(todo);
       case "active": return [...filterByType(assigned), ...filterByType(inProgress)];
+      case "blocked": return filterByType(blocked);
       case "qa": return filterByType(qa);
       case "completed": return filterByType(completed);
       case "deployed": return filterByType(deployed);
@@ -131,6 +134,7 @@ export default function App() {
     switch (activeTab) {
       case "todo": return { title: "Todo", color: "#79747E" };
       case "active": return { title: "Active", color: "#E8A317" };
+      case "blocked": return { title: "Blocked", color: "#D84315" };
       case "qa": return { title: "QA Testing", color: "#7B5EA7" };
       case "completed": return { title: "Completed", color: "#1B5E20" };
       case "deployed": return { title: "Deployed", color: "#00897B" };
@@ -388,6 +392,9 @@ export default function App() {
         </Column>
         <Column title="In Progress" color="#E8A317" count={filterByType(inProgress).length} isTablet={isTablet}>
           {renderCards(filterByType(inProgress))}
+        </Column>
+        <Column title="Blocked" color="#D84315" count={filterByType(blocked).length} isTablet={isTablet}>
+          {renderCards(filterByType(blocked))}
         </Column>
         <Column title="QA Testing" color="#7B5EA7" count={filterByType(qa).length} isTablet={isTablet}>
           {renderCards(filterByType(qa).slice(0, 30))}
