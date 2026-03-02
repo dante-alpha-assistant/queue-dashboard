@@ -51,7 +51,7 @@ const STAGE_COLORS = {
 };
 const STAGES = ["refinery", "foundry", "builder", "inspector", "deployer"];
 const STAGE_LABELS = { refinery: "Refine", foundry: "Found", builder: "Build", inspector: "Inspect", deployer: "Deploy" };
-const ACTIVE_STATUSES = new Set(["in_progress", "assigned", "running", "qa_testing"]);
+const ACTIVE_STATUSES = new Set(["in_progress", "assigned", "running", "qa_testing", "completed"]);
 
 const HAS_MARKDOWN = /[#*`\[|]/;
 
