@@ -374,6 +374,7 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
       cursor: "pointer",
       overflow: "hidden",
       fontFamily: "'Roboto', system-ui, -apple-system, sans-serif",
+      opacity: task.status === "qa_testing" && !task.qa_agent ? 0.65 : 1,
     }}
     onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)"; }}
     onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}
@@ -392,6 +393,11 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
           <Badge label={task.type} color={typeColor} />
           {priority && (
             <Badge label={priority.label} color={priority.color} bg={priority.bg} />
+          )}
+          {task.status === "qa_testing" && (
+            task.qa_agent
+              ? <Badge label={`🔍 ${task.qa_agent}`} color="#2E7D32" bg="#2E7D3220" />
+              : <Badge label="⏳ Waiting for QA" color="#7B5EA7" bg="#7B5EA720" />
           )}
         </div>
         <DurationTicker updatedAt={task.updated_at} startedAt={task.started_at} completedAt={task.completed_at} active={isActive} status={task.status} />
