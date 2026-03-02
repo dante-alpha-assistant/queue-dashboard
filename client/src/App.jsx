@@ -14,7 +14,6 @@ import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
 
 const MOBILE_TABS = [
   { key: "todo", label: "Todo", icon: "📋" },
-  { key: "assigned", label: "Active", icon: "👤" },
   { key: "in_progress", label: "Active", icon: "⚡" },
   { key: "blocked", label: "Blocked", icon: "🚫" },
   { key: "qa", label: "QA", icon: "🧪" },
@@ -393,11 +392,8 @@ export default function App() {
         <Column title="Todo" color="#79747E" count={filterByType(todo).length} isTablet={isTablet} headerAction={<DispatchButton />}>
           {renderCards(filterByType(todo))}
         </Column>
-        <Column title="Assigned" color="#6750A4" count={filterByType(assigned).length} isTablet={isTablet}>
-          {renderCards(filterByType(assigned))}
-        </Column>
-        <Column title="In Progress" color="#E8A317" count={filterByType(inProgress).length} isTablet={isTablet}>
-          {renderCards(filterByType(inProgress))}
+        <Column title="In Progress" color="#E8A317" count={filterByType(assigned).length + filterByType(inProgress).length} isTablet={isTablet}>
+          {renderCards([...filterByType(assigned), ...filterByType(inProgress)])}
         </Column>
         <Column title="Blocked" color="#D84315" count={filterByType(blocked).length} isTablet={isTablet}>
           {renderCards(filterByType(blocked))}
