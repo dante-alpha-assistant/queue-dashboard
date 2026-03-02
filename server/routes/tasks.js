@@ -3,6 +3,19 @@ import supabase from "../supabase.js";
 
 export const router = Router();
 
+const DISPATCHER_URL = process.env.DISPATCHER_URL || "http://task-dispatcher.agents.svc.cluster.local:8080";
+
+// Manual dispatch — proxy to task-dispatcher
+router.post("/dispatch", async (req, res) => {
+  try {
+    const resp = await fetch(`${DISPATCHER_URL}/api/dispatch`, { method: "POST" });
+    const data = await resp.json();
+    res.json(data);
+  } catch (e) {
+    res.status(502).json({ ok: false, error: `Dispatcher unreachable: ${e.message}` });
+  }
+});
+
 // Projects
 router.get("/projects", async (req, res) => {
   try {

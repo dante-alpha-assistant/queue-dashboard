@@ -1,4 +1,4 @@
-export default function Column({ title, color, count, children, isTablet, collapsible, collapsed, onToggleCollapse }) {
+export default function Column({ title, color, count, children, isTablet, collapsible, collapsed, onToggleCollapse, headerAction }) {
   if (collapsible && collapsed) {
     return (
       <div
@@ -66,6 +66,7 @@ export default function Column({ title, color, count, children, isTablet, collap
             background: `${color}20`, color,
             padding: "2px 10px", borderRadius: 10, fontSize: 12, fontWeight: 700,
           }}>{count}</span>
+          {headerAction}
           {collapsible && (
             <span style={{
               fontSize: 10,
