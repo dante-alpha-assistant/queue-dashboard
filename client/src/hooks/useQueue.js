@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
 export default function useQueue() {
-  const [stats, setStats] = useState({ todo: 0, assigned: 0, in_progress: 0, done: 0, qa: 0, completed: 0, failed: 0 });
+  const [stats, setStats] = useState({ todo: 0, assigned: 0, in_progress: 0, qa: 0, completed: 0, failed: 0 });
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState("");
@@ -64,15 +64,14 @@ export default function useQueue() {
   const todo = tasks.filter(t => t.status === "todo");
   const assigned = tasks.filter(t => t.status === "assigned");
   const inProgress = tasks.filter(t => t.status === "in_progress");
-  const done = tasks.filter(t => t.status === "done");
-  const qa = tasks.filter(t => t.status === "qa" || t.status === "qa_testing" || t.status === "done");
+  const qa = tasks.filter(t => t.status === "qa" || t.status === "qa_testing");
   const completed = tasks.filter(t => t.status === "completed");
   const blocked = tasks.filter(t => t.status === "blocked");
   const failed = tasks.filter(t => t.status === "failed");
   const deployed = tasks.filter(t => t.status === "deployed");
 
   return {
-    stats, tasks, todo, assigned, inProgress, done, qa, completed, deployed, blocked, failed,
+    stats, tasks, todo, assigned, inProgress, qa, completed, deployed, blocked, failed,
     loading, dispatch, updateTask, deleteTask,
     projects, selectedProject, setSelectedProject,
   };

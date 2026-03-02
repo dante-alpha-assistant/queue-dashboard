@@ -36,7 +36,7 @@ const BOTTOM_TABS = [
 
 export default function App() {
   const {
-    stats, todo, assigned, inProgress, done, qa, completed, deployed, blocked, failed,
+    stats, todo, assigned, inProgress, qa, completed, deployed, blocked, failed,
     loading, dispatch, updateTask,
     projects, selectedProject, setSelectedProject,
   } = useQueue();
@@ -108,7 +108,7 @@ export default function App() {
     );
   }
 
-  const allTasksRaw = [...todo, ...assigned, ...inProgress, ...blocked, ...done, ...qa, ...completed, ...deployed, ...failed];
+  const allTasksRaw = [...todo, ...assigned, ...inProgress, ...blocked, ...qa, ...completed, ...deployed, ...failed];
   const allTasks = filterTasksByTime(allTasksRaw, timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
   const activeTypes = ["all", ...new Set(allTasks.map(t => t.type).filter(Boolean))];
   const activeStages = ["all", ...new Set(allTasks.map(t => t.stage).filter(Boolean))];

@@ -61,7 +61,7 @@ export default function useTaskEvents() {
       try {
         const data = JSON.parse(e.data);
         // Clean up progress/monitor for terminal tasks
-        if (["done", "failed", "deployed", "cancelled", "deprecated"].includes(data.status)) {
+        if (["failed", "deployed", "cancelled", "deprecated"].includes(data.status)) {
           setProgress((prev) => {
             const next = { ...prev };
             delete next[data.taskId];

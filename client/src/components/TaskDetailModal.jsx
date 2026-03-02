@@ -27,7 +27,7 @@ const STATUS_CONFIG = {
   assigned:    { bg: "#6750A414", color: "#6750A4", label: "Assigned",    accent: "#6750A4" },
   in_progress: { bg: "#E8A31714", color: "#E8A317", label: "In Progress", accent: "#D97706" },
   running:     { bg: "#E8A31714", color: "#E8A317", label: "Running",     accent: "#D97706" },
-  done:        { bg: "#386A2014", color: "#386A20", label: "Done",        accent: "#386A20" },
+
   qa:          { bg: "#5E35B114", color: "#5E35B1", label: "QA",          accent: "#5E35B1" },
   qa_testing:  { bg: "#5E35B114", color: "#5E35B1", label: "QA Testing",  accent: "#5E35B1" },
   completed:   { bg: "#1B5E2014", color: "#1B5E20", label: "Completed",   accent: "#1B5E20" },
@@ -57,10 +57,10 @@ const ACTIVE_STATUSES = new Set(["in_progress", "assigned", "running", "qa_testi
 const HAS_MARKDOWN = /[#*`\[|]/;
 
 const TIMELINE_STEPS = [
-  { key: 'created', label: 'Created', statuses: ['todo', 'assigned', 'in_progress', 'running', 'done', 'completed', 'failed', 'qa', 'deployed'] },
-  { key: 'assigned', label: 'Assigned', statuses: ['assigned', 'in_progress', 'running', 'done', 'completed', 'failed', 'qa', 'deployed'] },
-  { key: 'in_progress', label: 'Working', statuses: ['in_progress', 'running', 'done', 'completed', 'failed', 'qa', 'deployed'] },
-  { key: 'done', label: 'Done', statuses: ['done', 'completed', 'failed', 'qa', 'deployed'] },
+  { key: 'created', label: 'Created', statuses: ['todo', 'assigned', 'in_progress', 'running', 'completed', 'failed', 'qa', 'qa_testing', 'deployed'] },
+  { key: 'assigned', label: 'Assigned', statuses: ['assigned', 'in_progress', 'running', 'completed', 'failed', 'qa', 'qa_testing', 'deployed'] },
+  { key: 'in_progress', label: 'Working', statuses: ['in_progress', 'running', 'completed', 'failed', 'qa', 'qa_testing', 'deployed'] },
+  { key: 'qa_testing', label: 'QA Testing', statuses: ['qa_testing', 'completed', 'failed', 'deployed'] },
   { key: 'qa', label: 'QA', statuses: ['qa', 'completed', 'deployed'] },
   { key: 'completed', label: 'Complete', statuses: ['completed', 'deployed'] },
 ];
@@ -463,7 +463,7 @@ function PipelineStepper({ stage }) {
 
 function getStepTime(task, key) {
   if (key === 'created') return task.created_at;
-  if (key === 'completed' || key === 'done') return task.completed_at;
+  if (key === 'completed' || key === 'qa_testing') return task.completed_at;
   return task.updated_at;
 }
 
@@ -961,7 +961,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
               Retry
             </button>
           )}
-          {(task.status === "done" || task.status === "completed") && (
+          {(task.status === "qa_testing" || task.status === "completed") && (
             <button className="tdm-action-btn" onClick={() => onStatusChange(task.id, { status: "todo" })}
               style={{ background: 'var(--md-surface-container-low, #F7F2FA)', color: 'var(--md-on-surface-variant, #49454F)', border: '1px solid var(--md-surface-variant, #E7E0EC)', minHeight: isMobile ? 42 : 36 }}>
               Reopen
