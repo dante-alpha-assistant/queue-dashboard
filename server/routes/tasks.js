@@ -472,7 +472,26 @@ router.get("/tasks/:id/activity", async (req, res) => {
       .order("changed_at", { ascending: false })
       .limit(100);
     if (error) throw error;
-    res.json(data || []);
+
+    // Enrich assigned_agent->null entries with error reason when no separate error entry was logged
+    const entries = data || [];
+    const unassignEntries = entries.filter(
+      e => e.field === 'assigned_agent' && (!e.new_value || e.new_value === 'null')
+    );
+    if (unassignEntries.length > 0) {
+      const errorEntries = entries.filter(e => e.field === 'error');
+      for (const entry of unassignEntries) {
+        const entryTime = new Date(entry.changed_at).getTime();
+        const hasMatchingError = errorEntries.some(e => Math.abs(new Date(e.changed_at).getTime() - entryTime) < 2000);
+        if (!hasMatchingError) {
+          // No error entry logged at this time — attach the task's current error
+          const { data: task } = await supabase.from("agent_tasks").select("error").eq("id", req.params.id).single();
+          if (task?.error) entry.reason = task.error;
+        }
+      }
+    }
+
+    res.json(entries);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

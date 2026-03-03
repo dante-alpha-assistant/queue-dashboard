@@ -205,6 +205,18 @@ function ActivityEntry({ entry, isLast }) {
             <ExpandableValue value={entry.new_value} color={getValueColor(entry.field, entry.new_value)} />
           </div>
         )}
+
+        {/* Show reason when assigned_agent is cleared without a separate error entry */}
+        {entry.reason && (
+          <div style={{
+            marginTop: 4, padding: '4px 8px', borderRadius: 6,
+            background: '#BA1A1A0A', borderLeft: '2px solid #BA1A1A',
+            fontSize: 11, color: '#BA1A1A',
+            maxWidth: 400, wordBreak: 'break-word',
+          }}>
+            ⚠️ {entry.reason}
+          </div>
+        )}
       </div>
     </div>
   );
