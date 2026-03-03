@@ -239,14 +239,6 @@ export default function App() {
           {renderCards(colTasks)}
         </div>
 
-        {/* FAB */}
-        <button onClick={() => setShowModal(true)} style={{
-          position: "fixed", bottom: 76, right: 16, width: 56, height: 56,
-          borderRadius: 16, background: "var(--md-primary)", color: "var(--md-on-primary)",
-          border: "none", fontSize: 24, fontWeight: 300, cursor: "pointer", zIndex: 50,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: "0 3px 5px rgba(0,0,0,0.2), 0 6px 10px rgba(0,0,0,0.14), 0 1px 18px rgba(0,0,0,0.12)",
-        }}>+</button>
 
         {/* Bottom navigation */}
         <div style={{
