@@ -42,7 +42,7 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const [selectedTask, setSelectedTask] = useState(null);
-  const [deepLinkId] = useState(() => {
+  const [deepLinkId, setDeepLinkId] = useState(() => {
     const match = location.pathname.match(/^\/task\/([a-f0-9-]+)$/i);
     return match ? match[1] : null;
   });
@@ -77,6 +77,7 @@ export default function App() {
 
   const handleCloseTask = useCallback(() => {
     setSelectedTask(null);
+    setDeepLinkId(null);
     navigate("/", { replace: true });
   }, [navigate]);
 
