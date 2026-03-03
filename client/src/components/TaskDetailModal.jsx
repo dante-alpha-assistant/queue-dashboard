@@ -76,6 +76,9 @@ function ensureModalStyles() {
   const style = document.createElement('style');
   style.id = MODAL_STYLE_ID;
   style.textContent = `
+    @keyframes tdm-spin {
+      to { transform: rotate(360deg); }
+    }
     @keyframes timeline-pulse {
       0%, 100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.4); }
       50% { box-shadow: 0 0 0 6px rgba(217, 119, 6, 0); }
@@ -569,6 +572,7 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
   const [open, setOpen] = useState(false);
   const [showAssignPicker, setShowAssignPicker] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
   const ref = useRef(null);
 
   useEffect(() => {
@@ -603,13 +607,18 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
 
   const handleAction = async (key) => {
     setOpen(false);
-    switch (key) {
-      case 'assign': setShowAssignPicker(true); return;
-      case 'retry': await onStatusChange(task.id, { status: 'todo', assigned_agent: null }); return;
-      case 'unblock': await onStatusChange(task.id, { status: 'todo', blocked_reason: null, assigned_agent: null }); return;
-      case 'reopen': await onStatusChange(task.id, { status: 'todo', assigned_agent: null }); return;
-      case 'deploy': handleDeploy(); return;
-      case 'deprecate': handleDeprecate(); return;
+    if (key === 'assign') { setShowAssignPicker(true); return; }
+    setActionLoading(true);
+    try {
+      switch (key) {
+        case 'retry': await onStatusChange(task.id, { status: 'todo', assigned_agent: null }); break;
+        case 'unblock': await onStatusChange(task.id, { status: 'todo', blocked_reason: null, assigned_agent: null }); break;
+        case 'reopen': await onStatusChange(task.id, { status: 'todo', assigned_agent: null }); break;
+        case 'deploy': await handleDeploy(); break;
+        case 'deprecate': await handleDeprecate(); break;
+      }
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -646,14 +655,14 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
   return (
     <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
       <button className="tdm-action-btn"
-        onClick={() => !assigning && setOpen(!open)}
-        disabled={assigning}
+        onClick={() => !assigning && !actionLoading && setOpen(!open)}
+        disabled={assigning || actionLoading}
         style={{
-          background: assigning ? 'var(--md-outline, #79747E)' : 'var(--md-primary, #6750A4)',
-          cursor: assigning ? 'not-allowed' : 'pointer', color: '#fff',
+          background: (assigning || actionLoading) ? 'var(--md-outline, #79747E)' : 'var(--md-primary, #6750A4)',
+          cursor: (assigning || actionLoading) ? 'not-allowed' : 'pointer', color: '#fff',
           minHeight: isMobile ? 42 : 36, display: 'flex', alignItems: 'center', gap: 6,
         }}>
-        {assigning ? "⏳ Assigning…" : "⚡ Actions ▾"}
+        {actionLoading ? (<><span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'tdm-spin 0.6s linear infinite' }} /> Processing…</>) : assigning ? "⏳ Assigning…" : "⚡ Actions ▾"}
       </button>
       {open && (
         <div style={menuStyle}>
