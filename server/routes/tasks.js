@@ -248,12 +248,12 @@ router.post("/deploy/:id", async (req, res) => {
       return res.status(400).json({ ok: false, error: `Task status is '${task.status}', must be 'completed' to deploy` });
     }
 
-    // 2. Extract PR reference — prefer pr_ref column, fall back to parsing result
+    // 2. Extract PR reference — prefer pull_request_url column, fall back to parsing result
     let prNumber = null;
     let repoFullName = null;
-    if (task.pr_ref) {
-      // pr_ref format: https://github.com/OWNER/REPO/pull/NUMBER
-      const prRefMatch = task.pr_ref.match(/github\.com\/(.+?)\/pull\/(\d+)/);
+    if (task.pull_request_url) {
+      // pull_request_url format: https://github.com/OWNER/REPO/pull/NUMBER
+      const prRefMatch = task.pull_request_url.match(/github\.com\/(.+?)\/pull\/(\d+)/);
       if (prRefMatch) {
         repoFullName = prRefMatch[1];
         prNumber = parseInt(prRefMatch[2]);
