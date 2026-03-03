@@ -374,6 +374,7 @@ export default function App() {
               color: "var(--md-on-surface-variant)", cursor: "pointer", fontSize: 12, fontWeight: 600,
               fontFamily: "'Roboto', system-ui, sans-serif",
             }}>🤖 Pingboard</button>
+            <span style={{ fontSize: 10, color: 'var(--md-on-surface-variant)', opacity: 0.6, fontFamily: 'monospace', marginLeft: 8, background: 'var(--md-surface-variant)', padding: '2px 6px', borderRadius: 4 }}>{__COMMIT_HASH__}</span>
           </div>
           <StatsBar stats={stats} isTablet={isTablet} />
         </div>
