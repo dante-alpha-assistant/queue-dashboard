@@ -200,11 +200,19 @@ export default function App() {
             <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: "-0.02em" }}>
               tasks<span style={{ color: "var(--md-primary)" }}>.</span>dante<span style={{ color: "var(--md-primary)" }}>.</span>id
             </span>
-            <button onClick={() => setView("pingboard")} style={{
-              marginLeft: "auto", padding: "4px 10px", borderRadius: 6,
-              background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)",
-              color: "var(--md-on-surface-variant)", cursor: "pointer", fontSize: 11, fontWeight: 600,
-            }}>🤖</button>
+            <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+              <a href="https://cloud.langfuse.com" target="_blank" rel="noopener noreferrer" style={{
+                padding: "4px 10px", borderRadius: 6,
+                background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)",
+                color: "var(--md-on-surface-variant)", cursor: "pointer", fontSize: 11, fontWeight: 600,
+                textDecoration: "none", display: "inline-flex", alignItems: "center",
+              }}>📊</a>
+              <button onClick={() => setView("pingboard")} style={{
+                padding: "4px 10px", borderRadius: 6,
+                background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)",
+                color: "var(--md-on-surface-variant)", cursor: "pointer", fontSize: 11, fontWeight: 600,
+              }}>🤖</button>
+            </div>
           </div>
         </div>
 
