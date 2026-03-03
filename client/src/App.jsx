@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import useQueue from "./hooks/useQueue";
 import useBreakpoint from "./hooks/useBreakpoint";
 import useTaskEvents from "./hooks/useTaskEvents";
@@ -48,6 +48,46 @@ export default function App() {
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
   const { progress: taskProgress, monitor: taskMonitor, connected: sseConnected } = useTaskEvents();
 
+  // --- URL routing: /task/:id ---
+  const [deepLinkId, setDeepLinkId] = useState(() => {
+    const m = window.location.pathname.match(/^\/task\/([a-f0-9-]+)$/i);
+    return m ? m[1] : null;
+  });
+  const [taskNotFound, setTaskNotFound] = useState(false);
+  const deepLinkResolved = useRef(false);
+
+  // Handle browser back/forward
+  useEffect(() => {
+    const onPop = () => {
+      const m = window.location.pathname.match(/^\/task\/([a-f0-9-]+)$/i);
+      if (m) {
+        setDeepLinkId(m[1]);
+        setTaskNotFound(false);
+        deepLinkResolved.current = false;
+      } else {
+        setDeepLinkId(null);
+        setTaskNotFound(false);
+        setSelectedTask(null);
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  // URL-aware task open/close
+  const handleOpenTask = useCallback((task) => {
+    setSelectedTask(task);
+    history.pushState(null, "", `/task/${task.id}`);
+  }, []);
+
+  const handleCloseTask = useCallback(() => {
+    setSelectedTask(null);
+    setTaskNotFound(false);
+    if (window.location.pathname.startsWith("/task/")) {
+      history.pushState(null, "", "/");
+    }
+  }, []);
+
   // Collapsible columns for Deployed and Failed
   const COLLAPSIBLE_COLUMNS = ["deployed", "failed"];
   const [collapsedCols, setCollapsedCols] = useState(() => {
@@ -81,6 +121,30 @@ export default function App() {
     );
   }
 
+  // 404 for deep-linked task not found
+  if (taskNotFound) {
+    return (
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "center",
+        height: "100vh", background: "var(--md-background)", color: "var(--md-on-surface)",
+        fontFamily: "'Roboto', system-ui, sans-serif",
+      }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🔍</div>
+          <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Task not found</div>
+          <div style={{ fontSize: 14, color: "var(--md-on-surface-variant)", marginBottom: 20 }}>
+            The task you're looking for doesn't exist or has been removed.
+          </div>
+          <button onClick={() => { setTaskNotFound(false); history.pushState(null, "", "/"); }} style={{
+            padding: "10px 24px", borderRadius: 20, background: "var(--md-primary)",
+            color: "var(--md-on-primary)", border: "none", fontSize: 14, fontWeight: 500,
+            cursor: "pointer", fontFamily: "'Roboto', system-ui, sans-serif",
+          }}>Go to Board</button>
+        </div>
+      </div>
+    );
+  }
+
   if (view === "pingboard") {
     return (
       <div style={{ fontFamily: "'Roboto', system-ui, sans-serif" }}>
@@ -107,6 +171,19 @@ export default function App() {
   }
 
   const allTasksRaw = [...todo, ...assigned, ...inProgress, ...blocked, ...qa, ...completed, ...deployed, ...failed];
+
+  // Resolve deep link once tasks are loaded
+  useEffect(() => {
+    if (!deepLinkId || deepLinkResolved.current || loading) return;
+    const found = allTasksRaw.find(t => t.id === deepLinkId);
+    if (found) {
+      setSelectedTask(found);
+      deepLinkResolved.current = true;
+    } else {
+      setTaskNotFound(true);
+      deepLinkResolved.current = true;
+    }
+  }, [deepLinkId, allTasksRaw, loading]);
   const allTasks = filterTasksByTime(allTasksRaw, timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
   const activeTypes = ["all", ...new Set(allTasks.map(t => t.type).filter(Boolean))];
   const activeStages = ["all", ...new Set(allTasks.map(t => t.stage).filter(Boolean))];
@@ -146,7 +223,7 @@ export default function App() {
   };
 
   const renderCards = (tasks) =>
-    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={setSelectedTask} isMobile={isMobile} progress={taskProgress[t.id]} monitor={taskMonitor[t.id]} />);
+    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={handleOpenTask} isMobile={isMobile} progress={taskProgress[t.id]} monitor={taskMonitor[t.id]} />);
 
   // MOBILE LAYOUT
   if (isMobile) {
@@ -280,8 +357,8 @@ export default function App() {
         {selectedTask && (
           <TaskDetailModal
             task={selectedTask}
-            onClose={() => setSelectedTask(null)}
-            onStatusChange={async (id, updates) => { await updateTask(id, updates); setSelectedTask(null); }}
+            onClose={handleCloseTask}
+            onStatusChange={async (id, updates) => { await updateTask(id, updates); handleCloseTask(); }}
             isMobile={isMobile}
             progress={selectedTask ? taskProgress[selectedTask.id] : null}
             monitor={selectedTask ? taskMonitor[selectedTask.id] : null}
@@ -429,8 +506,8 @@ export default function App() {
       {selectedTask && (
         <TaskDetailModal
           task={selectedTask}
-          onClose={() => setSelectedTask(null)}
-          onStatusChange={async (id, updates) => { await updateTask(id, updates); setSelectedTask(null); }}
+          onClose={handleCloseTask}
+          onStatusChange={async (id, updates) => { await updateTask(id, updates); handleCloseTask(); }}
           isMobile={false}
           isTablet={isTablet}
           progress={selectedTask ? taskProgress[selectedTask.id] : null}
