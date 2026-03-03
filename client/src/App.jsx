@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import useQueue from "./hooks/useQueue";
 import useBreakpoint from "./hooks/useBreakpoint";
 import useTaskEvents from "./hooks/useTaskEvents";
@@ -38,7 +39,13 @@ export default function App() {
     loading, updateTask,
     projects, selectedProject, setSelectedProject,
   } = useQueue();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [selectedTask, setSelectedTask] = useState(null);
+  const [deepLinkId] = useState(() => {
+    const match = location.pathname.match(/^\/task\/([a-f0-9-]+)$/i);
+    return match ? match[1] : null;
+  });
   const [typeFilter, setTypeFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("todo");
@@ -47,6 +54,31 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
   const { progress: taskProgress, monitor: taskMonitor, connected: sseConnected } = useTaskEvents();
+
+  // Resolve deep link once tasks are loaded
+  useEffect(() => {
+    if (!deepLinkId || loading) return;
+    const allLoaded = [...todo, ...assigned, ...inProgress, ...blocked, ...qa, ...completed, ...deployed, ...failed];
+    const found = allLoaded.find(t => t.id === deepLinkId);
+    if (found) {
+      setSelectedTask(found);
+    } else {
+      setSelectedTask({ _notFound: true, id: deepLinkId });
+    }
+  }, [deepLinkId, loading, todo, assigned, inProgress, blocked, qa, completed, deployed, failed]);
+
+  // Update URL when task is selected/deselected
+  const handleSelectTask = useCallback((task) => {
+    setSelectedTask(task);
+    if (task && task.id) {
+      navigate(`/task/${task.id}`, { replace: true });
+    }
+  }, [navigate]);
+
+  const handleCloseTask = useCallback(() => {
+    setSelectedTask(null);
+    navigate("/", { replace: true });
+  }, [navigate]);
 
   // Collapsible columns for Deployed and Failed
   const COLLAPSIBLE_COLUMNS = ["deployed", "failed"];
@@ -146,7 +178,7 @@ export default function App() {
   };
 
   const renderCards = (tasks) =>
-    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={setSelectedTask} isMobile={isMobile} progress={taskProgress[t.id]} monitor={taskMonitor[t.id]} />);
+    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={handleSelectTask} isMobile={isMobile} progress={taskProgress[t.id]} monitor={taskMonitor[t.id]} />);
 
   // MOBILE LAYOUT
   if (isMobile) {
@@ -277,15 +309,37 @@ export default function App() {
         </div>
 
         <ChatPanel isMobile={isMobile} />
-        {selectedTask && (
+        {selectedTask && !selectedTask._notFound && (
           <TaskDetailModal
             task={selectedTask}
-            onClose={() => setSelectedTask(null)}
+            onClose={handleCloseTask}
             onStatusChange={async (id, updates) => { await updateTask(id, updates); setSelectedTask(prev => prev ? { ...prev, ...updates } : null); }}
             isMobile={isMobile}
             progress={selectedTask ? taskProgress[selectedTask.id] : null}
             monitor={selectedTask ? taskMonitor[selectedTask.id] : null}
           />
+        )}
+        {selectedTask && selectedTask._notFound && (
+          <div style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }} onClick={handleCloseTask}>
+            <div style={{
+              background: "var(--md-surface)", borderRadius: 16, padding: "32px 40px",
+              textAlign: "center", maxWidth: 400,
+            }} onClick={e => e.stopPropagation()}>
+              <div style={{ fontSize: 48, marginBottom: 12 }}>🔍</div>
+              <h2 style={{ margin: "0 0 8px", color: "var(--md-on-surface)" }}>Task Not Found</h2>
+              <p style={{ color: "var(--md-on-surface-variant)", fontSize: 14, margin: "0 0 20px" }}>
+                No task with ID <code style={{ fontSize: 12 }}>{selectedTask.id}</code> was found.
+              </p>
+              <button onClick={handleCloseTask} style={{
+                padding: "8px 24px", borderRadius: 20, border: "none",
+                background: "var(--md-primary)", color: "var(--md-on-primary)",
+                cursor: "pointer", fontWeight: 600, fontSize: 14,
+              }}>Back to Board</button>
+            </div>
+          </div>
         )}
       </div>
     );
@@ -426,16 +480,38 @@ export default function App() {
       </div>
 
       <ChatPanel isMobile={false} />
-      {selectedTask && (
+      {selectedTask && !selectedTask._notFound && (
         <TaskDetailModal
           task={selectedTask}
-          onClose={() => setSelectedTask(null)}
+          onClose={handleCloseTask}
           onStatusChange={async (id, updates) => { await updateTask(id, updates); setSelectedTask(prev => prev ? { ...prev, ...updates } : null); }}
           isMobile={false}
           isTablet={isTablet}
           progress={selectedTask ? taskProgress[selectedTask.id] : null}
           monitor={selectedTask ? taskMonitor[selectedTask.id] : null}
         />
+      )}
+      {selectedTask && selectedTask._notFound && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }} onClick={handleCloseTask}>
+          <div style={{
+            background: "var(--md-surface)", borderRadius: 16, padding: "32px 40px",
+            textAlign: "center", maxWidth: 400,
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>🔍</div>
+            <h2 style={{ margin: "0 0 8px", color: "var(--md-on-surface)" }}>Task Not Found</h2>
+            <p style={{ color: "var(--md-on-surface-variant)", fontSize: 14, margin: "0 0 20px" }}>
+              No task with ID <code style={{ fontSize: 12 }}>{selectedTask.id}</code> was found.
+            </p>
+            <button onClick={handleCloseTask} style={{
+              padding: "8px 24px", borderRadius: 20, border: "none",
+              background: "var(--md-primary)", color: "var(--md-on-primary)",
+              cursor: "pointer", fontWeight: 600, fontSize: 14,
+            }}>Back to Board</button>
+          </div>
+        </div>
       )}
     </div>
   );
