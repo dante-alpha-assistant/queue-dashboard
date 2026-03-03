@@ -1,6 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 
-const AGENT_ICONS = { neo: "🕶️", mu: "🔧", beta: "⚡", alpha: "🧠", flow: "🌊", ifra: "🛠️" };
+const AGENT_ICONS = {
+  neo: "🕶️", mu: "🔧", beta: "⚡", alpha: "🧠", flow: "🌊", ifra: "🛠️",
+  "neo-worker": "🕶️", "ifra-worker": "🛠️", "beta-worker": "⚡",
+};
+
+const STATUS_DOT = {
+  online: '#4CAF50',
+  degraded: '#FF9800',
+  offline: '#9E9E9E',
+  busy: '#D97706',
+};
 
 export default function AgentPicker({ onSelect, onCancel, style }) {
   const [agents, setAgents] = useState([]);
@@ -25,7 +35,6 @@ export default function AgentPicker({ onSelect, onCancel, style }) {
     return () => { cancelled = true; };
   }, []);
 
-  // Close on click outside
   useEffect(() => {
     const handler = (e) => {
       if (ref.current && !ref.current.contains(e.target)) onCancel?.();
@@ -34,76 +43,107 @@ export default function AgentPicker({ onSelect, onCancel, style }) {
     return () => document.removeEventListener("mousedown", handler);
   }, [onCancel]);
 
-  const dropdownStyle = {
-    position: "absolute", zIndex: 100, bottom: "100%", right: 0, marginBottom: 4,
-    background: "var(--md-surface, #FFFBFE)",
-    border: "1px solid var(--md-surface-variant, #E7E0EC)",
-    borderRadius: 12, boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-    minWidth: 220, maxHeight: 240, overflow: "auto",
-    fontFamily: "'Roboto', system-ui, sans-serif",
-    ...style,
-  };
-
   return (
-    <div ref={ref} style={dropdownStyle} onClick={(e) => e.stopPropagation()}>
-      <div style={{ padding: "10px 12px 6px", fontSize: 11, fontWeight: 600, color: "var(--md-outline, #79747E)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-        Assign to agent
+    <div ref={ref} style={{
+      background: "var(--md-surface, #FFFBFE)",
+      border: "1px solid var(--md-surface-variant, #E7E0EC)",
+      borderRadius: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+      minWidth: 280, maxWidth: 340, maxHeight: 360, overflow: "auto",
+      fontFamily: "'Roboto', system-ui, sans-serif",
+      ...style,
+    }} onClick={(e) => e.stopPropagation()}>
+      <div style={{
+        padding: "12px 16px 8px", fontSize: 13, fontWeight: 600,
+        color: "var(--md-on-surface, #1C1B1F)",
+        borderBottom: "1px solid var(--md-surface-variant, #E7E0EC)",
+      }}>
+        👤 Assign to agent
       </div>
+
       {loading && (
-        <div style={{ padding: "16px", textAlign: "center", fontSize: 13, color: "var(--md-outline, #79747E)" }}>
-          <span style={{ display: "inline-block", animation: "spin 1s linear infinite", marginRight: 8 }}>⏳</span>
+        <div style={{ padding: 24, textAlign: "center", fontSize: 13, color: "var(--md-outline, #79747E)" }}>
           Loading agents…
         </div>
       )}
+
       {error && (
-        <div style={{ padding: "12px", fontSize: 12, color: "#BA1A1A" }}>
-          {error}
-        </div>
+        <div style={{ padding: 16, fontSize: 12, color: "#BA1A1A" }}>⚠️ {error}</div>
       )}
+
       {!loading && !error && agents.length === 0 && (
-        <div style={{ padding: "12px 16px", fontSize: 13, color: "var(--md-outline, #79747E)" }}>
-          No agents online
+        <div style={{ padding: 16, fontSize: 13, color: "var(--md-outline, #79747E)", textAlign: "center" }}>
+          No agents available
         </div>
       )}
-      {!loading && !error && agents.map((agent) => {
-        const icon = agent.avatar || AGENT_ICONS[agent.name?.split("-")[0]] || "🤖";
-        const load = `${agent.current_load ?? 0}/${agent.max_capacity ?? "?"}`;
-        return (
-          <button
-            key={agent.id}
-            onClick={(e) => { e.stopPropagation(); onSelect(agent.id); }}
-            style={{
-              display: "flex", alignItems: "center", gap: 10, width: "100%",
-              padding: "10px 12px", border: "none", background: "transparent",
-              cursor: "pointer", fontSize: 13, textAlign: "left",
-              color: "var(--md-on-surface, #1C1B1F)",
-              fontFamily: "'Roboto', system-ui, sans-serif",
-              borderTop: "1px solid var(--md-surface-variant, #E7E0EC)",
-              transition: "background 100ms ease",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--md-surface-container-low, #F7F2FA)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-          >
-            <span style={{
-              fontSize: 16, width: 32, height: 32, borderRadius: "50%",
-              background: "var(--md-surface-container-low, #F7F2FA)",
-              display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-            }}>{icon}</span>
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ fontWeight: 600, display: "block" }}>{agent.name || agent.id}</span>
-              {agent.capabilities && (
-                <span style={{ fontSize: 11, color: "var(--md-outline, #79747E)" }}>
-                  {agent.capabilities.slice(0, 3).join(", ")}
+
+      {!loading && !error && (
+        <div style={{ padding: "4px 0" }}>
+          {agents.map((agent) => {
+            const icon = agent.avatar || AGENT_ICONS[agent.name] || "🤖";
+            const statusColor = STATUS_DOT[agent.status] || '#9E9E9E';
+            const isAvailable = agent.status === 'online';
+            const types = (agent.task_types || agent.capabilities || []).slice(0, 4);
+
+            return (
+              <button
+                key={agent.id}
+                onClick={(e) => { e.stopPropagation(); onSelect(agent.name); }}
+                disabled={!isAvailable}
+                style={{
+                  display: "flex", alignItems: "center", gap: 12, width: "100%",
+                  padding: "10px 16px", border: "none", background: "transparent",
+                  cursor: isAvailable ? "pointer" : "not-allowed",
+                  fontSize: 13, textAlign: "left",
+                  color: isAvailable ? "var(--md-on-surface, #1C1B1F)" : "var(--md-outline, #79747E)",
+                  opacity: isAvailable ? 1 : 0.5,
+                  transition: "background 100ms ease",
+                }}
+                onMouseEnter={(e) => { if (isAvailable) e.currentTarget.style.background = "var(--md-surface-container-low, #F7F2FA)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+              >
+                {/* Avatar + status dot */}
+                <div style={{ position: "relative", flexShrink: 0 }}>
+                  <span style={{
+                    fontSize: 18, width: 36, height: 36, borderRadius: "50%",
+                    background: "var(--md-surface-container-low, #F7F2FA)",
+                    border: "1px solid var(--md-surface-variant, #E7E0EC)",
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  }}>{icon}</span>
+                  <div style={{
+                    position: "absolute", bottom: 0, right: 0,
+                    width: 10, height: 10, borderRadius: "50%",
+                    background: statusColor,
+                    border: "2px solid var(--md-surface, #FFFBFE)",
+                  }} />
+                </div>
+
+                {/* Name + capabilities */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, lineHeight: 1.3 }}>
+                    {agent.name}
+                  </div>
+                  {types.length > 0 && (
+                    <div style={{ fontSize: 11, color: "var(--md-outline, #79747E)", marginTop: 1 }}>
+                      {types.join(" · ")}
+                    </div>
+                  )}
+                </div>
+
+                {/* Status badge */}
+                <span style={{
+                  fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 10,
+                  background: `${statusColor}18`,
+                  color: statusColor,
+                  textTransform: "uppercase", letterSpacing: "0.03em",
+                  flexShrink: 0,
+                }}>
+                  {agent.status}
                 </span>
-              )}
-            </span>
-            <span style={{
-              fontSize: 11, fontWeight: 600, color: "var(--md-outline, #79747E)",
-              fontFamily: "'Roboto Mono', monospace", whiteSpace: "nowrap",
-            }}>({load})</span>
-          </button>
-        );
-      })}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

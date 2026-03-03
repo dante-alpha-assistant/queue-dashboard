@@ -26,7 +26,7 @@ agentsRouter.get("/discover", async (req, res) => {
     const { data, error } = await supabase
       .from("agent_cards")
       .select("id, name, capabilities, skills, status, endpoint_url, task_types, max_capacity, current_load, avatar")
-      .eq("status", "online")
+      .neq("status", "disabled")
       .order("name");
     if (error) throw error;
     res.json(data);
