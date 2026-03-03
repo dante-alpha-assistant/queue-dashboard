@@ -411,6 +411,22 @@ router.post("/deploy/:id", async (req, res) => {
   }
 });
 
+// Activity log for a task (Jira-style field change history)
+router.get("/tasks/:id/activity", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("task_activity_log")
+      .select("*")
+      .eq("task_id", req.params.id)
+      .order("changed_at", { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    res.json(data || []);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Archive task (soft delete — never actually delete)
 router.delete("/tasks/:id", async (req, res) => {
   try {

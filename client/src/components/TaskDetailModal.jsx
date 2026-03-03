@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import AgentPicker from './AgentPicker';
 import StatusTimeline from './StatusTimeline';
+import ActivityLog from './ActivityLog';
 import { ProgressDetail } from './ProgressFeed';
 
 /* ── Constants ────────────────────────────────────────────── */
@@ -647,6 +648,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const hasMetadata = !!task.metadata && typeof task.metadata === 'object' && Object.keys(task.metadata).length > 0;
 
   const tabs = [{ key: 'details', label: 'Details' }];
+  tabs.push({ key: 'activity', label: 'Activity' });
   if (hasResult || hasError) tabs.push({ key: 'output', label: hasError ? '⚠ Output' : 'Output' });
   if (hasQA) tabs.push({ key: 'qa', label: 'QA' });
   if (hasMetadata) tabs.push({ key: 'meta', label: 'Meta' });
@@ -849,6 +851,10 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
           </SectionLabel>
           <ResultDisplay result={task.qa_result} variant={task.qa_result.passed ? "success" : "error"} />
         </div>
+      )}
+
+      {activeTab === 'activity' && (
+        <ActivityLog taskId={task.id} />
       )}
 
       {activeTab === 'meta' && hasMetadata && (
