@@ -280,15 +280,7 @@ router.post("/deploy/:id", async (req, res) => {
             if (m) repoFullName = m[1];
           }
         }
-        // Try project's default repo
-        if (!repoFullName && task.project_id) {
-          const { data: repos } = await supabase.from("agent_repositories").select("url").eq("project_id", task.project_id).limit(1);
-          if (repos?.[0]?.url) {
-            const m = repos[0].url.match(/github\.com\/(.+?)(?:\.git)?$/);
-            if (m) repoFullName = m[1];
-          }
-        }
-        // Try searching GitHub for the PR number across org repos
+        // Try searching GitHub for the exact PR number across org repos (most accurate)
         if (!repoFullName && GH_TOKEN) {
           try {
             const searchResp = await fetch(`https://api.github.com/search/issues?q=is:pr+org:dante-alpha-assistant+${prNumber}+in:title`, {
@@ -303,8 +295,16 @@ router.post("/deploy/:id", async (req, res) => {
             }
           } catch {}
         }
+        // Last resort: project's default repo
+        if (!repoFullName && task.project_id) {
+          const { data: repos } = await supabase.from("agent_repositories").select("url").eq("project_id", task.project_id).limit(1);
+          if (repos?.[0]?.url) {
+            const m = repos[0].url.match(/github\.com\/(.+?)(?:\.git)?$/);
+            if (m) repoFullName = m[1];
+          }
+        }
         if (!repoFullName) {
-          return res.status(400).json({ ok: false, error: `Cannot determine repository for PR #${prNumber}. No repo reference in task result, no repository_id, and no project repos found.` });
+          return res.status(400).json({ ok: false, error: `Cannot determine repository for PR #${prNumber}. No repo reference in task result, no repository_id, and GitHub search found no match.` });
         }
       }
 

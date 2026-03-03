@@ -1025,7 +1025,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
               )}
             </button>
           )}
-          {deployError && <span style={{ color: '#D32F2F', fontSize: 12, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={deployError}>⚠️ {deployError}</span>}
+          {deployError && <span style={{ color: '#D32F2F', fontSize: 12, wordBreak: 'break-word' }}>⚠️ {deployError}</span>}
           <div style={{ flex: 1 }} />
           {/* Time hint */}
           {!isMobile && task.created_at && (
