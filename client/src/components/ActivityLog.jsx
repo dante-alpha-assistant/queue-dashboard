@@ -21,6 +21,7 @@ const FIELD_LABELS = {
   repository_id: 'Repository',
   blocked_reason: 'Blocked reason',
   pull_request_url: 'Pull request',
+  comment: 'Comment',
 };
 
 const FIELD_ICONS = {
@@ -42,6 +43,7 @@ const FIELD_ICONS = {
   repository_id: '📂',
   blocked_reason: '🚫',
   pull_request_url: '🔗',
+  comment: '💬',
 };
 
 const STATUS_COLORS = {
@@ -177,13 +179,15 @@ function ActivityEntry({ entry, isLast }) {
           {author && (
             <span style={{
               fontSize: 11, fontWeight: 600,
-              color: author === 'orchestration layer' ? '#9C27B0' : '#6750A4',
+              color: entry.field === 'comment'
+                ? (entry.author_type === 'agent' ? '#E65100' : '#1B5E20')
+                : author === 'orchestration layer' ? '#9C27B0' : '#6750A4',
             }}>
               {author}
             </span>
           )}
           <span style={{ fontSize: 11, color: 'var(--md-on-surface-variant, #49454F)' }}>
-            {isCreation ? 'created this task' : `changed ${label.toLowerCase()}`}
+            {isCreation ? 'created this task' : entry.field === 'comment' ? 'added a comment' : `changed ${label.toLowerCase()}`}
           </span>
           <span style={{
             fontSize: 9, color: 'var(--md-outline, #79747E)',
@@ -203,6 +207,20 @@ function ActivityEntry({ entry, isLast }) {
             <ExpandableValue value={entry.old_value} color={getValueColor(entry.field, entry.old_value)} />
             <span style={{ fontSize: 10, color: 'var(--md-outline, #79747E)' }}>→</span>
             <ExpandableValue value={entry.new_value} color={getValueColor(entry.field, entry.new_value)} />
+          </div>
+        )}
+
+        {/* Comment body */}
+        {entry.field === 'comment' && entry.new_value && (
+          <div style={{
+            marginTop: 6, padding: '8px 12px', borderRadius: 8,
+            background: entry.author_type === 'agent' ? '#FFF3E0' : '#E8F5E9',
+            borderLeft: `3px solid ${entry.author_type === 'agent' ? '#E65100' : '#1B5E20'}`,
+            fontSize: 12, color: 'var(--md-on-surface, #1C1B1F)',
+            lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+            maxWidth: 500,
+          }}>
+            {entry.new_value}
           </div>
         )}
 

@@ -467,16 +467,43 @@ router.get("/tasks/:id/activity", async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 10, 100);
     const offset = parseInt(req.query.offset) || 0;
-    const { data, error, count } = await supabase
-      .from("task_activity_log")
-      .select("*", { count: "exact" })
-      .eq("task_id", req.params.id)
-      .order("changed_at", { ascending: false })
-      .range(offset, offset + limit - 1);
-    if (error) throw error;
 
-    // Enrich assigned_agent->null entries with error reason when no separate error entry was logged
-    const entries = data || [];
+    // Fetch both activity log and comments, merge chronologically
+    const [activityRes, commentsRes] = await Promise.all([
+      supabase
+        .from("task_activity_log")
+        .select("*", { count: "exact" })
+        .eq("task_id", req.params.id)
+        .order("changed_at", { ascending: false }),
+      supabase
+        .from("task_comments")
+        .select("*")
+        .eq("task_id", req.params.id)
+        .order("created_at", { ascending: false }),
+    ]);
+
+    if (activityRes.error) throw activityRes.error;
+
+    // Convert comments to activity-like entries
+    const commentEntries = (commentsRes.data || []).map(c => ({
+      id: 'comment-' + c.id,
+      task_id: c.task_id,
+      field: 'comment',
+      old_value: null,
+      new_value: c.body,
+      changed_by: c.author,
+      changed_at: c.created_at,
+      author_type: c.author_type,
+    }));
+
+    // Merge and sort by timestamp descending
+    const allEntries = [...(activityRes.data || []), ...commentEntries]
+      .sort((a, b) => new Date(b.changed_at) - new Date(a.changed_at));
+
+    const total = allEntries.length;
+    const entries = allEntries.slice(offset, offset + limit);
+
+    // Enrich assigned_agent->null entries with error reason
     const unassignEntries = entries.filter(
       e => e.field === 'assigned_agent' && (!e.new_value || e.new_value === 'null')
     );
@@ -486,14 +513,13 @@ router.get("/tasks/:id/activity", async (req, res) => {
         const entryTime = new Date(entry.changed_at).getTime();
         const hasMatchingError = errorEntries.some(e => Math.abs(new Date(e.changed_at).getTime() - entryTime) < 2000);
         if (!hasMatchingError) {
-          // No error entry logged at this time — attach the task's current error
           const { data: task } = await supabase.from("agent_tasks").select("error").eq("id", req.params.id).single();
           if (task?.error) entry.reason = task.error;
         }
       }
     }
 
-    res.json({ entries, total: count || entries.length, limit, offset });
+    res.json({ entries, total, limit, offset });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
