@@ -68,7 +68,7 @@ export default function useQueue() {
   }, [fetchAll]);
 
   const todo = tasks.filter(t => t.status === "todo");
-  const assigned = tasks.filter(t => t.status === "assigned");
+  const assigned = [];
   const inProgress = tasks.filter(t => t.status === "in_progress");
   const qa = tasks.filter(t => t.status === "qa" || t.status === "qa_testing");
   const completed = tasks.filter(t => t.status === "completed");

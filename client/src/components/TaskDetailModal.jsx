@@ -54,13 +54,13 @@ const STAGE_COLORS = {
 };
 const STAGES = ["refinery", "foundry", "builder", "inspector", "deployer"];
 const STAGE_LABELS = { refinery: "Refine", foundry: "Found", builder: "Build", inspector: "Inspect", deployer: "Deploy" };
-const ACTIVE_STATUSES = new Set(["in_progress", "assigned", "running", "qa_testing", "completed"]);
+const ACTIVE_STATUSES = new Set(["in_progress", "running", "qa_testing", "completed"]);
 
 const HAS_MARKDOWN = /[#*`\[|]/;
 
 const TIMELINE_STEPS = [
-  { key: 'created', label: 'Created', statuses: ['todo', 'assigned', 'in_progress', 'running', 'completed', 'failed', 'qa', 'qa_testing', 'deployed'] },
-  { key: 'assigned', label: 'Assigned', statuses: ['assigned', 'in_progress', 'running', 'completed', 'failed', 'qa', 'qa_testing', 'deployed'] },
+  { key: 'created', label: 'Created', statuses: ['todo', 'in_progress', 'running', 'completed', 'failed', 'qa', 'qa_testing', 'deployed'] },
+  { key: 'assigned', label: 'Assigned', statuses: [ 'in_progress', 'running', 'completed', 'failed', 'qa', 'qa_testing', 'deployed'] },
   { key: 'in_progress', label: 'Working', statuses: ['in_progress', 'running', 'completed', 'failed', 'qa', 'qa_testing', 'deployed'] },
   { key: 'qa_testing', label: 'QA Testing', statuses: ['qa_testing', 'completed', 'failed', 'deployed'] },
   { key: 'qa', label: 'QA', statuses: ['qa', 'completed', 'deployed'] },

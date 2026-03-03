@@ -43,7 +43,7 @@ const STATUS_ICONS = {
   deprecated: '⊘',
 };
 
-const ACTIVE_STATUSES = new Set(['in_progress', 'assigned', 'running', 'qa_testing']);
+const ACTIVE_STATUSES = new Set(['in_progress', 'running', 'qa_testing']);
 
 /* ── Duration formatting ────────────────────────────────── */
 

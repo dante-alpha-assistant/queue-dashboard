@@ -29,7 +29,7 @@ const STAGE_COLORS = {
 const STAGES = ["refinery", "foundry", "builder", "inspector", "deployer"];
 const STAGE_LABELS = { refinery: "Refine", foundry: "Found", builder: "Build", inspector: "Inspect", deployer: "Deploy" };
 const STAGE_SHORT = { refinery: "REF", foundry: "FND", builder: "BLD", inspector: "INS", deployer: "DEP" };
-const ACTIVE_STATUSES = new Set(["in_progress", "assigned", "running", "qa_testing", "completed"]);
+const ACTIVE_STATUSES = new Set(["in_progress", "running", "qa_testing", "completed"]);
 
 function formatDuration(ms) {
   if (!ms || ms < 0) return "0s";
@@ -215,7 +215,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
     actions.push(
       <button
         key="retry"
-        onClick={(e) => { e.stopPropagation(); onStatusChange?.(task.id, { status: "assigned" }); }}
+        onClick={(e) => { e.stopPropagation(); onStatusChange?.(task.id, { assigned_agent: task.assigned_agent }); }}
         style={{ ...btnBase, background: "#E65100", color: "#fff" }}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">

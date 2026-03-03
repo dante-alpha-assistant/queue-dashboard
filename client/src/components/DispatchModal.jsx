@@ -39,7 +39,7 @@ export default function DispatchModal({ onClose, dispatch, projects = [], isMobi
         type,
         priority,
         assigned_agent: agent || null,
-        status: agent ? "assigned" : "todo",
+        assigned_agent: agent || null,
         project_id: projectId || null,
         repository_id: repositoryId || null,
       });
