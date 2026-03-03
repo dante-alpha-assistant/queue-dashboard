@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import useQueue from "./hooks/useQueue";
 import useBreakpoint from "./hooks/useBreakpoint";
 import useTaskEvents from "./hooks/useTaskEvents";
@@ -66,6 +66,63 @@ export default function App() {
     });
   }, []);
 
+
+  // URL-based task deep linking
+  const [urlTaskId, setUrlTaskId] = useState(() => {
+    const match = window.location.pathname.match(/^\/task\/([a-f0-9-]+)$/i);
+    return match ? match[1] : null;
+  });
+  const [taskNotFound, setTaskNotFound] = useState(false);
+
+  // Open task from URL once tasks are loaded
+  const allTasksRef = useRef([]);
+  useEffect(() => {
+    const all = [...todo, ...assigned, ...inProgress, ...blocked, ...qa, ...completed, ...deployed, ...failed];
+    allTasksRef.current = all;
+    if (urlTaskId && !loading) {
+      const task = all.find(t => t.id === urlTaskId);
+      if (task) {
+        setSelectedTask(task);
+        setUrlTaskId(null);
+        setTaskNotFound(false);
+      } else {
+        setTaskNotFound(true);
+      }
+    }
+  }, [urlTaskId, loading, todo, assigned, inProgress, blocked, qa, completed, deployed, failed]);
+
+  // Handle browser back/forward
+  useEffect(() => {
+    const onPopState = () => {
+      const match = window.location.pathname.match(/^\/task\/([a-f0-9-]+)$/i);
+      if (match) {
+        const task = allTasksRef.current.find(t => t.id === match[1]);
+        if (task) setSelectedTask(task);
+        else setTaskNotFound(true);
+      } else {
+        setSelectedTask(null);
+        setTaskNotFound(false);
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  // URL-aware task selection
+  const openTask = useCallback((task) => {
+    setSelectedTask(task);
+    setTaskNotFound(false);
+    window.history.pushState(null, "", `/task/${task.id}`);
+  }, []);
+
+  const closeTask = useCallback(() => {
+    setSelectedTask(null);
+    setTaskNotFound(false);
+    if (window.location.pathname.startsWith("/task/")) {
+      window.history.pushState(null, "", "/");
+    }
+  }, []);
+
   if (loading) {
     return (
       <div style={{
@@ -76,6 +133,31 @@ export default function App() {
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>⏳</div>
           <div style={{ fontSize: 14, fontWeight: 500 }}>Loading tasks...</div>
+        </div>
+      </div>
+    );
+  }
+
+
+  // Task not found (deep link to non-existent task)
+  if (taskNotFound) {
+    return (
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "center",
+        height: "100vh", background: "var(--md-background)", color: "var(--md-on-surface)",
+        fontFamily: "'Roboto', system-ui, sans-serif",
+      }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
+          <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Task not found</div>
+          <div style={{ fontSize: 14, color: "var(--md-on-surface-variant)", marginBottom: 24 }}>
+            The task you&apos;re looking for doesn&apos;t exist or may have been deleted.
+          </div>
+          <button onClick={() => { setTaskNotFound(false); window.history.pushState(null, "", "/"); }} style={{
+            padding: "10px 24px", borderRadius: 20, background: "var(--md-primary)",
+            color: "var(--md-on-primary)", border: "none", cursor: "pointer",
+            fontSize: 14, fontWeight: 500, fontFamily: "'Roboto', system-ui, sans-serif",
+          }}>Go to Board</button>
         </div>
       </div>
     );
@@ -146,7 +228,7 @@ export default function App() {
   };
 
   const renderCards = (tasks) =>
-    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={setSelectedTask} isMobile={isMobile} progress={taskProgress[t.id]} monitor={taskMonitor[t.id]} />);
+    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={openTask} isMobile={isMobile} progress={taskProgress[t.id]} monitor={taskMonitor[t.id]} />);
 
   // MOBILE LAYOUT
   if (isMobile) {
@@ -280,8 +362,8 @@ export default function App() {
         {selectedTask && (
           <TaskDetailModal
             task={selectedTask}
-            onClose={() => setSelectedTask(null)}
-            onStatusChange={async (id, updates) => { await updateTask(id, updates); setSelectedTask(null); }}
+            onClose={closeTask}
+            onStatusChange={async (id, updates) => { await updateTask(id, updates); closeTask(); }}
             isMobile={isMobile}
             progress={selectedTask ? taskProgress[selectedTask.id] : null}
             monitor={selectedTask ? taskMonitor[selectedTask.id] : null}
@@ -429,8 +511,8 @@ export default function App() {
       {selectedTask && (
         <TaskDetailModal
           task={selectedTask}
-          onClose={() => setSelectedTask(null)}
-          onStatusChange={async (id, updates) => { await updateTask(id, updates); setSelectedTask(null); }}
+          onClose={closeTask}
+          onStatusChange={async (id, updates) => { await updateTask(id, updates); closeTask(); }}
           isMobile={false}
           isTablet={isTablet}
           progress={selectedTask ? taskProgress[selectedTask.id] : null}
