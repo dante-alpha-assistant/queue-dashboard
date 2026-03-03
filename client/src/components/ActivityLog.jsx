@@ -219,21 +219,6 @@ function ActivityEntry({ entry, isLast }) {
         )}
       </div>
     </div>
-      {entries.length < total && (
-        <button
-          onClick={loadMore}
-          disabled={loadingMore}
-          style={{
-            display: 'block', width: '100%', padding: '10px 0',
-            marginTop: 8, background: 'none', border: '1px solid var(--md-surface-variant, #E7E0EC)',
-            borderRadius: 8, cursor: loadingMore ? 'not-allowed' : 'pointer',
-            fontSize: 12, fontWeight: 500, color: 'var(--md-primary, #6750A4)',
-          }}
-        >
-          {loadingMore ? '⏳ Loading…' : `Show more (${entries.length}/${total})`}
-        </button>
-      )}
-    </div>
   );
 }
 
@@ -322,6 +307,20 @@ export default function ActivityLog({ taskId }) {
           isLast={i === entries.length - 1}
         />
       ))}
+      {entries.length < total && (
+        <button
+          onClick={loadMore}
+          disabled={loadingMore}
+          style={{
+            display: 'block', width: '100%', padding: '10px 0',
+            marginTop: 8, background: 'none', border: '1px solid var(--md-surface-variant, #E7E0EC)',
+            borderRadius: 8, cursor: loadingMore ? 'not-allowed' : 'pointer',
+            fontSize: 12, fontWeight: 500, color: 'var(--md-primary, #6750A4)',
+          }}
+        >
+          {loadingMore ? '⏳ Loading…' : `Show more (${entries.length}/${total})`}
+        </button>
+      )}
     </div>
   );
 }
