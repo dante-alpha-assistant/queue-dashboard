@@ -727,17 +727,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
           {task.project && (
             <MetaCell label="Project">{task.project.name}</MetaCell>
           )}
-          {task.pull_request_url?.length > 0 && (
-            <MetaCell label={task.pull_request_url.length > 1 ? "Pull Requests" : "Pull Request"}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                {(Array.isArray(task.pull_request_url) ? task.pull_request_url : [task.pull_request_url]).map((url, i) => (
-                  <a key={i} href={url} target="_blank" rel="noopener noreferrer" style={{ color: "#6750A4", textDecoration: "none", fontWeight: 500, fontSize: 13 }}>
-                    {url.match(/\/([^/]+)\/pull\/(\d+)/)?.[0]?.replace(/^\//, "") || "View PR"} ↗
-                  </a>
-                ))}
-              </div>
-            </MetaCell>
-          )}
+
           <MetaCell label="Created">
             <span title={task.created_at}>{formatDateShort(task.created_at)}</span>
           </MetaCell>
@@ -835,6 +825,19 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
           {!hasDescription && !hasCriteria && (
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--md-outline, #79747E)', fontSize: 13, fontStyle: 'italic' }}>
               No description or acceptance criteria provided.
+            </div>
+          )}
+          {task.pull_request_url?.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <SectionLabel icon="🔗">{task.pull_request_url.length > 1 ? "Pull Requests" : "Pull Request"}</SectionLabel>
+              <div style={{ padding: 14, background: 'var(--md-surface-container-low, #F7F2FA)', borderRadius: 10, border: '1px solid var(--md-surface-variant, #E7E0EC)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {(Array.isArray(task.pull_request_url) ? task.pull_request_url : [task.pull_request_url]).map((url, i) => (
+                  <a key={i} href={url} target="_blank" rel="noopener noreferrer" style={{ color: "#6750A4", textDecoration: "none", fontWeight: 500, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M7.177 3.073L9.573.677A2.251 2.251 0 0 1 12.77 3.87l-2.584 2.584a2.25 2.25 0 0 1-3.182 0 .75.75 0 0 0-1.06 1.06 3.75 3.75 0 0 0 5.304 0l2.584-2.584a3.75 3.75 0 0 0-5.304-5.304L6.932 1.222a.75.75 0 1 0 1.06 1.06l.182-.182z"/><path d="M8.82 12.927l-2.396 2.396a2.25 2.25 0 0 1-3.182-3.182l2.584-2.584a2.25 2.25 0 0 1 3.182 0 .75.75 0 0 0 1.06-1.06 3.75 3.75 0 0 0-5.304 0L2.18 11.08a3.75 3.75 0 0 0 5.304 5.304l1.596-1.596a.75.75 0 0 0-1.06-1.06l-.182.182z"/></svg>
+                    {url}
+                  </a>
+                ))}
+              </div>
             </div>
           )}
         </>
