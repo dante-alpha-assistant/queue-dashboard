@@ -510,9 +510,8 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
             <span style={{ fontWeight: 600, display: "block", marginBottom: 2, fontSize: 12 }}>
               {isError ? "Error" : "Result"}
             </span>
-            <span style={{ fontSize: 12 }}>
-              {(typeof consoleText === "string" ? consoleText : JSON.stringify(consoleText)).slice(0, 140)}
-              {(typeof consoleText === "string" ? consoleText : JSON.stringify(consoleText)).length > 140 ? "…" : ""}
+            <span style={{ fontSize: 12, wordBreak: "break-word" }}>
+              {typeof consoleText === "string" ? consoleText : JSON.stringify(consoleText)}
             </span>
           </span>
         </div>
