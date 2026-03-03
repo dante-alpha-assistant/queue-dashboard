@@ -914,7 +914,6 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
             <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
               <StatusBadge status={task.status} />
               <Badge label={task.type} color={typeColor} />
-              <PriorityBadge priority={task.priority} />
               {isActive && !isMobile && !useWideLayout && <DurationTicker task={task} />}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>

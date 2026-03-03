@@ -378,7 +378,7 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
             bg={STATUS_BG[task.status] || `${statusColor}14`}
           />
           <Badge label={task.type} color={typeColor} />
-          {priority && (
+          {false && priority && (
             <Badge label={priority.label} color={priority.color} bg={priority.bg} />
           )}
           {task.status === "qa_testing" && (
