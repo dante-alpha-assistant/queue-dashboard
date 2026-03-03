@@ -288,22 +288,9 @@ function ActionBar({ task, onStatusChange, isMobile }) {
           </div>
         )}
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input
-            type="text"
-            placeholder="Response / instructions for agent..."
-            value={humanInput}
-            onChange={e => setHumanInput(e.target.value)}
-            onClick={e => e.stopPropagation()}
-            style={{
-              flex: 1, padding: isMobile ? "10px 12px" : "7px 12px", borderRadius: 8,
-              border: "1px solid var(--md-surface-variant, #E7E0EC)",
-              background: "var(--md-surface, #FFFBFE)",
-              color: "var(--md-on-surface, #1C1B1F)",
-              fontSize: 13, fontFamily: "'Roboto', system-ui, sans-serif",
-              outline: "none", minHeight: isMobile ? 44 : 34,
-            }}
-            onKeyDown={e => { if (e.key === "Enter") handleUnblock(e); }}
-          />
+          <span style={{ flex: 1, fontSize: 12, color: "var(--md-outline, #79747E)", fontStyle: "italic" }}>
+            💬 Open task details to add comments before unblocking
+          </span>
           <button
             onClick={handleUnblock}
             disabled={unblocking}
