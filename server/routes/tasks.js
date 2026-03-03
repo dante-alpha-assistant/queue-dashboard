@@ -100,6 +100,14 @@ router.post("/tasks", async (req, res) => {
   try {
     const { title, description, prompt, type, priority, assigned_agent, status, project_id, repository_id, acceptance_criteria, stage } = req.body;
     if (!title) return res.status(400).json({ error: "title required" });
+    const validPriorities = ["low", "normal", "high", "urgent"];
+    if (priority && !validPriorities.includes(priority)) {
+      return res.status(400).json({ error: `Invalid priority "${priority}". Must be one of: ${validPriorities.join(", ")}` });
+    }
+    const validTypes = ["coding", "ops", "general", "review", "research", "qa"];
+    if (type && !validTypes.includes(type)) {
+      return res.status(400).json({ error: `Invalid type "${type}". Must be one of: ${validTypes.join(", ")}` });
+    }
 
     const { data, error } = await supabase
       .from("agent_tasks")
