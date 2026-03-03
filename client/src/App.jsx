@@ -46,6 +46,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("todo");
   const [view, setView] = useState("board");
   const [timeFilter, setTimeFilter] = useState({ range: "today", customFrom: "", customTo: "" });
+  const [searchQuery, setSearchQuery] = useState("");
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
   const { progress: taskProgress, monitor: taskMonitor, connected: sseConnected } = useTaskEvents();
 
@@ -115,6 +116,7 @@ export default function App() {
     let filtered = filterTasksByTime(tasks, timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
     if (typeFilter !== "all") filtered = filtered.filter(t => t.type === typeFilter);
     if (stageFilter !== "all") filtered = filtered.filter(t => t.stage === stageFilter);
+    if (searchQuery.trim()) filtered = filtered.filter(t => t.title?.toLowerCase().includes(searchQuery.toLowerCase()));
     return filtered;
   };
   const filterByType = filterTasks;
@@ -382,6 +384,25 @@ export default function App() {
             </div>
           </>)}
           <div style={{ width: 1, height: 24, background: "var(--md-surface-variant)" }} />
+          <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+            <input
+              type="text"
+              placeholder="Search tasks..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{
+                padding: "8px 32px 8px 12px", borderRadius: 20, border: "1px solid var(--md-surface-variant)",
+                background: "var(--md-surface)", fontSize: 13, fontFamily: "'Roboto', system-ui, sans-serif",
+                outline: "none", width: 200, color: "var(--md-on-surface)",
+              }}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                style={{ position: "absolute", right: 8, background: "none", border: "none", cursor: "pointer", color: "var(--md-on-surface-variant)", fontSize: 14, padding: 0 }}
+              >✕</button>
+            )}
+          </div>
           <TimeFilter allTasks={allTasksRaw} value={timeFilter} onChange={setTimeFilter} isMobile={false} />
         </div>
       </div>
