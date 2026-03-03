@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import useQueue from "./hooks/useQueue";
 import useBreakpoint from "./hooks/useBreakpoint";
 import useTaskEvents from "./hooks/useTaskEvents";
@@ -38,7 +39,38 @@ export default function App() {
     loading, updateTask,
     projects, selectedProject, setSelectedProject,
   } = useQueue();
+  const { taskId: urlTaskId } = useParams();
+  const navigate = useNavigate();
   const [selectedTask, setSelectedTask] = useState(null);
+  const [taskNotFound, setTaskNotFound] = useState(false);
+
+  // Open task from URL param
+  useEffect(() => {
+    if (!urlTaskId || loading) return;
+    const allTasksList = [...todo, ...assigned, ...inProgress, ...blocked, ...qa, ...completed, ...deployed, ...failed];
+    const found = allTasksList.find(t => t.id === urlTaskId);
+    if (found) {
+      setSelectedTask(found);
+      setTaskNotFound(false);
+    } else {
+      setTaskNotFound(true);
+    }
+  }, [urlTaskId, loading, todo, assigned, inProgress, blocked, qa, completed, deployed, failed]);
+
+  // Wrap setSelectedTask to update URL
+  const openTask = useCallback((task) => {
+    setSelectedTask(task);
+    setTaskNotFound(false);
+    if (task) {
+      navigate(`/task/${task.id}`, { replace: true });
+    }
+  }, [navigate]);
+
+  const closeTask = useCallback(() => {
+    setSelectedTask(null);
+    setTaskNotFound(false);
+    navigate("/", { replace: true });
+  }, [navigate]);
   const [typeFilter, setTypeFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("todo");
@@ -76,6 +108,29 @@ export default function App() {
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>⏳</div>
           <div style={{ fontSize: 14, fontWeight: 500 }}>Loading tasks...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (taskNotFound && urlTaskId) {
+    return (
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "center",
+        height: "100vh", background: "var(--md-background)", color: "var(--md-on-surface)",
+        fontFamily: "'Roboto', system-ui, sans-serif",
+      }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
+          <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Task not found</div>
+          <div style={{ fontSize: 14, color: "var(--md-on-surface-variant)", marginBottom: 24 }}>
+            No task with ID <code style={{ background: "var(--md-surface-variant)", padding: "2px 6px", borderRadius: 4, fontSize: 12 }}>{urlTaskId}</code>
+          </div>
+          <button onClick={() => navigate("/")} style={{
+            padding: "10px 24px", borderRadius: 20, background: "var(--md-primary)",
+            color: "var(--md-on-primary)", border: "none", cursor: "pointer",
+            fontSize: 14, fontWeight: 500, fontFamily: "'Roboto', system-ui, sans-serif",
+          }}>← Back to board</button>
         </div>
       </div>
     );
@@ -146,7 +201,7 @@ export default function App() {
   };
 
   const renderCards = (tasks) =>
-    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={setSelectedTask} isMobile={isMobile} progress={taskProgress[t.id]} monitor={taskMonitor[t.id]} />);
+    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={openTask} isMobile={isMobile} progress={taskProgress[t.id]} monitor={taskMonitor[t.id]} />);
 
   // MOBILE LAYOUT
   if (isMobile) {
@@ -280,7 +335,7 @@ export default function App() {
         {selectedTask && (
           <TaskDetailModal
             task={selectedTask}
-            onClose={() => setSelectedTask(null)}
+            onClose={closeTask}
             onStatusChange={async (id, updates) => { await updateTask(id, updates); setSelectedTask(prev => prev ? { ...prev, ...updates } : null); }}
             isMobile={isMobile}
             progress={selectedTask ? taskProgress[selectedTask.id] : null}
@@ -429,7 +484,7 @@ export default function App() {
       {selectedTask && (
         <TaskDetailModal
           task={selectedTask}
-          onClose={() => setSelectedTask(null)}
+          onClose={closeTask}
           onStatusChange={async (id, updates) => { await updateTask(id, updates); setSelectedTask(prev => prev ? { ...prev, ...updates } : null); }}
           isMobile={false}
           isTablet={isTablet}
