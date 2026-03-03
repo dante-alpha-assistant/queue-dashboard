@@ -256,39 +256,27 @@ router.post("/deploy/:id", async (req, res) => {
       return res.status(400).json({ ok: false, error: `Task status is '${task.status}', must be 'completed' to deploy` });
     }
 
-    // 2. Extract PR reference — prefer pull_request_url column, fall back to parsing result
-    let prNumber = null;
-    let repoFullName = null;
-    if (task.pull_request_url) {
-      // pull_request_url format: https://github.com/OWNER/REPO/pull/NUMBER
-      const prRefMatch = task.pull_request_url.match(/github\.com\/(.+?)\/pull\/(\d+)/);
-      if (prRefMatch) {
-        repoFullName = prRefMatch[1];
-        prNumber = parseInt(prRefMatch[2]);
+    // 2. Collect all PR references — from pull_request_url array + parsing result text
+    const prRefs = []; // [{repo, number}]
+    if (task.pull_request_url && Array.isArray(task.pull_request_url)) {
+      for (const url of task.pull_request_url) {
+        const m = url.match(/github\.com\/(.+?)\/pull\/(\d+)/);
+        if (m) prRefs.push({ repo: m[1], number: parseInt(m[2]), url });
       }
     }
-    if (!prNumber && task.result) {
+    // Fall back to parsing result text if no structured PR refs
+    if (prRefs.length === 0 && task.result) {
       const resultStr = typeof task.result === "string" ? task.result : JSON.stringify(task.result);
       const prMatch = resultStr.match(/PR\s*#(\d+)/i) || resultStr.match(/#(\d+)\s*merged/i);
-      if (prMatch) prNumber = parseInt(prMatch[1]);
-      if (!repoFullName) {
+      if (prMatch) {
+        const prNumber = parseInt(prMatch[1]);
+        let repoFullName = null;
         const repoMatch = resultStr.match(/(dante-alpha-assistant\/[\w-]+)/);
         if (repoMatch) repoFullName = repoMatch[1];
-      }
-    }
-
-    // 3. If PR exists, merge it via GitHub API (squash merge, delete branch)
-    if (prNumber && GH_TOKEN) {
-      if (!repoFullName) {
-        // Try to find repo from repository relation
-        if (task.repository_id) {
+        if (!repoFullName && task.repository_id) {
           const { data: repo } = await supabase.from("agent_repositories").select("url").eq("id", task.repository_id).single();
-          if (repo?.url) {
-            const m = repo.url.match(/github\.com\/(.+?)(?:\.git)?$/);
-            if (m) repoFullName = m[1];
-          }
+          if (repo?.url) { const rm = repo.url.match(/github\.com\/(.+?)(?:\.git)?$/); if (rm) repoFullName = rm[1]; }
         }
-        // Try searching GitHub for the exact PR number across org repos (most accurate)
         if (!repoFullName && GH_TOKEN) {
           try {
             const searchResp = await fetch(`https://api.github.com/search/issues?q=is:pr+org:dante-alpha-assistant+${prNumber}+in:title`, {
@@ -297,63 +285,50 @@ router.post("/deploy/:id", async (req, res) => {
             if (searchResp.ok) {
               const searchData = await searchResp.json();
               const match = searchData.items?.find(i => i.number === prNumber);
-              if (match?.repository_url) {
-                repoFullName = match.repository_url.replace("https://api.github.com/repos/", "");
-              }
+              if (match?.repository_url) repoFullName = match.repository_url.replace("https://api.github.com/repos/", "");
             }
           } catch {}
         }
-        // Last resort: project's default repo
         if (!repoFullName && task.project_id) {
           const { data: repos } = await supabase.from("agent_repositories").select("url").eq("project_id", task.project_id).limit(1);
-          if (repos?.[0]?.url) {
-            const m = repos[0].url.match(/github\.com\/(.+?)(?:\.git)?$/);
-            if (m) repoFullName = m[1];
-          }
+          if (repos?.[0]?.url) { const rm = repos[0].url.match(/github\.com\/(.+?)(?:\.git)?$/); if (rm) repoFullName = rm[1]; }
         }
-        if (!repoFullName) {
-          return res.status(400).json({ ok: false, error: `Cannot determine repository for PR #${prNumber}. No repo reference in task result, no repository_id, and GitHub search found no match.` });
-        }
+        if (repoFullName) prRefs.push({ repo: repoFullName, number: prNumber });
       }
+    }
 
-      // Check PR status first
-      const prResp = await fetch(`https://api.github.com/repos/${repoFullName}/pulls/${prNumber}`, {
+    // 3. Merge ALL PRs via GitHub API (squash merge, delete branch)
+    const mergedPRs = [];
+    for (const pr of prRefs) {
+      if (!GH_TOKEN) continue;
+      const prResp = await fetch(`https://api.github.com/repos/${pr.repo}/pulls/${pr.number}`, {
         headers: { Authorization: `token ${GH_TOKEN}`, Accept: "application/vnd.github.v3+json" },
       });
       if (!prResp.ok) {
-        return res.status(400).json({ ok: false, error: `Failed to fetch PR #${prNumber} on ${repoFullName}: ${prResp.status}` });
+        return res.status(400).json({ ok: false, error: `Failed to fetch PR #${pr.number} on ${pr.repo}: ${prResp.status}` });
       }
-      const pr = await prResp.json();
+      const prData = await prResp.json();
 
-      if (pr.merged) {
-        // Already merged — skip merge step
-        console.log(`[DEPLOY] PR #${prNumber} on ${repoFullName} already merged, skipping merge`);
-      } else if (pr.state === "closed") {
-        return res.status(400).json({ ok: false, error: `PR #${prNumber} is closed but not merged` });
+      if (prData.merged) {
+        console.log(`[DEPLOY] PR #${pr.number} on ${pr.repo} already merged`);
+        mergedPRs.push(`#${pr.number} (${pr.repo}) — already merged`);
+      } else if (prData.state === "closed") {
+        return res.status(400).json({ ok: false, error: `PR #${pr.number} on ${pr.repo} is closed but not merged` });
       } else {
-        // Merge the PR (squash)
-        const mergeResp = await fetch(`https://api.github.com/repos/${repoFullName}/pulls/${prNumber}/merge`, {
+        const mergeResp = await fetch(`https://api.github.com/repos/${pr.repo}/pulls/${pr.number}/merge`, {
           method: "PUT",
           headers: { Authorization: `token ${GH_TOKEN}`, Accept: "application/vnd.github.v3+json", "Content-Type": "application/json" },
-          body: JSON.stringify({ merge_method: "squash", commit_title: `${task.title} (#${prNumber})` }),
+          body: JSON.stringify({ merge_method: "squash", commit_title: `${task.title} (#${pr.number})` }),
         });
-
         if (!mergeResp.ok) {
           const mergeErr = await mergeResp.json().catch(() => ({}));
-          const reason = mergeErr.message || `HTTP ${mergeResp.status}`;
-          return res.status(400).json({ ok: false, error: `Merge conflict or failure on PR #${prNumber}: ${reason}` });
+          return res.status(400).json({ ok: false, error: `Merge failed on PR #${pr.number} (${pr.repo}): ${mergeErr.message || mergeResp.status}` });
         }
-
-        console.log(`[DEPLOY] Merged PR #${prNumber} on ${repoFullName} (squash)`);
-
-        // Delete the branch
-        if (pr.head?.ref) {
-          try {
-            await fetch(`https://api.github.com/repos/${repoFullName}/git/refs/heads/${pr.head.ref}`, {
-              method: "DELETE",
-              headers: { Authorization: `token ${GH_TOKEN}` },
-            });
-          } catch {} // Best effort
+        console.log(`[DEPLOY] Merged PR #${pr.number} on ${pr.repo} (squash)`);
+        mergedPRs.push(`#${pr.number} (${pr.repo}) — merged`);
+        // Delete branch (best effort)
+        if (prData.head?.ref) {
+          try { await fetch(`https://api.github.com/repos/${pr.repo}/git/refs/heads/${prData.head.ref}`, { method: "DELETE", headers: { Authorization: `token ${GH_TOKEN}` } }); } catch {}
         }
       }
     }
@@ -440,8 +415,7 @@ router.post("/deploy/:id", async (req, res) => {
       ok: true,
       task: updated,
       details: {
-        pr_merged: prNumber ? `#${prNumber}` : null,
-        repo: repoFullName,
+        prs_merged: mergedPRs,
         argocd_synced: syncSucceeded,
         sync_triggered: syncTriggered,
       },

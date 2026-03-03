@@ -725,11 +725,15 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
           {task.project && (
             <MetaCell label="Project">{task.project.name}</MetaCell>
           )}
-          {task.pull_request_url && (
-            <MetaCell label="Pull Request">
-              <a href={task.pull_request_url} target="_blank" rel="noopener noreferrer" style={{ color: "#6750A4", textDecoration: "none", fontWeight: 500 }}>
-                {task.pull_request_url.match(/pull\/(\d+)/)?.[0] || "View PR"} ↗
-              </a>
+          {task.pull_request_url?.length > 0 && (
+            <MetaCell label={task.pull_request_url.length > 1 ? "Pull Requests" : "Pull Request"}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {(Array.isArray(task.pull_request_url) ? task.pull_request_url : [task.pull_request_url]).map((url, i) => (
+                  <a key={i} href={url} target="_blank" rel="noopener noreferrer" style={{ color: "#6750A4", textDecoration: "none", fontWeight: 500, fontSize: 13 }}>
+                    {url.match(/\/([^/]+)\/pull\/(\d+)/)?.[0]?.replace(/^\//, "") || "View PR"} ↗
+                  </a>
+                ))}
+              </div>
             </MetaCell>
           )}
           <MetaCell label="Created">
