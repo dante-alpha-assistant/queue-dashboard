@@ -565,7 +565,7 @@ function SmartRetryInfo({ metadata }) {
 
 /* ── Actions Dropdown ─────────────────────────────────────── */
 
-function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deploying, deploySuccess, handleDeprecate, deprecating, deprecateConfirm, isMobile }) {
+function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deploying, deploySuccess, handleDeprecate, deprecating, deprecateConfirm, isMobile, dropUp = true }) {
   const [open, setOpen] = useState(false);
   const [showAssignPicker, setShowAssignPicker] = useState(false);
   const [assigning, setAssigning] = useState(false);
@@ -626,7 +626,9 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
   if (actions.length === 0) return null;
 
   const menuStyle = {
-    position: 'absolute', bottom: '100%', left: 0, marginBottom: 4,
+    position: 'absolute',
+    ...(dropUp ? { bottom: '100%', marginBottom: 4 } : { top: '100%', marginTop: 4 }),
+    right: 0,
     background: 'var(--md-surface, #FFFBFE)',
     border: '1px solid var(--md-surface-variant, #E7E0EC)',
     borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
@@ -665,7 +667,7 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
         </div>
       )}
       {showAssignPicker && (
-        <div style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: 4, zIndex: 301 }}>
+        <div style={{ position: 'absolute', ...(dropUp ? { bottom: '100%', marginBottom: 4 } : { top: '100%', marginTop: 4 }), right: 0, zIndex: 301 }}>
           <AgentPicker
             onSelect={handleAssign}
             onCancel={() => setShowAssignPicker(false)}
@@ -1060,7 +1062,20 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
               <Badge label={task.type} color={typeColor} />
               {isActive && !isMobile && !useWideLayout && <DurationTicker task={task} />}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <ActionsDropdown
+                task={task}
+                onStatusChange={onStatusChange}
+                onClose={handleClose}
+                handleDeploy={handleDeploy}
+                deploying={deploying}
+                deploySuccess={deploySuccess}
+                handleDeprecate={handleDeprecate}
+                deprecating={deprecating}
+                deprecateConfirm={deprecateConfirm}
+                isMobile={isMobile}
+                dropUp={false}
+              />
               {!isMobile && <span className="tdm-kbd">esc</span>}
               <button onClick={handleClose} style={{
                 background: "transparent", border: "1px solid var(--md-surface-variant, #E7E0EC)",
@@ -1118,21 +1133,8 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
           borderTop: '1px solid var(--md-surface-variant, #E7E0EC)',
           display: 'flex', gap: 6, alignItems: 'center',
         }}>
-          <ActionsDropdown
-            task={task}
-            onStatusChange={onStatusChange}
-            onClose={handleClose}
-            handleDeploy={handleDeploy}
-            deploying={deploying}
-            deploySuccess={deploySuccess}
-            handleDeprecate={handleDeprecate}
-            deprecating={deprecating}
-            deprecateConfirm={deprecateConfirm}
-            isMobile={isMobile}
-          />
           {deployError && <span style={{ color: '#D32F2F', fontSize: 12, wordBreak: 'break-word' }}>⚠️ {deployError}</span>}
           {deprecateError && <span style={{color:"#D32F2F",fontSize:13}}>{deprecateError}</span>}
-          {assignErr && <span style={{ fontSize: 11, color: '#BA1A1A' }}>⚠️ {assignErr}</span>}
           <div style={{ flex: 1 }} />
           {!isMobile && task.created_at && (
             <span style={{ fontSize: 10, color: 'var(--md-outline, #79747E)', fontFamily: "'Roboto Mono', monospace" }}>
