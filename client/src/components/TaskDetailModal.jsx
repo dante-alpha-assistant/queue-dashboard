@@ -569,16 +569,18 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
   const [open, setOpen] = useState(false);
   const [showAssignPicker, setShowAssignPicker] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const [removeConfirm, setRemoveConfirm] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const ref = useRef(null);
 
   useEffect(() => {
     if (!open) return;
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setRemoveConfirm(false); } };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  // Build actions based on task status
+  // Build actions based on task status per spec
   const actions = [];
   const s = task.status;
 
@@ -591,25 +593,41 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
   if (s === 'blocked') {
     actions.push({ label: '🔓 Unblock', key: 'unblock', color: '#1B5E20' });
   }
-  if (s === 'qa_testing' || s === 'completed') {
+  if (s === 'completed' || s === 'deployed') {
     actions.push({ label: '↩️ Reopen', key: 'reopen' });
   }
   if (s === 'completed') {
     actions.push({ label: deploying ? '⏳ Deploying…' : deploySuccess ? '✅ Deployed' : '🚀 Deploy', key: 'deploy', color: '#00838F', disabled: deploying || deploySuccess });
   }
-  if (s !== 'deprecated') {
+  if (s === 'completed' || s === 'failed' || s === 'blocked') {
     actions.push({ label: deprecating ? '⏳…' : '🗑️ Deprecate', key: 'deprecate', color: '#9E9E9E', disabled: deprecating });
+  }
+  // Remove is available on all non-deprecated statuses
+  if (s !== 'deprecated') {
+    actions.push({ type: 'divider' });
+    actions.push({ label: removing ? '⏳ Removing…' : removeConfirm ? '⚠️ Confirm Remove' : '🗑 Remove', key: 'remove', color: '#BA1A1A', disabled: removing });
   }
 
   const handleAction = async (key) => {
-    setOpen(false);
     switch (key) {
-      case 'assign': setShowAssignPicker(true); return;
-      case 'retry': await onStatusChange(task.id, { status: 'todo', assigned_agent: null }); return;
-      case 'unblock': await onStatusChange(task.id, { status: 'todo', blocked_reason: null, assigned_agent: null }); return;
-      case 'reopen': await onStatusChange(task.id, { status: 'todo', assigned_agent: null }); return;
-      case 'deploy': handleDeploy(); return;
-      case 'deprecate': handleDeprecate(); return;
+      case 'assign': setOpen(false); setShowAssignPicker(true); return;
+      case 'retry': setOpen(false); await onStatusChange(task.id, { status: 'todo', assigned_agent: null }); return;
+      case 'unblock': setOpen(false); await onStatusChange(task.id, { status: 'todo', blocked_reason: null, assigned_agent: null }); return;
+      case 'reopen': setOpen(false); await onStatusChange(task.id, { status: 'todo', assigned_agent: null }); return;
+      case 'deploy': setOpen(false); handleDeploy(); return;
+      case 'deprecate': setOpen(false); handleDeprecate(); return;
+      case 'remove':
+        if (!removeConfirm) { setRemoveConfirm(true); return; }
+        setRemoving(true);
+        try {
+          await onStatusChange(task.id, { removed: true });
+          setOpen(false);
+          onClose();
+        } catch (e) {
+          setRemoving(false);
+          setRemoveConfirm(false);
+        }
+        return;
     }
   };
 
@@ -641,12 +659,13 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
     fontSize: 13, fontWeight: 500, textAlign: 'left',
     color: disabled ? '#bbb' : (color || 'var(--md-on-surface, #1C1B1F)'),
     opacity: disabled ? 0.5 : 1,
+    fontFamily: "'Roboto', system-ui, sans-serif",
   });
 
   return (
     <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
       <button className="tdm-action-btn"
-        onClick={() => !assigning && setOpen(!open)}
+        onClick={() => { if (!assigning) { setOpen(!open); setRemoveConfirm(false); } }}
         disabled={assigning}
         style={{
           background: assigning ? 'var(--md-outline, #79747E)' : 'var(--md-primary, #6750A4)',
@@ -657,15 +676,18 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
       </button>
       {open && (
         <div style={menuStyle}>
-          {actions.map(a => (
-            <button key={a.key} style={itemStyle(a.color, a.disabled)}
-              disabled={a.disabled}
-              onMouseEnter={e => { if (!a.disabled) e.target.style.background = 'var(--md-surface-container-low, #F7F2FA)'; }}
-              onMouseLeave={e => { e.target.style.background = 'none'; }}
-              onClick={() => !a.disabled && handleAction(a.key)}>
-              {a.label}
-            </button>
-          ))}
+          {actions.map((a, i) => {
+            if (a.type === 'divider') return <div key={`div-${i}`} style={{ height: 1, background: 'var(--md-surface-variant, #E7E0EC)', margin: '4px 0' }} />;
+            return (
+              <button key={a.key} style={itemStyle(a.color, a.disabled)}
+                disabled={a.disabled}
+                onMouseEnter={e => { if (!a.disabled) e.target.style.background = a.key === 'remove' ? '#BA1A1A08' : 'var(--md-surface-container-low, #F7F2FA)'; }}
+                onMouseLeave={e => { e.target.style.background = 'none'; }}
+                onClick={() => !a.disabled && handleAction(a.key)}>
+                {a.label}
+              </button>
+            );
+          })}
         </div>
       )}
       {showAssignPicker && (
