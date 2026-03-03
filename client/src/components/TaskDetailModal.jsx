@@ -651,6 +651,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const tabs = [{ key: 'details', label: 'Details' }];
   tabs.push({ key: 'comments', label: '💬 Comments' });
   tabs.push({ key: 'activity', label: 'Activity' });
+  tabs.push({ key: 'metadata', label: 'Metadata' });
   if (hasResult || hasError) tabs.push({ key: 'output', label: hasError ? '⚠ Output' : 'Output' });
   if (hasQA) tabs.push({ key: 'qa', label: 'QA' });
   if (hasMetadata) tabs.push({ key: 'meta', label: 'Meta' });
@@ -877,6 +878,36 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
 
       {activeTab === 'activity' && (
         <ActivityLog taskId={task.id} />
+      )}
+
+      {activeTab === 'metadata' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+            <MetaCell label="Status"><span style={{ color: STATUS_COLORS[task.status], fontWeight: 600 }}>{task.status}</span></MetaCell>
+            <MetaCell label="Type"><span style={{ color: typeColor, fontWeight: 600 }}>{task.type}</span></MetaCell>
+            <MetaCell label="Priority"><span style={{ color: PRIORITY_CONFIG[task.priority]?.color || 'var(--md-outline)', fontWeight: 600 }}>{task.priority || 'normal'}</span></MetaCell>
+            <MetaCell label="Stage">{task.stage || <span style={{ color: 'var(--md-outline)', fontStyle: 'italic' }}>None</span>}</MetaCell>
+            <MetaCell label="Assigned Agent">{task.assigned_agent || <span style={{ color: 'var(--md-outline)', fontStyle: 'italic' }}>Unassigned</span>}</MetaCell>
+            <MetaCell label="QA Agent">{task.qa_agent || <span style={{ color: 'var(--md-outline)', fontStyle: 'italic' }}>None</span>}</MetaCell>
+            <MetaCell label="Owner">{task.dispatched_by || <span style={{ color: 'var(--md-outline)', fontStyle: 'italic' }}>None</span>}</MetaCell>
+            <MetaCell label="Project">{task.project?.name || <span style={{ color: 'var(--md-outline)', fontStyle: 'italic' }}>None</span>}</MetaCell>
+            <MetaCell label="Created"><span title={task.created_at}>{formatDateShort(task.created_at)}</span></MetaCell>
+            <MetaCell label="Updated"><span title={task.updated_at}>{formatDateShort(task.updated_at)}</span></MetaCell>
+            {task.started_at && <MetaCell label="Started"><span title={task.started_at}>{formatDateShort(task.started_at)}</span></MetaCell>}
+            {task.completed_at && <MetaCell label="Completed"><span title={task.completed_at}>{formatDateShort(task.completed_at)}</span></MetaCell>}
+          </div>
+          <div style={{ borderTop: '1px solid var(--md-surface-variant, #E7E0EC)', paddingTop: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+              <MetaCell label="Dispatch Retries">{task.dispatch_retries ?? 0}</MetaCell>
+              <MetaCell label="QA Retries">{task.qa_retries ?? 0}</MetaCell>
+              <MetaCell label="Idle Retries">{task.idle_retries ?? 0}</MetaCell>
+              <MetaCell label="Last Failed Agent">{task.last_failed_agent || <span style={{ color: 'var(--md-outline)', fontStyle: 'italic' }}>None</span>}</MetaCell>
+            </div>
+          </div>
+          <div style={{ borderTop: '1px solid var(--md-surface-variant, #E7E0EC)', paddingTop: 10 }}>
+            <MetaCell label="Task ID"><span style={{ fontFamily: "'Roboto Mono', monospace", fontSize: 11 }}>{task.id}</span></MetaCell>
+          </div>
+        </div>
       )}
 
       {activeTab === 'meta' && hasMetadata && (

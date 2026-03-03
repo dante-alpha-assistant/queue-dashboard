@@ -16,9 +16,11 @@ const FIELD_LABELS = {
   result: 'Result',
   error: 'Error',
   qa_result: 'QA result',
+  qa_agent: 'QA agent',
   project_id: 'Project',
   repository_id: 'Repository',
   blocked_reason: 'Blocked reason',
+  pull_request_url: 'Pull request',
 };
 
 const FIELD_ICONS = {
@@ -35,9 +37,11 @@ const FIELD_ICONS = {
   result: '📦',
   error: '❌',
   qa_result: '🧪',
+  qa_agent: '🔍',
   project_id: '📁',
   repository_id: '📂',
   blocked_reason: '🚫',
+  pull_request_url: '🔗',
 };
 
 const STATUS_COLORS = {
@@ -63,6 +67,12 @@ const PRIORITY_COLORS = {
 
 /* ── Helpers ──────────────────────────────────────────────── */
 
+/** Rename "system" to a friendlier label */
+function displayAuthor(name) {
+  if (!name || name === 'system') return 'orchestration layer';
+  return name;
+}
+
 function formatTimestamp(iso) {
   if (!iso) return '';
   const d = new Date(iso);
@@ -82,23 +92,37 @@ function formatTimestamp(iso) {
   });
 }
 
-function truncateValue(val, max = 60) {
-  if (!val) return null;
-  if (val.length <= max) return val;
-  return val.slice(0, max) + '…';
-}
+const TRUNCATE_LIMIT = 60;
 
-function ValueChip({ value, color }) {
-  if (!value || value === 'null') return <span style={{ color: 'var(--md-outline, #79747E)', fontStyle: 'italic', fontSize: 11 }}>none</span>;
+function ExpandableValue({ value, color }) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!value || value === 'null') {
+    return <span style={{ color: 'var(--md-outline, #79747E)', fontStyle: 'italic', fontSize: 11 }}>none</span>;
+  }
+
+  const isLong = value.length > TRUNCATE_LIMIT;
+  const displayVal = (!isLong || expanded) ? value : value.slice(0, TRUNCATE_LIMIT) + '…';
+
   return (
-    <span style={{
-      fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 6,
-      background: color ? `${color}14` : 'var(--md-surface-container-low, #F7F2FA)',
-      color: color || 'var(--md-on-surface-variant, #49454F)',
-      maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-      display: 'inline-block', verticalAlign: 'middle',
-    }} title={value}>
-      {truncateValue(value)}
+    <span
+      onClick={isLong ? () => setExpanded(!expanded) : undefined}
+      style={{
+        fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 6,
+        background: color ? `${color}14` : 'var(--md-surface-container-low, #F7F2FA)',
+        color: color || 'var(--md-on-surface-variant, #49454F)',
+        maxWidth: expanded ? 'none' : 220,
+        overflow: 'hidden',
+        textOverflow: expanded ? 'unset' : 'ellipsis',
+        whiteSpace: expanded ? 'pre-wrap' : 'nowrap',
+        wordBreak: expanded ? 'break-all' : undefined,
+        display: 'inline-block', verticalAlign: 'middle',
+        cursor: isLong ? 'pointer' : 'default',
+        transition: 'all 0.15s ease',
+      }}
+      title={isLong && !expanded ? 'Click to expand' : undefined}
+    >
+      {displayVal}
     </span>
   );
 }
@@ -109,8 +133,8 @@ function ActivityEntry({ entry, isLast }) {
   const label = FIELD_LABELS[entry.field] || entry.field;
   const icon = FIELD_ICONS[entry.field] || '•';
   const isCreation = entry.field === 'created';
+  const author = displayAuthor(entry.changed_by);
 
-  // Color logic for status/priority changes
   const getValueColor = (field, val) => {
     if (field === 'status') return STATUS_COLORS[val] || null;
     if (field === 'priority') return PRIORITY_COLORS[val] || null;
@@ -150,12 +174,12 @@ function ActivityEntry({ entry, isLast }) {
           display: 'flex', alignItems: 'center', gap: 6,
           flexWrap: 'wrap', marginTop: 1,
         }}>
-          {entry.changed_by && (
+          {author && (
             <span style={{
               fontSize: 11, fontWeight: 600,
-              color: '#6750A4',
+              color: author === 'orchestration layer' ? '#9C27B0' : '#6750A4',
             }}>
-              {entry.changed_by}
+              {author}
             </span>
           )}
           <span style={{ fontSize: 11, color: 'var(--md-on-surface-variant, #49454F)' }}>
@@ -176,9 +200,9 @@ function ActivityEntry({ entry, isLast }) {
             display: 'flex', alignItems: 'center', gap: 6,
             marginTop: 4, flexWrap: 'wrap',
           }}>
-            <ValueChip value={entry.old_value} color={getValueColor(entry.field, entry.old_value)} />
+            <ExpandableValue value={entry.old_value} color={getValueColor(entry.field, entry.old_value)} />
             <span style={{ fontSize: 10, color: 'var(--md-outline, #79747E)' }}>→</span>
-            <ValueChip value={entry.new_value} color={getValueColor(entry.field, entry.new_value)} />
+            <ExpandableValue value={entry.new_value} color={getValueColor(entry.field, entry.new_value)} />
           </div>
         )}
       </div>
@@ -215,7 +239,6 @@ export default function ActivityLog({ taskId }) {
     };
 
     fetchActivity();
-    // Poll every 10s for live updates
     const id = setInterval(fetchActivity, 10000);
     return () => { cancelled = true; clearInterval(id); };
   }, [taskId]);
@@ -240,9 +263,6 @@ export default function ActivityLog({ taskId }) {
     return (
       <div style={{ padding: 30, textAlign: 'center', color: 'var(--md-outline, #79747E)', fontSize: 13, fontStyle: 'italic' }}>
         No activity recorded yet.
-        <div style={{ fontSize: 11, marginTop: 6, opacity: 0.7 }}>
-          Activity will appear here once the database trigger is applied.
-        </div>
       </div>
     );
   }
