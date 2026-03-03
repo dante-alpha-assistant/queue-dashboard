@@ -565,10 +565,9 @@ function SmartRetryInfo({ metadata }) {
 
 /* ── Actions Dropdown ─────────────────────────────────────── */
 
-function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deploying, deploySuccess, handleDeprecate, deprecating, deprecateConfirm, isMobile, dropUp = true }) {
+function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deploying, deploySuccess, handleDeprecate, deprecating, onRemove, removing, isMobile, dropUp = true }) {
   const [open, setOpen] = useState(false);
-  const [showAssignPicker, setShowAssignPicker] = useState(false);
-  const [assigning, setAssigning] = useState(false);
+  const [removeConfirm, setRemoveConfirm] = useState(false);
   const ref = useRef(null);
 
   useEffect(() => {
@@ -582,44 +581,38 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
   const actions = [];
   const s = task.status;
 
-  if (s === 'todo') {
-    actions.push({ label: '👤 Assign', key: 'assign' });
-  }
-  if (s === 'failed') {
-    actions.push({ label: '🔄 Retry', key: 'retry', color: '#E65100' });
-  }
-  if (s === 'blocked') {
-    actions.push({ label: '🔓 Unblock', key: 'unblock', color: '#1B5E20' });
-  }
-  if (s === 'qa_testing' || s === 'completed') {
-    actions.push({ label: '↩️ Reopen', key: 'reopen' });
-  }
   if (s === 'completed') {
     actions.push({ label: deploying ? '⏳ Deploying…' : deploySuccess ? '✅ Deployed' : '🚀 Deploy', key: 'deploy', color: '#00838F', disabled: deploying || deploySuccess });
-  }
-  if (s !== 'deprecated') {
+    actions.push({ label: '↩️ Reopen', key: 'reopen' });
+    actions.push({ label: deprecating ? '⏳…' : '🗑️ Deprecate', key: 'deprecate', color: '#9E9E9E', disabled: deprecating });
+  } else if (s === 'deployed') {
+    actions.push({ label: '↩️ Reopen', key: 'reopen' });
+  } else if (s === 'failed') {
+    actions.push({ label: '🔄 Retry', key: 'retry', color: '#E65100' });
+    actions.push({ label: deprecating ? '⏳…' : '🗑️ Deprecate', key: 'deprecate', color: '#9E9E9E', disabled: deprecating });
+  } else if (s === 'blocked') {
+    actions.push({ label: '🔓 Unblock', key: 'unblock', color: '#1B5E20' });
     actions.push({ label: deprecating ? '⏳…' : '🗑️ Deprecate', key: 'deprecate', color: '#9E9E9E', disabled: deprecating });
   }
+  // Remove available for all statuses
+  actions.push({ label: removing ? '⏳…' : removeConfirm ? '⚠️ Confirm Remove' : '🗑 Remove', key: 'remove', color: '#BA1A1A', disabled: removing });
 
   const handleAction = async (key) => {
+    if (key === 'remove') {
+      if (!removeConfirm) { setRemoveConfirm(true); return; }
+      setRemoveConfirm(false);
+      setOpen(false);
+      onRemove();
+      return;
+    }
     setOpen(false);
+    setRemoveConfirm(false);
     switch (key) {
-      case 'assign': setShowAssignPicker(true); return;
       case 'retry': await onStatusChange(task.id, { status: 'todo', assigned_agent: null }); return;
       case 'unblock': await onStatusChange(task.id, { status: 'todo', blocked_reason: null, assigned_agent: null }); return;
       case 'reopen': await onStatusChange(task.id, { status: 'todo', assigned_agent: null }); return;
       case 'deploy': handleDeploy(); return;
       case 'deprecate': handleDeprecate(); return;
-    }
-  };
-
-  const handleAssign = async (agentId) => {
-    setShowAssignPicker(false);
-    setAssigning(true);
-    try {
-      await onStatusChange(task.id, { assigned_agent: agentId });
-    } finally {
-      setAssigning(false);
     }
   };
 
@@ -646,14 +639,13 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
   return (
     <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
       <button className="tdm-action-btn"
-        onClick={() => !assigning && setOpen(!open)}
-        disabled={assigning}
+        onClick={() => setOpen(!open)}
         style={{
-          background: assigning ? 'var(--md-outline, #79747E)' : 'var(--md-primary, #6750A4)',
-          cursor: assigning ? 'not-allowed' : 'pointer', color: '#fff',
+          background: 'var(--md-primary, #6750A4)',
+          cursor: 'pointer', color: '#fff',
           minHeight: isMobile ? 42 : 36, display: 'flex', alignItems: 'center', gap: 6,
         }}>
-        {assigning ? "⏳ Assigning…" : "⚡ Actions ▾"}
+        {"⚡ Actions ▾"}
       </button>
       {open && (
         <div style={menuStyle}>
@@ -666,14 +658,6 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
               {a.label}
             </button>
           ))}
-        </div>
-      )}
-      {showAssignPicker && (
-        <div style={{ position: 'absolute', ...(dropUp ? { bottom: '100%', marginBottom: 4 } : { top: '100%', marginTop: 4 }), right: 0, zIndex: 301 }}>
-          <AgentPicker
-            onSelect={handleAssign}
-            onCancel={() => setShowAssignPicker(false)}
-          />
         </div>
       )}
     </div>
@@ -696,6 +680,8 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const [deploying, setDeploying] = useState(false);
   const [deployError, setDeployError] = useState(null);
   const [deploySuccess, setDeploySuccess] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState(null);
 
   useEffect(() => { ensureModalStyles(); }, []);
   useEffect(() => {
@@ -747,6 +733,20 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
       setTimeout(() => setDeployError(null), 5000);
     } finally {
       setDeploying(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    setRemoving(true);
+    setRemoveError(null);
+    try {
+      await onStatusChange(task.id, { removed: true });
+      handleClose();
+    } catch (err) {
+      setRemoveError(err.message || "Failed to remove task");
+      setTimeout(() => setRemoveError(null), 5000);
+    } finally {
+      setRemoving(false);
     }
   };
 
@@ -1074,7 +1074,8 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
                 deploySuccess={deploySuccess}
                 handleDeprecate={handleDeprecate}
                 deprecating={deprecating}
-                deprecateConfirm={deprecateConfirm}
+                onRemove={handleRemove}
+                removing={removing}
                 isMobile={isMobile}
                 dropUp={false}
               />
@@ -1137,6 +1138,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
         }}>
           {deployError && <span style={{ color: '#D32F2F', fontSize: 12, wordBreak: 'break-word' }}>⚠️ {deployError}</span>}
           {deprecateError && <span style={{color:"#D32F2F",fontSize:13}}>{deprecateError}</span>}
+          {removeError && <span style={{ color: '#D32F2F', fontSize: 12 }}>⚠️ {removeError}</span>}
           <div style={{ flex: 1 }} />
           {!isMobile && task.created_at && (
             <span style={{ fontSize: 10, color: 'var(--md-outline, #79747E)', fontFamily: "'Roboto Mono', monospace" }}>

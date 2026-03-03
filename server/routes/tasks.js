@@ -47,12 +47,12 @@ router.get("/repositories", async (req, res) => {
 // Stats
 router.get("/stats", async (req, res) => {
   try {
-    let query = supabase.from("agent_tasks").select("status");
+    let query = supabase.from("agent_tasks").select("status, removed");
     if (req.query.project_id) query = query.eq("project_id", req.query.project_id);
     const { data, error } = await query;
     if (error) throw error;
     const stats = { todo: 0, in_progress: 0, qa_testing: 0, completed: 0, failed: 0, deployed: 0, blocked: 0 };
-    data.forEach((t) => { if (t.status !== "deprecated" && stats[t.status] !== undefined) stats[t.status]++; });
+    data.forEach((t) => { if (t.status !== "deprecated" && !t.removed && stats[t.status] !== undefined) stats[t.status]++; });
     res.json(stats);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -71,6 +71,10 @@ router.get("/tasks", async (req, res) => {
     // Hide deprecated tasks by default (soft-deleted); include with ?include_deprecated=true
     if (req.query.include_deprecated !== "true") {
       query = query.neq("status", "deprecated");
+    }
+    // Hide removed tasks by default; include with ?include_removed=true
+    if (req.query.include_removed !== "true") {
+      query = query.or("removed.is.null,removed.eq.false");
     }
 
 
