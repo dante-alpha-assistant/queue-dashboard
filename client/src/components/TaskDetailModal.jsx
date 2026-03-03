@@ -646,12 +646,14 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
   return (
     <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
       <button className="tdm-action-btn"
-        onClick={() => setOpen(!open)}
+        onClick={() => !assigning && setOpen(!open)}
+        disabled={assigning}
         style={{
-          background: 'var(--md-primary, #6750A4)', color: '#fff',
+          background: assigning ? 'var(--md-outline, #79747E)' : 'var(--md-primary, #6750A4)',
+          cursor: assigning ? 'not-allowed' : 'pointer', color: '#fff',
           minHeight: isMobile ? 42 : 36, display: 'flex', alignItems: 'center', gap: 6,
         }}>
-        ⚡ Actions ▾
+        {assigning ? "⏳ Assigning…" : "⚡ Actions ▾"}
       </button>
       {open && (
         <div style={menuStyle}>
