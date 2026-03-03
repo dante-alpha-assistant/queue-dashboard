@@ -465,12 +465,14 @@ router.post("/tasks/:id/comments", async (req, res) => {
 // Activity log for a task (Jira-style field change history)
 router.get("/tasks/:id/activity", async (req, res) => {
   try {
-    const { data, error } = await supabase
+    const limit = Math.min(parseInt(req.query.limit) || 10, 100);
+    const offset = parseInt(req.query.offset) || 0;
+    const { data, error, count } = await supabase
       .from("task_activity_log")
-      .select("*")
+      .select("*", { count: "exact" })
       .eq("task_id", req.params.id)
       .order("changed_at", { ascending: false })
-      .limit(100);
+      .range(offset, offset + limit - 1);
     if (error) throw error;
 
     // Enrich assigned_agent->null entries with error reason when no separate error entry was logged
@@ -491,7 +493,7 @@ router.get("/tasks/:id/activity", async (req, res) => {
       }
     }
 
-    res.json(entries);
+    res.json({ entries, total: count || entries.length, limit, offset });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

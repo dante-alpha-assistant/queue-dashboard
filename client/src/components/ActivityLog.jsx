@@ -219,6 +219,21 @@ function ActivityEntry({ entry, isLast }) {
         )}
       </div>
     </div>
+      {entries.length < total && (
+        <button
+          onClick={loadMore}
+          disabled={loadingMore}
+          style={{
+            display: 'block', width: '100%', padding: '10px 0',
+            marginTop: 8, background: 'none', border: '1px solid var(--md-surface-variant, #E7E0EC)',
+            borderRadius: 8, cursor: loadingMore ? 'not-allowed' : 'pointer',
+            fontSize: 12, fontWeight: 500, color: 'var(--md-primary, #6750A4)',
+          }}
+        >
+          {loadingMore ? '⏳ Loading…' : `Show more (${entries.length}/${total})`}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -227,7 +242,10 @@ function ActivityEntry({ entry, isLast }) {
 export default function ActivityLog({ taskId }) {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
+  const [total, setTotal] = useState(0);
+  const PAGE_SIZE = 10;
 
   useEffect(() => {
     if (!taskId) return;
@@ -235,11 +253,12 @@ export default function ActivityLog({ taskId }) {
 
     const fetchActivity = async () => {
       try {
-        const res = await fetch(`/api/tasks/${taskId}/activity`);
+        const res = await fetch(`/api/tasks/${taskId}/activity?limit=${PAGE_SIZE}&offset=0`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (!cancelled) {
-          setEntries(data);
+          setEntries(data.entries || data);
+          setTotal(data.total || 0);
           setLoading(false);
         }
       } catch (e) {
@@ -254,6 +273,21 @@ export default function ActivityLog({ taskId }) {
     const id = setInterval(fetchActivity, 10000);
     return () => { cancelled = true; clearInterval(id); };
   }, [taskId]);
+
+  const loadMore = async () => {
+    setLoadingMore(true);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/activity?limit=${PAGE_SIZE}&offset=${entries.length}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setEntries(prev => [...prev, ...(data.entries || data)]);
+      setTotal(data.total || total);
+    } catch (e) {
+      console.error('Failed to load more activity:', e);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   if (loading) {
     return (
