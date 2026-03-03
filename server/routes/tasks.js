@@ -452,6 +452,42 @@ router.post("/deploy/:id", async (req, res) => {
   }
 });
 
+// Task comments — chronological thread per task
+router.get("/tasks/:id/comments", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("task_comments")
+      .select("*")
+      .eq("task_id", req.params.id)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    res.json(data || []);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post("/tasks/:id/comments", async (req, res) => {
+  try {
+    const { body, author, author_type } = req.body;
+    if (!body || !body.trim()) return res.status(400).json({ error: "body is required" });
+    const { data, error } = await supabase
+      .from("task_comments")
+      .insert({
+        task_id: req.params.id,
+        author: author || "dante",
+        author_type: author_type || "human",
+        body: body.trim(),
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Activity log for a task (Jira-style field change history)
 router.get("/tasks/:id/activity", async (req, res) => {
   try {
