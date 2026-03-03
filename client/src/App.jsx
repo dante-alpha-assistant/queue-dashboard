@@ -81,14 +81,14 @@ export default function App() {
   }, [navigate]);
 
   // Collapsible columns for Deployed and Failed
-  const COLLAPSIBLE_COLUMNS = ["deployed", "failed"];
+  const COLLAPSIBLE_COLUMNS = ["completed", "deployed", "failed"];
   const [collapsedCols, setCollapsedCols] = useState(() => {
     try {
       const saved = localStorage.getItem("collapsed-columns");
       if (saved) return JSON.parse(saved);
     } catch {}
-    // Default: deployed and failed are collapsed
-    return { deployed: true, failed: true };
+    // Default: completed, deployed and failed are collapsed
+    return { completed: true, deployed: true, failed: true };
   });
   const toggleCollapse = useCallback((col) => {
     setCollapsedCols(prev => {
@@ -466,7 +466,8 @@ export default function App() {
         <Column title="QA Testing" color="#7B5EA7" count={filterByType(qa).length} isTablet={isTablet}>
           {renderCards(filterByType(qa).slice(0, 30))}
         </Column>
-        <Column title="Completed" color="#1B5E20" count={filterByType(completed).length} isTablet={isTablet}>
+        <Column title="Completed" color="#1B5E20" count={filterByType(completed).length} isTablet={isTablet}
+          collapsible collapsed={!!collapsedCols.completed} onToggleCollapse={() => toggleCollapse("completed")}>
           {renderCards(filterByType(completed).slice(0, 20))}
         </Column>
         <Column title="Deployed" color="#00897B" count={filterByType(deployed).length} isTablet={isTablet}
