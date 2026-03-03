@@ -563,6 +563,119 @@ function SmartRetryInfo({ metadata }) {
   );
 }
 
+/* ── Actions Dropdown ─────────────────────────────────────── */
+
+function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deploying, deploySuccess, handleDeprecate, deprecating, deprecateConfirm, isMobile }) {
+  const [open, setOpen] = useState(false);
+  const [showAssignPicker, setShowAssignPicker] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  // Build actions based on task status
+  const actions = [];
+  const s = task.status;
+
+  if (s === 'todo') {
+    actions.push({ label: '👤 Assign', key: 'assign' });
+  }
+  if (s === 'failed') {
+    actions.push({ label: '🔄 Retry', key: 'retry', color: '#E65100' });
+  }
+  if (s === 'blocked') {
+    actions.push({ label: '🔓 Unblock', key: 'unblock', color: '#1B5E20' });
+  }
+  if (s === 'qa_testing' || s === 'completed') {
+    actions.push({ label: '↩️ Reopen', key: 'reopen' });
+  }
+  if (s === 'completed') {
+    actions.push({ label: deploying ? '⏳ Deploying…' : deploySuccess ? '✅ Deployed' : '🚀 Deploy', key: 'deploy', color: '#00838F', disabled: deploying || deploySuccess });
+  }
+  if (s !== 'deprecated') {
+    actions.push({ label: deprecating ? '⏳…' : '🗑️ Deprecate', key: 'deprecate', color: '#9E9E9E', disabled: deprecating });
+  }
+
+  const handleAction = async (key) => {
+    setOpen(false);
+    switch (key) {
+      case 'assign': setShowAssignPicker(true); return;
+      case 'retry': await onStatusChange(task.id, { status: 'todo', assigned_agent: null }); return;
+      case 'unblock': await onStatusChange(task.id, { status: 'todo', blocked_reason: null, assigned_agent: null }); return;
+      case 'reopen': await onStatusChange(task.id, { status: 'todo', assigned_agent: null }); return;
+      case 'deploy': handleDeploy(); return;
+      case 'deprecate': handleDeprecate(); return;
+    }
+  };
+
+  const handleAssign = async (agentId) => {
+    setShowAssignPicker(false);
+    setAssigning(true);
+    try {
+      await onStatusChange(task.id, { assigned_agent: agentId });
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  if (actions.length === 0) return null;
+
+  const menuStyle = {
+    position: 'absolute', bottom: '100%', left: 0, marginBottom: 4,
+    background: 'var(--md-surface, #FFFBFE)',
+    border: '1px solid var(--md-surface-variant, #E7E0EC)',
+    borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+    minWidth: 180, zIndex: 300, overflow: 'hidden',
+  };
+
+  const itemStyle = (color, disabled) => ({
+    display: 'block', width: '100%', padding: '10px 16px',
+    background: 'none', border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
+    fontSize: 13, fontWeight: 500, textAlign: 'left',
+    color: disabled ? '#bbb' : (color || 'var(--md-on-surface, #1C1B1F)'),
+    opacity: disabled ? 0.5 : 1,
+  });
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+      <button className="tdm-action-btn"
+        onClick={() => setOpen(!open)}
+        style={{
+          background: 'var(--md-primary, #6750A4)', color: '#fff',
+          minHeight: isMobile ? 42 : 36, display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+        ⚡ Actions ▾
+      </button>
+      {open && (
+        <div style={menuStyle}>
+          {actions.map(a => (
+            <button key={a.key} style={itemStyle(a.color, a.disabled)}
+              disabled={a.disabled}
+              onMouseEnter={e => { if (!a.disabled) e.target.style.background = 'var(--md-surface-container-low, #F7F2FA)'; }}
+              onMouseLeave={e => { e.target.style.background = 'none'; }}
+              onClick={() => !a.disabled && handleAction(a.key)}>
+              {a.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {showAssignPicker && (
+        <div style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: 4, zIndex: 301 }}>
+          <AgentPicker
+            onSelect={handleAssign}
+            onCancel={() => setShowAssignPicker(false)}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Main Modal ───────────────────────────────────────────── */
 
 export default function TaskDetailModal({ task, onClose, onStatusChange, isMobile, isTablet, progress, monitor }) {
@@ -1005,94 +1118,27 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
           borderTop: '1px solid var(--md-surface-variant, #E7E0EC)',
           display: 'flex', gap: 6, alignItems: 'center',
         }}>
-          {task.status === "todo" && (
-            <div style={{ position: 'relative', display: 'inline-block' }}>
-              <button className="tdm-action-btn" disabled={assigningAgent}
-                onClick={() => setShowAssignPicker(!showAssignPicker)}
-                style={{ background: assigningAgent ? 'var(--md-outline, #79747E)' : 'var(--md-primary, #6750A4)', color: 'var(--md-on-primary, #fff)', minHeight: isMobile ? 42 : 36, opacity: assigningAgent ? 0.7 : 1 }}>
-                {assigningAgent ? <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⏳</span> : (
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="23" y1="11" x2="17" y2="11" /></svg>
-                )}
-                {assigningAgent ? 'Assigning…' : 'Assign'}
-              </button>
-              {showAssignPicker && (
-                <AgentPicker
-                  onSelect={async (agentId) => {
-                    setShowAssignPicker(false);
-                    setAssigningAgent(true);
-                    setAssignErr(null);
-                    try {
-                      await onStatusChange(task.id, { status: 'assigned', assigned_agent: agentId });
-                    } catch (e) {
-                      setAssignErr(e.message || 'Assignment failed');
-                      setTimeout(() => setAssignErr(null), 3000);
-                    } finally {
-                      setAssigningAgent(false);
-                    }
-                  }}
-                  onCancel={() => setShowAssignPicker(false)}
-                />
-              )}
-              {assignErr && <span style={{ position: 'absolute', bottom: -20, left: 0, fontSize: 11, color: '#BA1A1A', whiteSpace: 'nowrap' }}>⚠️ {assignErr}</span>}
-            </div>
-          )}
-          {task.status === "failed" && (
-            <button className="tdm-action-btn" onClick={() => onStatusChange(task.id, { status: "todo" })}
-              style={{ background: '#E65100', color: '#fff', minHeight: isMobile ? 42 : 36 }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 105.64-12.48L1 10" /></svg>
-              Retry
-            </button>
-          )}
-          {(task.status === "qa_testing" || task.status === "completed") && (
-            <button className="tdm-action-btn" onClick={() => onStatusChange(task.id, { status: "todo" })}
-              style={{ background: 'var(--md-surface-container-low, #F7F2FA)', color: 'var(--md-on-surface-variant, #49454F)', border: '1px solid var(--md-surface-variant, #E7E0EC)', minHeight: isMobile ? 42 : 36 }}>
-              Reopen
-            </button>
-          )}
-          {task.status === "completed" && (
-            <button className="tdm-action-btn" onClick={handleDeploy} disabled={deploying || deploySuccess}
-              style={{
-                background: deploySuccess ? '#00838F' : deploying ? '#00838F88' : '#00838F',
-                color: '#fff',
-                minHeight: isMobile ? 42 : 36,
-                opacity: deploying ? 0.8 : 1,
-                cursor: deploying ? 'wait' : 'pointer',
-              }}>
-              {deploying ? (
-                <>
-                  <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite', fontSize: 14 }}>⏳</span>
-                  Deploying…
-                </>
-              ) : deploySuccess ? (
-                <>✅ Deployed</>
-              ) : (
-                <>🚀 Deploy</>
-              )}
-            </button>
-          )}
+          <ActionsDropdown
+            task={task}
+            onStatusChange={onStatusChange}
+            onClose={handleClose}
+            handleDeploy={handleDeploy}
+            deploying={deploying}
+            deploySuccess={deploySuccess}
+            handleDeprecate={handleDeprecate}
+            deprecating={deprecating}
+            deprecateConfirm={deprecateConfirm}
+            isMobile={isMobile}
+          />
           {deployError && <span style={{ color: '#D32F2F', fontSize: 12, wordBreak: 'break-word' }}>⚠️ {deployError}</span>}
+          {deprecateError && <span style={{color:"#D32F2F",fontSize:13}}>{deprecateError}</span>}
+          {assignErr && <span style={{ fontSize: 11, color: '#BA1A1A' }}>⚠️ {assignErr}</span>}
           <div style={{ flex: 1 }} />
-          {/* Time hint */}
           {!isMobile && task.created_at && (
             <span style={{ fontSize: 10, color: 'var(--md-outline, #79747E)', fontFamily: "'Roboto Mono', monospace" }}>
               {timeAgo(task.updated_at || task.created_at)}
             </span>
           )}
-          {task.status !== 'deprecated' && (
-            <button className="tdm-action-btn" onClick={handleDeprecate} disabled={deprecating}
-              onBlur={() => { if (!deprecating) setDeprecateConfirm(false); }}
-              style={{
-                background: deprecateConfirm ? '#9E9E9E' : 'var(--md-surface-container-low, #F7F2FA)',
-                color: deprecateConfirm ? '#fff' : '#79747E',
-                border: deprecateConfirm ? '1px solid #9E9E9E' : '1px solid var(--md-surface-variant, #E7E0EC)',
-                minHeight: isMobile ? 42 : 36,
-                opacity: deprecating ? 0.6 : 1,
-                cursor: deprecating ? 'wait' : 'pointer',
-              }}>
-              {deprecating ? '⏳ Deprecating…' : deprecateConfirm ? 'Mark as deprecated? This hides the task from the board.' : 'Deprecate'}
-            </button>
-          )}
-          {deprecateError && <span style={{color:"#D32F2F",fontSize:13,marginLeft:8}}>{deprecateError}</span>}
           <button className="tdm-action-btn" onClick={handleClose}
             style={{ background: 'var(--md-surface-container-low, #F7F2FA)', color: 'var(--md-on-surface-variant, #49454F)', border: '1px solid var(--md-surface-variant, #E7E0EC)', minHeight: isMobile ? 42 : 36 }}>
             Close
