@@ -725,6 +725,13 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
           {task.project && (
             <MetaCell label="Project">{task.project.name}</MetaCell>
           )}
+          {task.pull_request_url && (
+            <MetaCell label="Pull Request">
+              <a href={task.pull_request_url} target="_blank" rel="noopener noreferrer" style={{ color: "#6750A4", textDecoration: "none", fontWeight: 500 }}>
+                {task.pull_request_url.match(/pull\/(\d+)/)?.[0] || "View PR"} ↗
+              </a>
+            </MetaCell>
+          )}
           <MetaCell label="Created">
             <span title={task.created_at}>{formatDateShort(task.created_at)}</span>
           </MetaCell>
