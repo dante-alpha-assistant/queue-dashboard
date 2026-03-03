@@ -248,15 +248,25 @@ router.post("/deploy/:id", async (req, res) => {
       return res.status(400).json({ ok: false, error: `Task status is '${task.status}', must be 'completed' to deploy` });
     }
 
-    // 2. Extract PR reference from task result
+    // 2. Extract PR reference — prefer pr_ref column, fall back to parsing result
     let prNumber = null;
     let repoFullName = null;
-    if (task.result) {
+    if (task.pr_ref) {
+      // pr_ref format: https://github.com/OWNER/REPO/pull/NUMBER
+      const prRefMatch = task.pr_ref.match(/github\.com\/(.+?)\/pull\/(\d+)/);
+      if (prRefMatch) {
+        repoFullName = prRefMatch[1];
+        prNumber = parseInt(prRefMatch[2]);
+      }
+    }
+    if (!prNumber && task.result) {
       const resultStr = typeof task.result === "string" ? task.result : JSON.stringify(task.result);
       const prMatch = resultStr.match(/PR\s*#(\d+)/i) || resultStr.match(/#(\d+)\s*merged/i);
       if (prMatch) prNumber = parseInt(prMatch[1]);
-      const repoMatch = resultStr.match(/(dante-alpha-assistant\/[\w-]+)/);
-      if (repoMatch) repoFullName = repoMatch[1];
+      if (!repoFullName) {
+        const repoMatch = resultStr.match(/(dante-alpha-assistant\/[\w-]+)/);
+        if (repoMatch) repoFullName = repoMatch[1];
+      }
     }
 
     // 3. If PR exists, merge it via GitHub API (squash merge, delete branch)
