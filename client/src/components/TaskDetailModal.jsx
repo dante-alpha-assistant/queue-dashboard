@@ -996,7 +996,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
       {activeTab === 'metadata' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
-            <MetaCell label="Status"><span style={{ color: STATUS_COLORS[task.status], fontWeight: 600 }}>{task.status}</span></MetaCell>
+            <MetaCell label="Status"><span style={{ color: STATUS_CONFIG[task.status]?.color || '#79747E', fontWeight: 600 }}>{task.status}</span></MetaCell>
             <MetaCell label="Type"><span style={{ color: typeColor, fontWeight: 600 }}>{task.type}</span></MetaCell>
             <MetaCell label="Priority"><span style={{ color: PRIORITY_CONFIG[task.priority]?.color || 'var(--md-outline)', fontWeight: 600 }}>{task.priority || 'normal'}</span></MetaCell>
             <MetaCell label="Stage">{task.stage || <span style={{ color: 'var(--md-outline)', fontStyle: 'italic' }}>None</span>}</MetaCell>
