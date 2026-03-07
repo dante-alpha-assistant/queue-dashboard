@@ -46,8 +46,9 @@ const PRIORITY_CONFIG = {
 };
 
 const TYPE_COLORS = {
-  coding: "#6750A4", research: "#0061A4", ops: "#7D5260", general: "#79747E", test: "#386A20",
+  coding: "#6750A4", research: "#0061A4", ops: "#7D5260", general: "#79747E", test: "#386A20", manual: "#795548",
 };
+const TASK_TYPES = ["manual", "coding", "ops", "general", "research", "test"];
 
 const STAGE_COLORS = {
   refinery: "#E65100", foundry: "#1565C0", builder: "#2E7D32", inspector: "#6A1B9A", deployer: "#00838F",
@@ -840,7 +841,15 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
       <div className="tdm-sidebar-card" style={{ padding: '4px 12px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
           <MetaCell label="Type">
-            <span style={{ color: typeColor, fontWeight: 600 }}>{task.type}</span>
+            <select
+              className="tdm-stage-select"
+              value={task.type || "general"}
+              onChange={e => onStatusChange(task.id, { type: e.target.value })}
+              onClick={e => e.stopPropagation()}
+              style={{ color: TYPE_COLORS[task.type] || '#79747E' }}
+            >
+              {TASK_TYPES.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
+            </select>
           </MetaCell>
           <MetaCell label="Priority">
             {task.priority && task.priority !== 'normal'
