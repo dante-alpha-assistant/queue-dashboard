@@ -430,6 +430,23 @@ router.post("/deploy/:id", async (req, res) => {
       return res.status(500).json({ ok: false, error: `Failed to update task status: ${updateErr.message}` });
     }
 
+    // 7. Log deployment activity
+    const activityDetails = [];
+    if (mergedPRs.length > 0) activityDetails.push(`PRs: ${mergedPRs.join(", ")}`);
+    activityDetails.push(syncSucceeded ? "ArgoCD sync succeeded" : "ArgoCD sync timed out (deployed anyway)");
+    try {
+      await supabase.from("task_activity_log").insert({
+        task_id: req.params.id,
+        field: "status",
+        old_value: task.status,
+        new_value: "deployed",
+        changed_by: "deploy-action",
+        details: activityDetails.join(". "),
+      });
+    } catch (e) {
+      console.warn(`[DEPLOY] Failed to log activity: ${e.message}`);
+    }
+
     res.json({
       ok: true,
       task: updated,
@@ -441,6 +458,17 @@ router.post("/deploy/:id", async (req, res) => {
     });
   } catch (e) {
     console.error(`[DEPLOY] Error deploying task ${req.params.id}:`, e.message);
+    // Log failed deploy attempt
+    try {
+      await supabase.from("task_activity_log").insert({
+        task_id: req.params.id,
+        field: "deploy_error",
+        old_value: null,
+        new_value: "failed",
+        changed_by: "deploy-action",
+        details: e.message,
+      });
+    } catch {}
     res.status(500).json({ ok: false, error: e.message });
   }
 });
