@@ -706,6 +706,10 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const [deploying, setDeploying] = useState(false);
   const [deployError, setDeployError] = useState(null);
   const [deploySuccess, setDeploySuccess] = useState(false);
+  const [refineOpen, setRefineOpen] = useState(false);
+  const [refineText, setRefineText] = useState('');
+  const [refining, setRefining] = useState(false);
+  const [refineError, setRefineError] = useState(null);
 
   useEffect(() => { ensureModalStyles(); }, []);
   useEffect(() => {
@@ -757,6 +761,29 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
       setTimeout(() => setDeployError(null), 5000);
     } finally {
       setDeploying(false);
+    }
+  };
+
+  const handleRefine = async () => {
+    if (!refineText.trim()) return;
+    setRefining(true);
+    setRefineError(null);
+    try {
+      const resp = await fetch(`/api/tasks/${task.id}/refine`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ instructions: refineText.trim() }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Refine failed");
+      // Update task in parent via onStatusChange (triggers re-fetch)
+      await onStatusChange(task.id, { description: data.task.description });
+      setRefineText('');
+      setRefineOpen(false);
+    } catch (e) {
+      setRefineError(e.message);
+    } finally {
+      setRefining(false);
     }
   };
 
@@ -940,10 +967,69 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
         <>
           {hasDescription && (
             <div style={{ marginBottom: 16 }}>
-              <SectionLabel icon="📝" collapsible collapsed={collapsedSections.desc} onToggle={() => toggleSection('desc')}>Description</SectionLabel>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <SectionLabel icon="📝" collapsible collapsed={collapsedSections.desc} onToggle={() => toggleSection('desc')}>Description</SectionLabel>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setRefineOpen(o => !o); setRefineError(null); }}
+                  style={{
+                    background: refineOpen ? 'rgba(103, 80, 164, 0.08)' : 'transparent',
+                    border: '1px solid var(--md-surface-variant, #E7E0EC)',
+                    borderRadius: 100, padding: '4px 12px', fontSize: 11, fontWeight: 600,
+                    cursor: 'pointer', color: 'var(--md-primary, #6750A4)',
+                    transition: 'all 0.15s', fontFamily: "'Roboto', system-ui, sans-serif",
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(103, 80, 164, 0.08)'; }}
+                  onMouseLeave={e => { if (!refineOpen) e.currentTarget.style.background = 'transparent'; }}
+                >✨ Refine</button>
+              </div>
               {!collapsedSections.desc && (
                 <div style={{ padding: 14, background: 'var(--md-surface-container-low, #F7F2FA)', borderRadius: 10, border: '1px solid var(--md-surface-variant, #E7E0EC)' }}>
                   <MarkdownContent text={task.description} />
+                </div>
+              )}
+              {refineOpen && (
+                <div style={{ marginTop: 8, padding: 14, background: 'rgba(103, 80, 164, 0.04)', borderRadius: 10, border: '1px solid rgba(103, 80, 164, 0.15)' }}>
+                  <textarea
+                    value={refineText}
+                    onChange={e => setRefineText(e.target.value)}
+                    placeholder="Describe how to improve the description... (e.g. 'add acceptance criteria for edge cases', 'make it more specific about API endpoints')"
+                    style={{
+                      width: '100%', minHeight: 80, padding: 10, fontSize: 13,
+                      border: '1px solid var(--md-surface-variant, #E7E0EC)',
+                      borderRadius: 8, resize: 'vertical', fontFamily: "'Roboto', system-ui, sans-serif",
+                      background: 'var(--md-surface, #FFFBFE)', color: 'var(--md-on-surface, #1C1B1F)',
+                      outline: 'none', lineHeight: 1.5, boxSizing: 'border-box',
+                    }}
+                    onFocus={e => { e.target.style.borderColor = 'var(--md-primary, #6750A4)'; }}
+                    onBlur={e => { e.target.style.borderColor = 'var(--md-surface-variant, #E7E0EC)'; }}
+                    disabled={refining}
+                  />
+                  {refineError && <div style={{ color: '#BA1A1A', fontSize: 12, marginTop: 6 }}>⚠️ {refineError}</div>}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => { setRefineOpen(false); setRefineText(''); setRefineError(null); }}
+                      disabled={refining}
+                      style={{
+                        padding: '6px 16px', borderRadius: 100, border: '1px solid var(--md-surface-variant, #E7E0EC)',
+                        background: 'transparent', fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                        color: 'var(--md-on-surface-variant, #49454F)', fontFamily: "'Roboto', system-ui, sans-serif",
+                      }}
+                    >Cancel</button>
+                    <button
+                      onClick={handleRefine}
+                      disabled={refining || !refineText.trim()}
+                      style={{
+                        padding: '6px 16px', borderRadius: 100, border: 'none',
+                        background: (refining || !refineText.trim()) ? 'var(--md-outline, #79747E)' : 'var(--md-primary, #6750A4)',
+                        color: '#fff', fontSize: 12, fontWeight: 600, cursor: (refining || !refineText.trim()) ? 'not-allowed' : 'pointer',
+                        fontFamily: "'Roboto', system-ui, sans-serif",
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                      }}
+                    >
+                      {refining ? (<><span style={{ display: 'inline-block', width: 12, height: 12, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'tdm-spin 0.6s linear infinite' }} /> Refining…</>) : '✨ Refine'}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

@@ -544,6 +544,98 @@ router.get("/tasks/:id/activity", async (req, res) => {
   }
 });
 
+// Refine task description via AI
+router.post("/tasks/:id/refine", async (req, res) => {
+  try {
+    const { instructions } = req.body;
+    if (!instructions || !instructions.trim()) {
+      return res.status(400).json({ error: "instructions is required" });
+    }
+
+    // Fetch current task
+    const { data: task, error: fetchErr } = await supabase
+      .from("agent_tasks")
+      .select("*")
+      .eq("id", req.params.id)
+      .single();
+    if (fetchErr || !task) {
+      return res.status(404).json({ error: "Task not found" });
+    }
+
+    const oldDescription = task.description || "";
+
+    // Call AI to refine
+    const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
+    const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+
+    let newDescription;
+
+    if (OPENROUTER_KEY || ANTHROPIC_KEY) {
+      const { default: OpenAI } = await import("openai");
+
+      const apiConfig = OPENROUTER_KEY
+        ? { apiKey: OPENROUTER_KEY, baseURL: "https://openrouter.ai/api/v1" }
+        : { apiKey: ANTHROPIC_KEY, baseURL: "https://api.anthropic.com/v1" };
+
+      const client = new OpenAI(apiConfig);
+      const model = OPENROUTER_KEY ? "anthropic/claude-sonnet-4" : "claude-sonnet-4-20250514";
+
+      const completion = await client.chat.completions.create({
+        model,
+        max_tokens: 4096,
+        messages: [
+          {
+            role: "system",
+            content: "You are a PRD specialist. Rewrite the task description incorporating the user feedback. Keep the same markdown structure. Be specific and actionable. Return ONLY the rewritten description, no preamble or explanation.",
+          },
+          {
+            role: "user",
+            content: `## Current Description\n\n${oldDescription}\n\n## Refinement Instructions\n\n${instructions.trim()}`,
+          },
+        ],
+      });
+
+      newDescription = completion.choices[0]?.message?.content?.trim();
+      if (!newDescription) {
+        return res.status(502).json({ error: "AI returned empty response" });
+      }
+    } else {
+      return res.status(500).json({ error: "No AI API key configured (OPENROUTER_API_KEY or ANTHROPIC_API_KEY)" });
+    }
+
+    // Update description
+    const { data: updated, error: updateErr } = await supabase
+      .from("agent_tasks")
+      .update({ description: newDescription, updated_at: new Date().toISOString() })
+      .eq("id", req.params.id)
+      .select()
+      .single();
+    if (updateErr) throw updateErr;
+
+    // Log activity
+    await supabase.from("task_activity_log").insert({
+      task_id: req.params.id,
+      field: "description",
+      old_value: oldDescription,
+      new_value: newDescription,
+      changed_by: "dante (refined)",
+    });
+
+    // Log refinement instructions as comment
+    await supabase.from("task_comments").insert({
+      task_id: req.params.id,
+      author: "dante",
+      author_type: "user",
+      body: `[Refinement] ${instructions.trim()}`,
+    });
+
+    res.json({ ok: true, task: updated });
+  } catch (e) {
+    console.error(`[REFINE] Error refining task ${req.params.id}:`, e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Archive task (soft delete — never actually delete)
 router.delete("/tasks/:id", async (req, res) => {
   try {
