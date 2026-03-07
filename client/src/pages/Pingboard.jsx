@@ -1,3 +1,4 @@
+import SpeedLoader from "../components/SpeedLoader";
 import { useState, useEffect } from "react";
 
 const STATUS_COLORS = {
@@ -61,18 +62,7 @@ export default function Pingboard() {
   });
 
   if (loading) {
-    return (
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "center",
-        height: "100vh", background: "var(--md-background)",
-        fontFamily: "'Roboto', system-ui, sans-serif",
-      }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>🤖</div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--md-primary)" }}>Loading agents...</div>
-        </div>
-      </div>
-    );
+    return <SpeedLoader text="Loading agents..." />;
   }
 
   return (

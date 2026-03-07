@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import SpeedLoader from "./components/SpeedLoader";
 import { useNavigate, useLocation } from "react-router-dom";
 import useQueue from "./hooks/useQueue";
 import useBreakpoint from "./hooks/useBreakpoint";
@@ -100,18 +101,7 @@ export default function App() {
   }, []);
 
   if (loading) {
-    return (
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "center",
-        height: "100vh", background: "var(--md-background)", color: "var(--md-primary)",
-        fontFamily: "'Roboto', system-ui, sans-serif",
-      }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>⏳</div>
-          <div style={{ fontSize: 14, fontWeight: 500 }}>Loading tasks...</div>
-        </div>
-      </div>
-    );
+    return <SpeedLoader text="Loading tasks..." />;
   }
 
   if (view === "pingboard") {
