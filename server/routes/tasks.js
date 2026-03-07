@@ -298,6 +298,9 @@ router.post("/deploy/:id", async (req, res) => {
     }
 
     // 3. Merge ALL PRs via GitHub API (squash merge, delete branch)
+    if (prRefs.length > 0 && !GH_TOKEN) {
+      return res.status(500).json({ ok: false, error: "GH_TOKEN not configured — cannot merge PRs. Ask an admin to add GH_TOKEN to the queue-dashboard deployment." });
+    }
     const mergedPRs = [];
     for (const pr of prRefs) {
       if (!GH_TOKEN) continue;
@@ -391,8 +394,21 @@ router.post("/deploy/:id", async (req, res) => {
         return res.status(504).json({ ok: false, error: "ArgoCD sync timed out after 2 minutes. PR was merged but sync did not complete. Check ArgoCD status manually." });
       }
     } else {
-      // No ArgoCD credentials — skip sync verification, just mark deployed
-      console.log(`[DEPLOY] No ArgoCD credentials configured, skipping sync verification`);
+      // No ArgoCD credentials — try kubectl rollout restart via K8s API (in-cluster)
+      console.log(`[DEPLOY] No ArgoCD credentials configured, attempting K8s rollout restart`);
+      const K8S_NAMESPACE = process.env.K8S_DEPLOY_NAMESPACE;
+      const K8S_DEPLOYMENT = process.env.K8S_DEPLOY_NAME;
+      if (K8S_NAMESPACE && K8S_DEPLOYMENT) {
+        try {
+          const { execSync } = await import("child_process");
+          execSync(`kubectl rollout restart deployment/${K8S_DEPLOYMENT} -n ${K8S_NAMESPACE}`, { timeout: 30000 });
+          console.log(`[DEPLOY] Rollout restart triggered for ${K8S_DEPLOYMENT} in ${K8S_NAMESPACE}`);
+        } catch (e) {
+          console.warn(`[DEPLOY] kubectl rollout restart failed: ${e.message}`);
+        }
+      } else {
+        console.log(`[DEPLOY] No K8S_DEPLOY_NAMESPACE/K8S_DEPLOY_NAME configured, skipping rollout restart`);
+      }
       syncSucceeded = true;
     }
 
