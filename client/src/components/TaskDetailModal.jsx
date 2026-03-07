@@ -743,9 +743,16 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
     setDeploying(true);
     setDeployError(null);
     setDeploySuccess(false);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 150000); // 2.5min timeout (backend polls ArgoCD up to 2min)
     try {
-      const resp = await fetch(`/api/deploy/${task.id}`, { method: "POST" });
-      const data = await resp.json();
+      const resp = await fetch(`/api/deploy/${task.id}`, { method: "POST", signal: controller.signal });
+      let data;
+      try {
+        data = await resp.json();
+      } catch {
+        throw new Error(`Deploy failed — server returned non-JSON response (HTTP ${resp.status})`);
+      }
       if (!resp.ok || !data.ok) {
         throw new Error(data.error || `Deploy failed (HTTP ${resp.status})`);
       }
@@ -753,9 +760,11 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
       // Auto-close after success so the board refreshes
       setTimeout(() => handleClose(), 1500);
     } catch (e) {
-      setDeployError(e.message || "Deploy failed");
-      setTimeout(() => setDeployError(null), 5000);
+      const msg = e.name === 'AbortError' ? 'Deploy timed out — check deployment status manually' : (e.message || "Deploy failed");
+      setDeployError(msg);
+      setTimeout(() => setDeployError(null), 8000);
     } finally {
+      clearTimeout(timeout);
       setDeploying(false);
     }
   };

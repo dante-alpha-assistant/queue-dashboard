@@ -346,6 +346,7 @@ router.post("/deploy/:id", async (req, res) => {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ username: ARGOCD_USERNAME, password: ARGOCD_PASSWORD }),
+          signal: AbortSignal.timeout(15000),
         });
         if (sessResp.ok) {
           const sessData = await sessResp.json();
@@ -358,6 +359,7 @@ router.post("/deploy/:id", async (req, res) => {
           method: "POST",
           headers: { Authorization: `Bearer ${argoToken}`, "Content-Type": "application/json" },
           body: JSON.stringify({}),
+          signal: AbortSignal.timeout(15000),
         });
         syncTriggered = syncResp.ok;
         if (!syncResp.ok) {
@@ -376,6 +378,7 @@ router.post("/deploy/:id", async (req, res) => {
         try {
           const appResp = await fetch(`${ARGOCD_URL}/api/v1/applications/${ARGOCD_APP}`, {
             headers: { Authorization: `Bearer ${argoToken}` },
+            signal: AbortSignal.timeout(10000),
           });
           if (appResp.ok) {
             const app = await appResp.json();
@@ -427,6 +430,17 @@ router.post("/deploy/:id", async (req, res) => {
       return res.status(500).json({ ok: false, error: `Failed to update task status: ${updateErr.message}` });
     }
 
+    // 7. Log to activity log
+    const activityDetails = [];
+    if (mergedPRs.length > 0) activityDetails.push(`PRs: ${mergedPRs.join(", ")}`);
+    if (syncSucceeded) activityDetails.push("ArgoCD synced");
+    await supabase.from("task_activity_log").insert({
+      task_id: req.params.id,
+      action: "deployed",
+      details: `Deployment triggered${activityDetails.length ? ` — ${activityDetails.join("; ")}` : ""}`,
+      performed_by: "dashboard",
+    }).then(({ error }) => { if (error) console.warn(`[DEPLOY] Failed to log activity: ${error.message}`); });
+
     res.json({
       ok: true,
       task: updated,
@@ -438,6 +452,13 @@ router.post("/deploy/:id", async (req, res) => {
     });
   } catch (e) {
     console.error(`[DEPLOY] Error deploying task ${req.params.id}:`, e.message);
+    // Log failure to activity log (best effort)
+    await supabase.from("task_activity_log").insert({
+      task_id: req.params.id,
+      action: "deploy_failed",
+      details: `Deploy failed: ${e.message}`,
+      performed_by: "dashboard",
+    }).catch(() => {});
     res.status(500).json({ ok: false, error: e.message });
   }
 });
