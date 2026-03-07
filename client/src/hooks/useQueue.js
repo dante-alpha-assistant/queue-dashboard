@@ -6,6 +6,7 @@ export default function useQueue() {
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState("");
   const [loading, setLoading] = useState(true);
+  const [transitioning, setTransitioning] = useState({});
   const initialLoad = useRef(true);
 
   const fetchAll = useCallback(async () => {
@@ -46,16 +47,25 @@ export default function useQueue() {
   }, [fetchAll]);
 
   const updateTask = useCallback(async (id, updates) => {
-    const res = await fetch(`/api/tasks/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updates),
-    });
-    if (!res.ok) {
-      const errBody = await res.json().catch(() => ({}));
-      throw new Error(errBody?.message || errBody?.error || `Update failed (${res.status})`);
+    setTransitioning(prev => ({ ...prev, [id]: true }));
+    try {
+      const res = await fetch(`/api/tasks/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody?.message || errBody?.error || `Update failed (${res.status})`);
+      }
+      await fetchAll();
+    } finally {
+      setTransitioning(prev => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
     }
-    await fetchAll();
   }, [fetchAll]);
 
   const deleteTask = useCallback(async (id) => {
@@ -78,7 +88,7 @@ export default function useQueue() {
 
   return {
     stats, tasks, todo, assigned, inProgress, qa, completed, deployed, blocked, failed,
-    loading, dispatch, updateTask, deleteTask,
+    loading, transitioning, dispatch, updateTask, deleteTask,
     projects, selectedProject, setSelectedProject,
   };
 }

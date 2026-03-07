@@ -37,7 +37,7 @@ const BOTTOM_TABS = [
 export default function App() {
   const {
     stats, todo, assigned, inProgress, qa, completed, deployed, blocked, failed,
-    loading, updateTask,
+    loading, transitioning, updateTask,
     projects, selectedProject, setSelectedProject,
   } = useQueue();
   const navigate = useNavigate();
@@ -169,7 +169,7 @@ export default function App() {
   };
 
   const renderCards = (tasks) =>
-    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={handleSelectTask} isMobile={isMobile} progress={taskProgress[t.id]} monitor={taskMonitor[t.id]} />);
+    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={handleSelectTask} isMobile={isMobile} progress={taskProgress[t.id]} monitor={taskMonitor[t.id]} transitioning={!!transitioning[t.id]} />);
 
   // MOBILE LAYOUT
   if (isMobile) {
