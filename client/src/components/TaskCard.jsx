@@ -215,7 +215,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
     actions.push(
       <button
         key="retry"
-        onClick={(e) => { e.stopPropagation(); onStatusChange?.(task.id, { assigned_agent: task.assigned_agent }); }}
+        onClick={(e) => { e.stopPropagation(); onStatusChange?.(task.id, { status: 'todo', assigned_agent: null, idle_retries: 0, qa_retries: 0 }); }}
         style={{ ...btnBase, background: "#E65100", color: "#fff" }}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
