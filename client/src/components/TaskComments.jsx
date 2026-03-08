@@ -27,7 +27,6 @@ export default function TaskComments({ taskId }) {
   const [body, setBody] = useState('');
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState(null);
-  const bottomRef = useRef(null);
   const textareaRef = useRef(null);
 
   const fetchComments = async () => {
@@ -35,7 +34,7 @@ export default function TaskComments({ taskId }) {
       const resp = await fetch(`/api/tasks/${taskId}/comments`);
       if (!resp.ok) throw new Error('Failed to load comments');
       const data = await resp.json();
-      setComments(data);
+      setComments([...data].reverse());
     } catch (e) {
       setError(e.message);
     } finally {
@@ -50,9 +49,7 @@ export default function TaskComments({ taskId }) {
     return () => clearInterval(interval);
   }, [taskId]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [comments.length]);
+  // No auto-scroll needed — newest comments are already at the top
 
   const handleSubmit = async (e) => {
     e?.preventDefault();
@@ -67,7 +64,7 @@ export default function TaskComments({ taskId }) {
       });
       if (!resp.ok) throw new Error('Failed to post comment');
       const newComment = await resp.json();
-      setComments(prev => [...prev, newComment]);
+      setComments(prev => [newComment, ...prev]);
       setBody('');
       textareaRef.current?.focus();
     } catch (e) {
@@ -130,7 +127,7 @@ export default function TaskComments({ taskId }) {
             </div>
           );
         })}
-        <div ref={bottomRef} />
+
       </div>
 
       {/* Input */}
