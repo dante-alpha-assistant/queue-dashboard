@@ -334,7 +334,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
 }
 
 /* ── Task Card ────────────────────────────────────────────── */
-export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, progress, monitor }) {
+export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, progress, monitor, transitioning }) {
   const agent = task.assigned_agent?.toLowerCase();
   const icon = AGENT_ICONS[agent] || "🤖";
   const role = AGENT_ROLES[agent] || "Agent";
@@ -351,21 +351,39 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
   const isError = !resultText && !!errorText;
 
   return (
-    <div onClick={() => onCardClick?.(task)} style={{
+    <div onClick={() => !transitioning && onCardClick?.(task)} style={{
       background: "var(--md-surface, #FFFBFE)",
       borderRadius: 16,
       border: "1px solid var(--md-surface-variant, #E7E0EC)",
       borderLeft: `4px solid ${statusColor}`,
       marginBottom: 12,
-      transition: "box-shadow 200ms ease, transform 100ms ease",
-      cursor: "pointer",
+      transition: "box-shadow 200ms ease, transform 100ms ease, opacity 200ms ease",
+      cursor: transitioning ? "not-allowed" : "pointer",
       overflow: "hidden",
       fontFamily: "'Roboto', system-ui, -apple-system, sans-serif",
-      opacity: task.status === "qa_testing" && !task.qa_agent ? 0.65 : 1,
+      opacity: transitioning ? 0.7 : (task.status === "qa_testing" && !task.qa_agent ? 0.65 : 1),
+      position: "relative",
+      pointerEvents: transitioning ? "none" : "auto",
     }}
-    onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)"; }}
+    onMouseEnter={(e) => { if (!transitioning) e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)"; }}
     onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}
     >
+      {/* Transition loading overlay */}
+      {transitioning && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 10,
+          background: "rgba(255,251,254,0.6)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          borderRadius: 16,
+          backdropFilter: "blur(1px)",
+        }}>
+          <div style={{
+            width: 28, height: 28, border: "3px solid var(--md-surface-variant, #E7E0EC)",
+            borderTopColor: statusColor, borderRadius: "50%",
+            animation: "spin 0.8s linear infinite",
+          }} />
+        </div>
+      )}
       {/* ── Header: badges + duration ───────────────────── */}
       <div style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
