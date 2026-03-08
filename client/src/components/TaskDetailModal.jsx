@@ -576,7 +576,7 @@ function SmartRetryInfo({ metadata }) {
 
 /* ── Actions Dropdown ─────────────────────────────────────── */
 
-function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deploying, deploySuccess, deployConfirm, handleDeprecate, deprecating, deprecateConfirm, isMobile, dropUp = true }) {
+function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deploying, deploySuccess, deployConfirm, handleRebase, rebasing, rebaseSuccess, rebaseError, handleDeprecate, deprecating, deprecateConfirm, isMobile, dropUp = true }) {
   const [open, setOpen] = useState(false);
   const [showAssignPicker, setShowAssignPicker] = useState(false);
   const [assigning, setAssigning] = useState(false);
@@ -611,6 +611,11 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
     const deployLabel = deploying ? '⏳ Deploying…' : deploySuccess ? '✅ Deployed' : deployConfirm ? `⚠️ Confirm Deploy → ${deployTarget}` : `🚀 Deploy → ${deployTarget}`;
     actions.push({ label: deployLabel, key: 'deploy', color: deployConfirm ? '#E65100' : '#00838F', disabled: deploying || deploySuccess });
   }
+  // Rebase PR — available when task has PRs and is in completed, qa_testing, deploy_failed, or failed status
+  if (['completed', 'qa_testing', 'deploy_failed', 'failed'].includes(s) && task.pull_request_url?.length > 0) {
+    const rebaseLabel = rebasing ? '⏳ Rebasing…' : rebaseSuccess ? '✅ Rebase Sent' : '🔄 Rebase PR';
+    actions.push({ label: rebaseLabel, key: 'rebase', color: '#E65100', disabled: rebasing || rebaseSuccess });
+  }
   if (s !== 'deprecated') {
     actions.push({ label: deprecating ? '⏳…' : '🗑️ Deprecate', key: 'deprecate', color: '#9E9E9E', disabled: deprecating });
   }
@@ -632,6 +637,7 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
         case 'unblock': await onStatusChange(task.id, { status: 'todo', blocked_reason: null, assigned_agent: null }); break;
         case 'reopen': await onStatusChange(task.id, { status: 'todo', assigned_agent: null }); break;
         case 'deploy': await handleDeploy(); break;
+        case 'rebase': await handleRebase(); break;
         case 'deprecate': await handleDeprecate(); break;
       }
     } finally {
@@ -722,6 +728,10 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const [deploying, setDeploying] = useState(false);
   const [deployError, setDeployError] = useState(null);
   const [deploySuccess, setDeploySuccess] = useState(false);
+  const [rebasing, setRebasing] = useState(false);
+  const [rebaseError, setRebaseError] = useState(null);
+  const [rebaseSuccess, setRebaseSuccess] = useState(false);
+  const [mergeConflict, setMergeConflict] = useState(null); // null = unchecked, true/false = checked
 
   useEffect(() => { ensureModalStyles(); }, []);
   useEffect(() => {
@@ -785,6 +795,44 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
       setTimeout(() => setDeployError(null), 5000);
     } finally {
       setDeploying(false);
+    }
+  };
+
+  // Check PR mergeability when task has PRs and is in a deployable state
+  useEffect(() => {
+    if (!task?.pull_request_url?.length) return;
+    if (!['completed', 'qa_testing', 'deploy_failed'].includes(task.status)) return;
+    let cancelled = false;
+    fetch(`/api/tasks/${task.id}/mergeability`)
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled) return;
+        if (data.prs?.length) {
+          const hasConflict = data.prs.some(pr => pr.mergeable === false || pr.mergeable_state === 'dirty');
+          setMergeConflict(hasConflict);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [task?.id, task?.status]);
+
+  const handleRebase = async () => {
+    setRebasing(true);
+    setRebaseError(null);
+    setRebaseSuccess(false);
+    try {
+      const resp = await fetch(`/api/tasks/${task.id}/rebase`, { method: "POST" });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        throw new Error(data.error || `Rebase failed (HTTP ${resp.status})`);
+      }
+      setRebaseSuccess(true);
+      setTimeout(() => handleClose(), 1500);
+    } catch (e) {
+      setRebaseError(e.message || "Rebase failed");
+      setTimeout(() => setRebaseError(null), 5000);
+    } finally {
+      setRebasing(false);
     }
   };
 
@@ -1118,6 +1166,10 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
                 deploying={deploying}
                 deploySuccess={deploySuccess}
                 deployConfirm={deployConfirm}
+                handleRebase={handleRebase}
+                rebasing={rebasing}
+                rebaseSuccess={rebaseSuccess}
+                rebaseError={rebaseError}
                 handleDeprecate={handleDeprecate}
                 deprecating={deprecating}
                 deprecateConfirm={deprecateConfirm}
@@ -1181,7 +1233,9 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
           borderTop: '1px solid var(--md-surface-variant, #E7E0EC)',
           display: 'flex', gap: 6, alignItems: 'center',
         }}>
+          {mergeConflict && <span style={{ color: '#E65100', fontSize: 12, fontWeight: 600 }}>⚠️ PR has merge conflicts</span>}
           {deployError && <span style={{ color: '#D32F2F', fontSize: 12, wordBreak: 'break-word' }}>⚠️ {deployError}</span>}
+          {rebaseError && <span style={{ color: '#D32F2F', fontSize: 12, wordBreak: 'break-word' }}>⚠️ {rebaseError}</span>}
           {deprecateError && <span style={{color:"#D32F2F",fontSize:13}}>{deprecateError}</span>}
           <div style={{ flex: 1 }} />
           {!isMobile && task.created_at && (

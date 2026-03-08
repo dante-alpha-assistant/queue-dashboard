@@ -619,6 +619,170 @@ router.get("/tasks/:id/activity", async (req, res) => {
   }
 });
 
+// Rebase PR — send task back to agent to resolve merge conflicts
+router.post("/tasks/:id/rebase", async (req, res) => {
+  const GH_TOKEN = process.env.GH_TOKEN;
+  const DISPATCHER_URL = process.env.DISPATCHER_URL || "http://task-dispatcher.agents.svc.cluster.local:8080";
+
+  try {
+    // 1. Fetch task
+    const { data: task, error: fetchErr } = await supabase
+      .from("agent_tasks")
+      .select("*")
+      .eq("id", req.params.id)
+      .single();
+
+    if (fetchErr || !task) {
+      return res.status(404).json({ ok: false, error: "Task not found" });
+    }
+
+    // 2. Find PR references
+    const prRefs = [];
+    if (task.pull_request_url && Array.isArray(task.pull_request_url)) {
+      for (const url of task.pull_request_url) {
+        const m = url.match(/github\.com\/(.+?)\/pull\/(\d+)/);
+        if (m) prRefs.push({ repo: m[1], number: parseInt(m[2]), url });
+      }
+    }
+
+    if (prRefs.length === 0) {
+      return res.status(400).json({ ok: false, error: "No PR found on this task — nothing to rebase" });
+    }
+
+    if (!GH_TOKEN) {
+      return res.status(500).json({ ok: false, error: "GH_TOKEN not configured" });
+    }
+
+    // 3. Check mergeability of the first PR
+    const pr = prRefs[0];
+    const prResp = await fetch(`https://api.github.com/repos/${pr.repo}/pulls/${pr.number}`, {
+      headers: { Authorization: `token ${GH_TOKEN}`, Accept: "application/vnd.github.v3+json" },
+    });
+
+    if (!prResp.ok) {
+      return res.status(400).json({ ok: false, error: `Failed to fetch PR #${pr.number}: HTTP ${prResp.status}` });
+    }
+
+    const prData = await prResp.json();
+
+    if (prData.merged) {
+      return res.status(400).json({ ok: false, error: `PR #${pr.number} is already merged` });
+    }
+    if (prData.state === "closed") {
+      return res.status(400).json({ ok: false, error: `PR #${pr.number} is closed` });
+    }
+
+    // 4. Determine which agent to dispatch to
+    const rebaseAgent = task.assigned_agent || task.last_failed_agent || null;
+
+    // 5. Update task: set back to in_progress with rebase metadata
+    const { data: updated, error: updateErr } = await supabase
+      .from("agent_tasks")
+      .update({
+        status: "in_progress",
+        assigned_agent: rebaseAgent,
+        started_at: new Date().toISOString(),
+        completed_at: null,
+        error: null,
+        result: null,
+        metadata: {
+          ...(task.metadata || {}),
+          rebase_requested: true,
+          rebase_requested_at: new Date().toISOString(),
+          rebase_pr: { repo: pr.repo, number: pr.number, branch: prData.head?.ref, base: prData.base?.ref || "main" },
+        },
+      })
+      .eq("id", req.params.id)
+      .select()
+      .single();
+
+    if (updateErr) {
+      return res.status(500).json({ ok: false, error: `Failed to update task: ${updateErr.message}` });
+    }
+
+    // 6. Log activity
+    await supabase.from("task_activity_log").insert({
+      task_id: req.params.id,
+      field: "rebase_requested",
+      old_value: null,
+      new_value: `Rebase PR #${pr.number} on ${pr.repo} (branch: ${prData.head?.ref})`,
+      changed_by: "dashboard",
+      changed_at: new Date().toISOString(),
+    }).catch(() => {});
+
+    console.log(`[REBASE] Task ${req.params.id} — rebase requested for PR #${pr.number} on ${pr.repo}, assigned to ${rebaseAgent || "scheduler"}`);
+
+    res.json({
+      ok: true,
+      task: updated,
+      details: {
+        pr_number: pr.number,
+        repo: pr.repo,
+        branch: prData.head?.ref,
+        base: prData.base?.ref || "main",
+        assigned_to: rebaseAgent || "will be auto-assigned",
+        mergeable: prData.mergeable,
+        mergeable_state: prData.mergeable_state,
+      },
+    });
+  } catch (e) {
+    console.error(`[REBASE] Error for task ${req.params.id}:`, e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Check PR mergeability for a task
+router.get("/tasks/:id/mergeability", async (req, res) => {
+  const GH_TOKEN = process.env.GH_TOKEN;
+
+  try {
+    const { data: task, error } = await supabase
+      .from("agent_tasks")
+      .select("pull_request_url")
+      .eq("id", req.params.id)
+      .single();
+
+    if (error || !task) return res.status(404).json({ error: "Task not found" });
+
+    if (!task.pull_request_url?.length) {
+      return res.json({ has_pr: false });
+    }
+
+    if (!GH_TOKEN) {
+      return res.json({ has_pr: true, error: "GH_TOKEN not configured" });
+    }
+
+    const results = [];
+    for (const url of task.pull_request_url) {
+      const m = url.match(/github\.com\/(.+?)\/pull\/(\d+)/);
+      if (!m) continue;
+
+      try {
+        const prResp = await fetch(`https://api.github.com/repos/${m[1]}/pulls/${parseInt(m[2])}`, {
+          headers: { Authorization: `token ${GH_TOKEN}`, Accept: "application/vnd.github.v3+json" },
+        });
+        if (prResp.ok) {
+          const pr = await prResp.json();
+          results.push({
+            repo: m[1],
+            number: parseInt(m[2]),
+            mergeable: pr.mergeable,
+            mergeable_state: pr.mergeable_state,
+            state: pr.state,
+            merged: pr.merged,
+            branch: pr.head?.ref,
+            base: pr.base?.ref,
+          });
+        }
+      } catch {}
+    }
+
+    res.json({ has_pr: true, prs: results });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Archive task (soft delete — never actually delete)
 router.delete("/tasks/:id", async (req, res) => {
   try {
