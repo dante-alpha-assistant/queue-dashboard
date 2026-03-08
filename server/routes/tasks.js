@@ -51,7 +51,7 @@ router.get("/stats", async (req, res) => {
     if (req.query.project_id) query = query.eq("project_id", req.query.project_id);
     const { data, error } = await query;
     if (error) throw error;
-    const stats = { todo: 0, in_progress: 0, qa_testing: 0, completed: 0, failed: 0, deployed: 0, blocked: 0 };
+    const stats = { todo: 0, in_progress: 0, qa_testing: 0, completed: 0, failed: 0, deployed: 0, blocked: 0, deploying: 0, deploy_failed: 0 };
     data.forEach((t) => { if (t.status !== "deprecated" && stats[t.status] !== undefined) stats[t.status]++; });
     res.json(stats);
   } catch (e) {
@@ -254,11 +254,15 @@ router.post("/deploy/:id", async (req, res) => {
     if (fetchErr || !task) {
       return res.status(404).json({ ok: false, error: "Task not found" });
     }
-    if (task.status !== "completed") {
+    if (task.status !== "completed" && task.status !== "deploying") {
       return res.status(400).json({ ok: false, error: `Task status is '${task.status}', must be 'completed' to deploy` });
     }
 
     const deployTarget = task.deploy_target || "kubernetes";
+
+    // Set status to 'deploying' immediately so UI shows progress
+    await supabase.from('agent_tasks').update({ status: 'deploying' }).eq('id', req.params.id);
+    console.log(`[DEPLOY] Task ${req.params.id} → deploying (target: ${deployTarget})`);
     console.log(`[DEPLOY] Task ${req.params.id} — deploy_target: ${deployTarget}`);
 
     // 2. Collect all PR references
@@ -498,6 +502,12 @@ router.post("/deploy/:id", async (req, res) => {
     });
   } catch (e) {
     console.error(`[DEPLOY] Error deploying task ${req.params.id}:`, e.message);
+    // Set status to deploy_failed so user can see what happened
+    await supabase.from('agent_tasks').update({ 
+      status: 'deploy_failed', 
+      error: `Deploy failed: ${e.message}`,
+      updated_at: new Date().toISOString()
+    }).eq('id', req.params.id).catch(() => {});
     res.status(500).json({ ok: false, error: e.message });
   }
 });

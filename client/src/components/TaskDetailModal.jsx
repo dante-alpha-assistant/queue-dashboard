@@ -597,7 +597,7 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
   if (s === 'todo') {
     actions.push({ label: '👤 Assign', key: 'assign' });
   }
-  if (s === 'failed') {
+  if (s === 'failed' || s === 'deploy_failed') {
     actions.push({ label: '🔄 Retry', key: 'retry', color: '#E65100' });
   }
   if (s === 'blocked') {
@@ -606,8 +606,10 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
   if (s === 'qa_testing' || s === 'completed') {
     actions.push({ label: '↩️ Reopen', key: 'reopen' });
   }
-  if (s === 'completed') {
-    actions.push({ label: deploying ? '⏳ Deploying…' : deploySuccess ? '✅ Deployed' : '🚀 Deploy', key: 'deploy', color: '#00838F', disabled: deploying || deploySuccess });
+  if (s === 'completed' || s === 'deploy_failed') {
+    const deployTarget = task.deploy_target || 'kubernetes';
+    const deployLabel = deploying ? '⏳ Deploying…' : deploySuccess ? '✅ Deployed' : `🚀 Deploy → ${deployTarget}`;
+    actions.push({ label: deployLabel, key: 'deploy', color: '#00838F', disabled: deploying || deploySuccess });
   }
   if (s !== 'deprecated') {
     actions.push({ label: deprecating ? '⏳…' : '🗑️ Deprecate', key: 'deprecate', color: '#9E9E9E', disabled: deprecating });
@@ -746,7 +748,14 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
     }
   };
 
+  const [deployConfirm, setDeployConfirm] = useState(false);
+
   const handleDeploy = async () => {
+    if (!deployConfirm) {
+      setDeployConfirm(true);
+      return;
+    }
+    setDeployConfirm(false);
     setDeploying(true);
     setDeployError(null);
     setDeploySuccess(false);

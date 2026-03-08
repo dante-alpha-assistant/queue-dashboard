@@ -8,11 +8,13 @@ const STATUS_COLORS = {
   todo: "#79747E", assigned: "#6750A4", in_progress: "#E8A317", running: "#E8A317",
   failed: "#BA1A1A", qa: "#5E35B1", qa_testing: "#5E35B1",
   completed: "#1B5E20", deployed: "#00838F", blocked: "#D84315",
+  deploying: "#F57C00", deploy_failed: "#C62828",
 };
 const STATUS_BG = {
   todo: "#79747E14", assigned: "#6750A414", in_progress: "#E8A31714", running: "#E8A31714",
   failed: "#BA1A1A14", qa: "#5E35B114", qa_testing: "#5E35B114",
   completed: "#1B5E2014", deployed: "#00838F14", blocked: "#D8431514",
+  deploying: "#F57C0014", deploy_failed: "#C6282814",
 };
 const PRIORITY_MAP = {
   urgent: { color: "#D32F2F", bg: "#D32F2F14", label: "Urgent", icon: "🔴" },
@@ -111,7 +113,7 @@ function PipelineStepper({ stage, isMobile }) {
 }
 
 /* ── Duration Ticker ──────────────────────────────────────── */
-const TERMINAL_STATUSES = new Set(["deployed", "failed", "cancelled"]);
+const TERMINAL_STATUSES = new Set(["deployed", "failed", "cancelled", "deploy_failed"]);
 
 function DurationTicker({ updatedAt, startedAt, completedAt, active, status }) {
   const [now, setNow] = useState(Date.now());
