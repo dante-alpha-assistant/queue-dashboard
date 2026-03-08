@@ -572,6 +572,7 @@ function SmartRetryInfo({ metadata }) {
 function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deploying, deploySuccess, handleDeprecate, deprecating, deprecateConfirm, isMobile, dropUp = true }) {
   const [open, setOpen] = useState(false);
   const [showAssignPicker, setShowAssignPicker] = useState(false);
+  const [showTypePicker, setShowTypePicker] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const ref = useRef(null);
@@ -589,6 +590,7 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
 
   if (s === 'todo') {
     actions.push({ label: '👤 Assign', key: 'assign' });
+    actions.push({ label: '🏷️ Change Type', key: 'change_type' });
   }
   if (s === 'failed') {
     actions.push({ label: '🔄 Retry', key: 'retry', color: '#E65100' });
@@ -609,6 +611,7 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
   const handleAction = async (key) => {
     setOpen(false);
     if (key === 'assign') { setShowAssignPicker(true); return; }
+    if (key === 'change_type') { setShowTypePicker(true); return; }
     setActionLoading(true);
     try {
       switch (key) {
@@ -630,6 +633,16 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
       await onStatusChange(task.id, { assigned_agent: agentId });
     } finally {
       setAssigning(false);
+    }
+  };
+
+  const handleChangeType = async (newType) => {
+    setShowTypePicker(false);
+    setActionLoading(true);
+    try {
+      await onStatusChange(task.id, { type: newType });
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -684,6 +697,42 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
             onSelect={handleAssign}
             onCancel={() => setShowAssignPicker(false)}
           />
+        </div>
+      )}
+      {showTypePicker && (
+        <div style={{
+          position: 'absolute',
+          ...(dropUp ? { bottom: '100%', marginBottom: 4 } : { top: '100%', marginTop: 4 }),
+          right: 0, zIndex: 301,
+          background: 'var(--md-surface, #FFFBFE)',
+          border: '1px solid var(--md-surface-variant, #E7E0EC)',
+          borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+          minWidth: 160, overflow: 'hidden',
+        }}>
+          <div style={{ padding: '8px 14px', fontSize: 10, fontWeight: 600, color: 'var(--md-outline, #79747E)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid var(--md-surface-variant, #E7E0EC)' }}>
+            Select Type
+          </div>
+          {['coding', 'ops', 'general', 'review', 'research', 'qa'].map(t => (
+            <button key={t}
+              style={{
+                display: 'block', width: '100%', padding: '10px 16px',
+                background: t === task.type ? 'var(--md-surface-container-low, #F7F2FA)' : 'none',
+                border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: t === task.type ? 600 : 500,
+                textAlign: 'left', color: TYPE_COLORS[t] || 'var(--md-on-surface, #1C1B1F)',
+              }}
+              onMouseEnter={e => { e.target.style.background = 'var(--md-surface-container-low, #F7F2FA)'; }}
+              onMouseLeave={e => { if (t !== task.type) e.target.style.background = 'none'; }}
+              onClick={() => handleChangeType(t)}>
+              {t === task.type ? `✓ ${t.charAt(0).toUpperCase() + t.slice(1)}` : t.charAt(0).toUpperCase() + t.slice(1)}
+            </button>
+          ))}
+          <div style={{ borderTop: '1px solid var(--md-surface-variant, #E7E0EC)' }}>
+            <button
+              style={{ display: 'block', width: '100%', padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--md-outline, #79747E)', textAlign: 'center' }}
+              onClick={() => setShowTypePicker(false)}>
+              Cancel
+            </button>
+          </div>
         </div>
       )}
     </div>
