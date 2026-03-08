@@ -594,7 +594,14 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
   const actions = [];
   const s = task.status;
 
-  if (s === 'todo') {
+  // Stop/Resume: paused tasks can be resumed, non-paused can be stopped
+  if (task.paused) {
+    actions.push({ label: '▶️ Resume', key: 'resume', color: '#2E7D32' });
+  } else {
+    actions.push({ label: '⏸️ Stop task', key: 'stop', color: '#E65100' });
+  }
+
+  if (s === 'todo' && !task.paused) {
     actions.push({ label: '👤 Assign', key: 'assign' });
   }
   if (s === 'failed' || s === 'deploy_failed') {
@@ -628,6 +635,8 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
     setActionLoading(true);
     try {
       switch (key) {
+        case 'stop': await onStatusChange(task.id, { status: 'todo', assigned_agent: null, started_at: null, paused: true }); break;
+        case 'resume': await onStatusChange(task.id, { paused: false }); break;
         case 'retry': await onStatusChange(task.id, { status: 'todo', assigned_agent: null, idle_retries: 0, qa_retries: 0 }); break;
         case 'unblock': await onStatusChange(task.id, { status: 'todo', blocked_reason: null, assigned_agent: null }); break;
         case 'reopen': await onStatusChange(task.id, { status: 'todo', assigned_agent: null }); break;
@@ -1106,6 +1115,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8 }}>
             <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
               <StatusBadge status={task.status} />
+              {task.paused && <Badge label="⏸️ Paused" color="#E65100" bg="#E6510020" />}
               <Badge label={task.type} color={typeColor} />
               {isActive && !isMobile && !useWideLayout && <DurationTicker task={task} />}
             </div>

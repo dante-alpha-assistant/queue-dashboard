@@ -153,6 +153,8 @@ router.patch("/tasks/:id", async (req, res) => {
     if (updates.status === "deprecated") {
       updates.completed_at = updates.completed_at || new Date().toISOString();
     }
+    // When resuming (paused: false), don't auto-clear other fields
+    // When pausing, the client sends { status: todo, assigned_agent: null, started_at: null, paused: true }
 
     const { data, error } = await supabase
       .from("agent_tasks")
