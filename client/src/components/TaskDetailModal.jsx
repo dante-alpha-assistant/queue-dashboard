@@ -576,7 +576,7 @@ function SmartRetryInfo({ metadata }) {
 
 /* ── Actions Dropdown ─────────────────────────────────────── */
 
-function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deploying, deploySuccess, handleDeprecate, deprecating, deprecateConfirm, isMobile, dropUp = true }) {
+function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deploying, deploySuccess, deployConfirm, handleDeprecate, deprecating, deprecateConfirm, isMobile, dropUp = true }) {
   const [open, setOpen] = useState(false);
   const [showAssignPicker, setShowAssignPicker] = useState(false);
   const [assigning, setAssigning] = useState(false);
@@ -608,14 +608,21 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
   }
   if (s === 'completed' || s === 'deploy_failed') {
     const deployTarget = task.deploy_target || 'kubernetes';
-    const deployLabel = deploying ? '⏳ Deploying…' : deploySuccess ? '✅ Deployed' : `🚀 Deploy → ${deployTarget}`;
-    actions.push({ label: deployLabel, key: 'deploy', color: '#00838F', disabled: deploying || deploySuccess });
+    const deployLabel = deploying ? '⏳ Deploying…' : deploySuccess ? '✅ Deployed' : deployConfirm ? `⚠️ Confirm Deploy → ${deployTarget}` : `🚀 Deploy → ${deployTarget}`;
+    actions.push({ label: deployLabel, key: 'deploy', color: deployConfirm ? '#E65100' : '#00838F', disabled: deploying || deploySuccess });
   }
   if (s !== 'deprecated') {
     actions.push({ label: deprecating ? '⏳…' : '🗑️ Deprecate', key: 'deprecate', color: '#9E9E9E', disabled: deprecating });
   }
 
   const handleAction = async (key) => {
+    // For deploy confirmation step, keep dropdown open so user sees the confirm button
+    if (key === 'deploy' && !deployConfirm) {
+      // First click — don't close dropdown, just trigger confirm state
+      setActionLoading(true);
+      try { await handleDeploy(); } finally { setActionLoading(false); }
+      return;
+    }
     setOpen(false);
     if (key === 'assign') { setShowAssignPicker(true); return; }
     setActionLoading(true);
@@ -749,12 +756,17 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   };
 
   const [deployConfirm, setDeployConfirm] = useState(false);
+  const deployConfirmTimer = useRef(null);
 
   const handleDeploy = async () => {
     if (!deployConfirm) {
       setDeployConfirm(true);
+      // Auto-reset confirmation after 5 seconds
+      clearTimeout(deployConfirmTimer.current);
+      deployConfirmTimer.current = setTimeout(() => setDeployConfirm(false), 5000);
       return;
     }
+    clearTimeout(deployConfirmTimer.current);
     setDeployConfirm(false);
     setDeploying(true);
     setDeployError(null);
@@ -1105,6 +1117,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
                 handleDeploy={handleDeploy}
                 deploying={deploying}
                 deploySuccess={deploySuccess}
+                deployConfirm={deployConfirm}
                 handleDeprecate={handleDeprecate}
                 deprecating={deprecating}
                 deprecateConfirm={deprecateConfirm}

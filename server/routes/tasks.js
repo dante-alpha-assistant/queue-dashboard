@@ -288,6 +288,7 @@ router.post("/deploy/:id", async (req, res) => {
     // 3. Merge PRs (shared across all deploy targets)
     const mergedPRs = [];
     if (prRefs.length > 0 && !GH_TOKEN) {
+      await supabase.from('agent_tasks').update({ status: 'deploy_failed', error: 'GH_TOKEN not configured', updated_at: new Date().toISOString() }).eq('id', req.params.id);
       return res.status(500).json({ ok: false, error: "GH_TOKEN not configured — cannot merge PRs." });
     }
     for (const pr of prRefs) {
@@ -296,12 +297,14 @@ router.post("/deploy/:id", async (req, res) => {
         headers: { Authorization: `token ${GH_TOKEN}`, Accept: "application/vnd.github.v3+json" },
       });
       if (!prResp.ok) {
+        await supabase.from('agent_tasks').update({ status: 'deploy_failed', error: `Failed to fetch PR #${pr.number}`, updated_at: new Date().toISOString() }).eq('id', req.params.id);
         return res.status(400).json({ ok: false, error: `Failed to fetch PR #${pr.number} on ${pr.repo}: ${prResp.status}` });
       }
       const prData = await prResp.json();
       if (prData.merged) {
         mergedPRs.push(`#${pr.number} (${pr.repo}) — already merged`);
       } else if (prData.state === "closed") {
+        await supabase.from('agent_tasks').update({ status: 'deploy_failed', error: `PR #${pr.number} closed but not merged`, updated_at: new Date().toISOString() }).eq('id', req.params.id);
         return res.status(400).json({ ok: false, error: `PR #${pr.number} on ${pr.repo} is closed but not merged` });
       } else {
         const mergeResp = await fetch(`https://api.github.com/repos/${pr.repo}/pulls/${pr.number}/merge`, {
@@ -311,6 +314,7 @@ router.post("/deploy/:id", async (req, res) => {
         });
         if (!mergeResp.ok) {
           const mergeErr = await mergeResp.json().catch(() => ({}));
+          await supabase.from('agent_tasks').update({ status: 'deploy_failed', error: `Merge failed: ${mergeErr.message || mergeResp.status}`, updated_at: new Date().toISOString() }).eq('id', req.params.id);
           return res.status(400).json({ ok: false, error: `Merge failed on PR #${pr.number} (${pr.repo}): ${mergeErr.message || mergeResp.status}` });
         }
         mergedPRs.push(`#${pr.number} (${pr.repo}) — merged`);
@@ -333,6 +337,7 @@ router.post("/deploy/:id", async (req, res) => {
       console.log(`[DEPLOY] Target is 'vercel' — triggering Vercel deployment`);
 
       if (!VERCEL_TOKEN) {
+        await supabase.from('agent_tasks').update({ status: 'deploy_failed', error: 'VERCEL_TOKEN not configured', updated_at: new Date().toISOString() }).eq('id', req.params.id);
         return res.status(500).json({ ok: false, error: "VERCEL_TOKEN not configured — cannot deploy to Vercel." });
       }
 
@@ -341,6 +346,7 @@ router.post("/deploy/:id", async (req, res) => {
       const repoFullName = repoUrl?.match(/github\.com\/(.+?)(?:\.git)?$/)?.[1];
 
       if (!repoFullName) {
+        await supabase.from('agent_tasks').update({ status: 'deploy_failed', error: 'No repository URL found', updated_at: new Date().toISOString() }).eq('id', req.params.id);
         return res.status(400).json({ ok: false, error: "No repository URL found — cannot deploy to Vercel." });
       }
 
@@ -382,7 +388,9 @@ router.post("/deploy/:id", async (req, res) => {
 
         if (!importResp.ok) {
           const err = await importResp.json().catch(() => ({}));
-          return res.status(400).json({ ok: false, error: `Vercel project creation failed: ${err.error?.message || importResp.status}` });
+          const errMsg = `Vercel project creation failed: ${err.error?.message || importResp.status}`;
+          await supabase.from('agent_tasks').update({ status: 'deploy_failed', error: errMsg, updated_at: new Date().toISOString() }).eq('id', req.params.id);
+          return res.status(400).json({ ok: false, error: errMsg });
         }
         vercelProject = await importResp.json();
         console.log(`[DEPLOY] Created Vercel project: ${vercelProject.name}`);
