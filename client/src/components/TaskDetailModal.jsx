@@ -67,12 +67,13 @@ const ACTIVE_STATUSES = new Set(["in_progress", "running", "qa_testing", "comple
 const HAS_MARKDOWN = /[#*`\[|]/;
 
 const TIMELINE_STEPS = [
-  { key: 'created', label: 'Created', statuses: ['todo', 'in_progress', 'running', 'completed', 'failed', 'qa', 'qa_testing', 'deployed'] },
-  { key: 'assigned', label: 'Assigned', statuses: [ 'in_progress', 'running', 'completed', 'failed', 'qa', 'qa_testing', 'deployed'] },
-  { key: 'in_progress', label: 'Working', statuses: ['in_progress', 'running', 'completed', 'failed', 'qa', 'qa_testing', 'deployed'] },
-  { key: 'qa_testing', label: 'QA Testing', statuses: ['qa_testing', 'completed', 'failed', 'deployed'] },
-  { key: 'qa', label: 'QA', statuses: ['qa', 'completed', 'deployed'] },
-  { key: 'completed', label: 'Complete', statuses: ['completed', 'deployed'] },
+  { key: 'created', label: 'Created', statuses: ['todo', 'in_progress', 'running', 'completed', 'failed', 'qa', 'qa_testing', 'deploying', 'deployed', 'deploy_failed'] },
+  { key: 'assigned', label: 'Assigned', statuses: [ 'in_progress', 'running', 'completed', 'failed', 'qa', 'qa_testing', 'deploying', 'deployed', 'deploy_failed'] },
+  { key: 'in_progress', label: 'Working', statuses: ['in_progress', 'running', 'completed', 'failed', 'qa', 'qa_testing', 'deploying', 'deployed', 'deploy_failed'] },
+  { key: 'qa_testing', label: 'QA Testing', statuses: ['qa_testing', 'completed', 'failed', 'deploying', 'deployed', 'deploy_failed'] },
+  { key: 'qa', label: 'QA', statuses: ['qa', 'completed', 'deploying', 'deployed', 'deploy_failed'] },
+  { key: 'completed', label: 'Complete', statuses: ['completed', 'deploying', 'deployed', 'deploy_failed'] },
+  { key: 'deploying', label: 'Deploying', statuses: ['deploying', 'deployed', 'deploy_failed'] },
 ];
 
 /* ── Styles ────────────────────────────────────────────────── */
@@ -483,8 +484,11 @@ function getStepTime(task, key) {
 function Timeline({ task }) {
   const status = task.status || 'todo';
   const isFailed = status === 'failed';
+  const isDeployFailed = status === 'deploy_failed';
   const steps = isFailed
     ? [...TIMELINE_STEPS.slice(0, 4), { key: 'failed', label: 'Failed', statuses: ['failed'] }]
+    : isDeployFailed
+    ? [...TIMELINE_STEPS, { key: 'deploy_failed', label: 'Deploy Failed', statuses: ['deploy_failed'] }]
     : TIMELINE_STEPS;
   const activeIdx = steps.reduce((last, s, i) => s.statuses.includes(status) ? i : last, -1);
 
