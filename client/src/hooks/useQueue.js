@@ -85,9 +85,11 @@ export default function useQueue() {
   const blocked = tasks.filter(t => t.status === "blocked");
   const failed = tasks.filter(t => t.status === "failed");
   const deployed = tasks.filter(t => t.status === "deployed");
+  const deploying = tasks.filter(t => t.status === "deploying");
+  const deployFailed = tasks.filter(t => t.status === "deploy_failed");
 
   return {
-    stats, tasks, todo, assigned, inProgress, qa, completed, deployed, blocked, failed,
+    stats, tasks, todo, assigned, inProgress, qa, completed, deployed, blocked, failed, deploying, deployFailed,
     loading, transitioning, dispatch, updateTask, deleteTask,
     projects, selectedProject, setSelectedProject,
   };

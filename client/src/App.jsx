@@ -21,6 +21,8 @@ const MOBILE_TABS = [
   { key: "qa", label: "QA", icon: "🧪" },
   { key: "completed", label: "Done", icon: "✅" },
   { key: "deployed", label: "Deployed", icon: "🚀" },
+  { key: "deploying", label: "Deploying", icon: "⏳" },
+  { key: "deploy_failed", label: "Deploy Failed", icon: "💥" },
   { key: "failed", label: "Failed", icon: "❌" },
 ];
 
@@ -31,13 +33,14 @@ const BOTTOM_TABS = [
   { key: "blocked", label: "Blocked", icon: "🚫", color: "#D84315" },
   { key: "qa", label: "QA", icon: "🧪", color: "#7B5EA7" },
   { key: "completed", label: "Done", icon: "✅", color: "#1B5E20" },
+  { key: "deploying", label: "Deploying", icon: "⏳", color: "#E65100" },
   { key: "deployed", label: "Deployed", icon: "🚀", color: "#00897B" },
   { key: "failed", label: "Failed", icon: "❌", color: "#BA1A1A" },
 ];
 
 export default function App() {
   const {
-    stats, todo, assigned, inProgress, qa, completed, deployed, blocked, failed,
+    stats, todo, assigned, inProgress, qa, completed, deployed, blocked, failed, deploying, deployFailed,
     loading, transitioning, updateTask,
     projects, selectedProject, setSelectedProject,
   } = useQueue();
@@ -60,14 +63,14 @@ export default function App() {
   // Resolve deep link once tasks are loaded
   useEffect(() => {
     if (!deepLinkId || loading) return;
-    const allLoaded = [...todo, ...assigned, ...inProgress, ...blocked, ...qa, ...completed, ...deployed, ...failed];
+    const allLoaded = [...todo, ...assigned, ...inProgress, ...blocked, ...qa, ...completed, ...deploying, ...deployed, ...deployFailed, ...failed];
     const found = allLoaded.find(t => t.id === deepLinkId);
     if (found) {
       setSelectedTask(found);
     } else {
       setSelectedTask({ _notFound: true, id: deepLinkId });
     }
-  }, [deepLinkId, loading, todo, assigned, inProgress, blocked, qa, completed, deployed, failed]);
+  }, [deepLinkId, loading, todo, assigned, inProgress, blocked, qa, completed, deploying, deployed, deployFailed, failed]);
 
   // Update URL when task is selected/deselected
   const handleSelectTask = useCallback((task) => {
@@ -84,14 +87,14 @@ export default function App() {
   }, [navigate]);
 
   // Collapsible columns for Deployed and Failed
-  const COLLAPSIBLE_COLUMNS = ["completed", "deployed", "failed"];
+  const COLLAPSIBLE_COLUMNS = ["completed", "deploying", "deployed", "deploy_failed", "failed"];
   const [collapsedCols, setCollapsedCols] = useState(() => {
     try {
       const saved = localStorage.getItem("collapsed-columns");
       if (saved) return JSON.parse(saved);
     } catch {}
-    // Default: completed, deployed and failed are collapsed
-    return { completed: true, deployed: true, failed: true };
+    // Default: completed, deployed, deploy_failed and failed are collapsed
+    return { completed: true, deployed: true, deploy_failed: true, failed: true };
   });
   const toggleCollapse = useCallback((col) => {
     setCollapsedCols(prev => {
@@ -130,7 +133,7 @@ export default function App() {
     );
   }
 
-  const allTasksRaw = [...todo, ...assigned, ...inProgress, ...blocked, ...qa, ...completed, ...deployed, ...failed];
+  const allTasksRaw = [...todo, ...assigned, ...inProgress, ...blocked, ...qa, ...completed, ...deploying, ...deployed, ...deployFailed, ...failed];
   const allTasks = filterTasksByTime(allTasksRaw, timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
   const activeTypes = ["all", ...new Set(allTasks.map(t => t.type).filter(Boolean))];
   const activeStages = ["all", ...new Set(allTasks.map(t => t.stage).filter(Boolean))];
@@ -150,7 +153,9 @@ export default function App() {
       case "blocked": return filterByType(blocked);
       case "qa": return filterByType(qa);
       case "completed": return filterByType(completed);
+      case "deploying": return filterByType(deploying);
       case "deployed": return filterByType(deployed);
+      case "deploy_failed": return filterByType(deployFailed);
       case "failed": return filterByType(failed);
       default: return filterByType(todo);
     }
@@ -163,7 +168,9 @@ export default function App() {
       case "blocked": return { title: "Blocked", color: "#D84315" };
       case "qa": return { title: "QA Testing", color: "#7B5EA7" };
       case "completed": return { title: "Completed", color: "#1B5E20" };
+      case "deploying": return { title: "Deploying", color: "#E65100" };
       case "deployed": return { title: "Deployed", color: "#00897B" };
+      case "deploy_failed": return { title: "Deploy Failed", color: "#C62828" };
       case "failed": return { title: "Failed", color: "#BA1A1A" };
       default: return { title: "Todo", color: "#79747E" };
     }
@@ -464,9 +471,17 @@ export default function App() {
           collapsible collapsed={!!collapsedCols.completed} onToggleCollapse={() => toggleCollapse("completed")}>
           {renderCards(filterByType(completed).slice(0, 20))}
         </Column>
+        <Column title="⏳ Deploying" color="#E65100" count={filterByType(deploying).length} isTablet={isTablet}
+          collapsible collapsed={!!collapsedCols.deploying} onToggleCollapse={() => toggleCollapse("deploying")}>
+          {renderCards(filterByType(deploying))}
+        </Column>
         <Column title="Deployed" color="#00897B" count={filterByType(deployed).length} isTablet={isTablet}
           collapsible collapsed={!!collapsedCols.deployed} onToggleCollapse={() => toggleCollapse("deployed")}>
           {renderCards(filterByType(deployed).slice(0, 20))}
+        </Column>
+        <Column title="💥 Deploy Failed" color="#C62828" count={filterByType(deployFailed).length} isTablet={isTablet}
+          collapsible collapsed={!!collapsedCols.deploy_failed} onToggleCollapse={() => toggleCollapse("deploy_failed")}>
+          {renderCards(filterByType(deployFailed))}
         </Column>
         <Column title="Failed" color="#BA1A1A" count={filterByType(failed).length} isTablet={isTablet}
           collapsible collapsed={!!collapsedCols.failed} onToggleCollapse={() => toggleCollapse("failed")}>
