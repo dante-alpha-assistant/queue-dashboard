@@ -3,6 +3,7 @@ import cors from "cors";
 import { router } from "./routes/tasks.js";
 import { chatRouter } from "./routes/chat.js";
 import { agentsRouter } from "./routes/agents.js";
+import { neoChatRouter } from "./routes/neoChat.js";
 
 const app = express();
 app.use(cors());
@@ -10,6 +11,7 @@ app.use(express.json());
 app.use("/api", router);
 app.use("/api/chat", chatRouter);
 app.use("/api/agents", agentsRouter);
+app.use("/api/neo-chat", neoChatRouter);
 
 // Serve static frontend in production
 import { serveStatic } from "./static.js";

@@ -9,6 +9,7 @@ import Column from "./components/Column";
 import DispatchButton from "./components/DispatchButton";
 import TaskCard from "./components/TaskCard";
 import ChatPanel from "./components/ChatPanel";
+import NeoChatPanel from "./components/NeoChatPanel";
 import TaskDetailModal from "./components/TaskDetailModal";
 import Pingboard from "./pages/Pingboard";
 import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
@@ -300,6 +301,7 @@ export default function App() {
         </div>
 
         <ChatPanel isMobile={isMobile} />
+        <NeoChatPanel isMobile={isMobile} />
         {selectedTask && !selectedTask._notFound && (
           <TaskDetailModal
             task={selectedTask}
@@ -473,6 +475,7 @@ export default function App() {
       </div>
 
       <ChatPanel isMobile={false} />
+      <NeoChatPanel isMobile={false} />
       {selectedTask && !selectedTask._notFound && (
         <TaskDetailModal
           task={selectedTask}
