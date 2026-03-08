@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const AUTHOR_ICONS = {
   dante: '👤', neo: '🕶️', mu: '🔧', beta: '⚡', alpha: '🧠', flow: '🌊', ifra: '🛠️',
@@ -87,9 +89,9 @@ export default function TaskComments({ taskId }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Comments list */}
       <div style={{
-        maxHeight: 360, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8,
+        display: 'flex', flexDirection: 'column', gap: 8,
         padding: comments.length ? '2px 0' : 0,
-      }} className="tdm-scrollbar">
+      }}>
         {loading && (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--md-outline, #79747E)', fontSize: 13 }}>
             Loading comments…
@@ -122,10 +124,18 @@ export default function TaskComments({ taskId }) {
                     {formatTime(c.created_at)}
                   </span>
                 </div>
-                <div style={{
+                <div className="tdm-md" style={{
                   fontSize: 13, lineHeight: 1.6, color: 'var(--md-on-surface, #1C1B1F)',
-                  whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                }}>{c.body}</div>
+                  wordBreak: 'break-word',
+                }}>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
+                      p: ({ node, ...props }) => <p {...props} style={{ margin: '4px 0' }} />,
+                    }}
+                  >{c.body}</ReactMarkdown>
+                </div>
               </div>
             </div>
           );
