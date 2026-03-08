@@ -612,7 +612,7 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
     setActionLoading(true);
     try {
       switch (key) {
-        case 'retry': await onStatusChange(task.id, { status: 'todo', assigned_agent: null }); break;
+        case 'retry': await onStatusChange(task.id, { status: 'todo', assigned_agent: null, idle_retries: 0, qa_retries: 0 }); break;
         case 'unblock': await onStatusChange(task.id, { status: 'todo', blocked_reason: null, assigned_agent: null }); break;
         case 'reopen': await onStatusChange(task.id, { status: 'todo', assigned_agent: null }); break;
         case 'deploy': await handleDeploy(); break;
