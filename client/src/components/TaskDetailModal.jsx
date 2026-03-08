@@ -55,6 +55,13 @@ const STAGE_COLORS = {
 };
 const STAGES = ["refinery", "foundry", "builder", "inspector", "deployer"];
 const STAGE_LABELS = { refinery: "Refine", foundry: "Found", builder: "Build", inspector: "Inspect", deployer: "Deploy" };
+
+const DEPLOY_TARGETS = ["kubernetes", "vercel", "none"];
+const DEPLOY_TARGET_CONFIG = {
+  kubernetes: { icon: "☸️", color: "#326CE5", label: "Kubernetes" },
+  vercel: { icon: "▲", color: "#000000", label: "Vercel" },
+  none: { icon: "⏭️", color: "#79747E", label: "None" },
+};
 const ACTIVE_STATUSES = new Set(["in_progress", "running", "qa_testing", "completed"]);
 
 const HAS_MARKDOWN = /[#*`\[|]/;
@@ -863,6 +870,17 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
             <MetaCell label="Project">{task.project.name}</MetaCell>
           )}
 
+          <MetaCell label="Deploy">
+            <select
+              className="tdm-stage-select"
+              value={task.deploy_target || "kubernetes"}
+              onChange={e => onStatusChange(task.id, { deploy_target: e.target.value })}
+              onClick={e => e.stopPropagation()}
+              style={{ color: DEPLOY_TARGET_CONFIG[task.deploy_target || 'kubernetes']?.color || '#79747E' }}
+            >
+              {DEPLOY_TARGETS.map(t => <option key={t} value={t}>{DEPLOY_TARGET_CONFIG[t].icon} {DEPLOY_TARGET_CONFIG[t].label}</option>)}
+            </select>
+          </MetaCell>
           <MetaCell label="Created">
             <span title={task.created_at}>{formatDateShort(task.created_at)}</span>
           </MetaCell>
@@ -980,12 +998,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
               {!task.pull_request_url?.length && !task.repository_url && (
                 <span style={{ color: 'var(--md-outline, #79747E)', fontSize: 13, fontStyle: 'italic' }}>No links</span>
               )}
-              {task.deploy_target && task.deploy_target !== 'kubernetes' && (
-                <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--md-outline, #79747E)' }}>
-                  <span>{task.deploy_target === 'vercel' ? '▲' : task.deploy_target === 'none' ? '⏭️' : '☸️'}</span>
-                  Deploy target: <strong>{task.deploy_target}</strong>
-                </div>
-              )}
+
             </div>
           </div>
         </>
