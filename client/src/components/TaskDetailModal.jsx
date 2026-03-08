@@ -779,7 +779,6 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   tabs.push({ key: 'comments', label: '💬 Comments' });
   tabs.push({ key: 'activity', label: 'Activity' });
   tabs.push({ key: 'metadata', label: 'Metadata' });
-  if (hasResult || hasError) tabs.push({ key: 'output', label: hasError ? '⚠ Output' : 'Output' });
   if (hasQA) tabs.push({ key: 'qa', label: 'QA' });
   if (hasMetadata) tabs.push({ key: 'meta', label: 'Meta' });
 
@@ -978,23 +977,6 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
               )}
             </div>
           </div>
-        </>
-      )}
-
-      {activeTab === 'output' && (
-        <>
-          {hasResult && (
-            <div style={{ marginBottom: 16 }}>
-              <SectionLabel icon="✓" color="#386A20">Result</SectionLabel>
-              <ResultDisplay result={task.result} variant="success" />
-            </div>
-          )}
-          {hasError && (
-            <div style={{ marginBottom: 16 }}>
-              <SectionLabel icon="✕" color="#BA1A1A">Error</SectionLabel>
-              <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', padding: 14, background: '#BA1A1A06', borderRadius: 10, border: '1px solid #BA1A1A18', color: '#BA1A1A' }}>{task.error}</div>
-            </div>
-          )}
         </>
       )}
 
