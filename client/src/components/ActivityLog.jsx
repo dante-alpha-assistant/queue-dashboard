@@ -22,6 +22,7 @@ const FIELD_LABELS = {
   blocked_reason: 'Blocked reason',
   pull_request_url: 'Pull request',
   comment: 'Comment',
+  refinement: 'Refinement request',
 };
 
 const FIELD_ICONS = {
@@ -44,6 +45,7 @@ const FIELD_ICONS = {
   blocked_reason: '🚫',
   pull_request_url: '🔗',
   comment: '💬',
+  refinement: '✨',
 };
 
 const STATUS_COLORS = {
@@ -187,7 +189,7 @@ function ActivityEntry({ entry, isLast }) {
             </span>
           )}
           <span style={{ fontSize: 11, color: 'var(--md-on-surface-variant, #49454F)' }}>
-            {isCreation ? 'created this task' : entry.field === 'comment' ? 'added a comment' : `changed ${label.toLowerCase()}`}
+            {isCreation ? 'created this task' : entry.field === 'comment' ? 'added a comment' : entry.field === 'refinement' ? 'requested a refinement' : `changed ${label.toLowerCase()}`}
           </span>
           <span style={{
             fontSize: 9, color: 'var(--md-outline, #79747E)',
@@ -198,8 +200,22 @@ function ActivityEntry({ entry, isLast }) {
           </span>
         </div>
 
-        {/* Value change row (skip for creation) */}
-        {!isCreation && (
+        {/* Refinement request body */}
+        {entry.field === 'refinement' && entry.new_value && (
+          <div style={{
+            marginTop: 6, padding: '8px 12px', borderRadius: 8,
+            background: '#FFF8E1',
+            borderLeft: '3px solid #F9A825',
+            fontSize: 12, color: 'var(--md-on-surface, #1C1B1F)',
+            lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+            maxWidth: 500,
+          }}>
+            {entry.new_value}
+          </div>
+        )}
+
+        {/* Value change row (skip for creation and refinement) */}
+        {!isCreation && entry.field !== 'refinement' && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6,
             marginTop: 4, flexWrap: 'wrap',

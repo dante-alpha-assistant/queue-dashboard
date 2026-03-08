@@ -612,7 +612,16 @@ router.post("/tasks/:id/refine", async (req, res) => {
       .single();
     if (updateErr) throw updateErr;
 
-    // Log activity
+    // Log the refinement request (what the user asked for)
+    await supabase.from("task_activity_log").insert({
+      task_id: req.params.id,
+      field: "refinement",
+      old_value: null,
+      new_value: instructions.trim(),
+      changed_by: "dante",
+    });
+
+    // Log the description change (what actually changed — also captured by DB trigger)
     await supabase.from("task_activity_log").insert({
       task_id: req.params.id,
       field: "description",
