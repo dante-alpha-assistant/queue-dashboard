@@ -890,6 +890,36 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
             </select>
           </div>
         </div>
+
+        {/* Deploy target selector */}
+        <div style={{ borderTop: '1px solid var(--md-surface-variant, #E7E0EC)', paddingTop: 8, paddingBottom: 6, marginTop: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span className="tdm-meta-label">Deploy Target</span>
+            <select
+              className="tdm-stage-select"
+              value={task.deploy_target || "kubernetes"}
+              onChange={e => onStatusChange(task.id, { deploy_target: e.target.value })}
+              onClick={e => e.stopPropagation()}
+              style={{ color: ({ kubernetes: '#1565C0', vercel: '#000', none: '#79747E' })[task.deploy_target || 'kubernetes'] || '#79747E' }}
+            >
+              <option value="kubernetes">☸️ Kubernetes</option>
+              <option value="vercel">▲ Vercel</option>
+              <option value="none">— None</option>
+            </select>
+          </div>
+          {task.metadata?.deployment_url && (
+            <div style={{ marginTop: 6 }}>
+              <a
+                href={task.metadata.deployment_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontSize: 11, color: '#1565C0', wordBreak: 'break-all' }}
+              >
+                🔗 {task.metadata.deployment_url}
+              </a>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Pipeline stepper */}
