@@ -233,13 +233,15 @@ router.get("/events", async (req, res) => {
 // Merges PR (if present), triggers ArgoCD sync, waits for sync, updates status
 router.post("/deploy/:id", async (req, res) => {
   const GH_TOKEN = process.env.GH_TOKEN;
+  const VERCEL_TOKEN = process.env.VERCEL_TOKEN;
+  const VERCEL_TEAM_ID = process.env.VERCEL_TEAM_ID;
   const ARGOCD_URL = process.env.ARGOCD_URL || "http://argocd-server.argocd.svc.cluster.local";
   const ARGOCD_USERNAME = process.env.ARGOCD_USERNAME;
   const ARGOCD_PASSWORD = process.env.ARGOCD_PASSWORD;
   const ARGOCD_TOKEN_ENV = process.env.ARGOCD_TOKEN;
   const ARGOCD_APP = process.env.ARGOCD_APP || "dev";
-  const SYNC_TIMEOUT = 120_000; // 2 minutes
-  const SYNC_POLL_INTERVAL = 5_000; // 5 seconds
+  const SYNC_TIMEOUT = 120_000;
+  const SYNC_POLL_INTERVAL = 5_000;
 
   try {
     // 1. Fetch task and verify it's completed
@@ -256,15 +258,17 @@ router.post("/deploy/:id", async (req, res) => {
       return res.status(400).json({ ok: false, error: `Task status is '${task.status}', must be 'completed' to deploy` });
     }
 
-    // 2. Collect all PR references — from pull_request_url array + parsing result text
-    const prRefs = []; // [{repo, number}]
+    const deployTarget = task.deploy_target || "kubernetes";
+    console.log(`[DEPLOY] Task ${req.params.id} — deploy_target: ${deployTarget}`);
+
+    // 2. Collect all PR references
+    const prRefs = [];
     if (task.pull_request_url && Array.isArray(task.pull_request_url)) {
       for (const url of task.pull_request_url) {
         const m = url.match(/github\.com\/(.+?)\/pull\/(\d+)/);
         if (m) prRefs.push({ repo: m[1], number: parseInt(m[2]), url });
       }
     }
-    // Fall back to parsing result text if no structured PR refs
     if (prRefs.length === 0 && task.result) {
       const resultStr = typeof task.result === "string" ? task.result : JSON.stringify(task.result);
       const prMatch = resultStr.match(/PR\s*#(\d+)/i) || resultStr.match(/#(\d+)\s*merged/i);
@@ -273,35 +277,15 @@ router.post("/deploy/:id", async (req, res) => {
         let repoFullName = null;
         const repoMatch = resultStr.match(/(dante-alpha-assistant\/[\w-]+)/);
         if (repoMatch) repoFullName = repoMatch[1];
-        if (!repoFullName && task.repository_id) {
-          const { data: repo } = await supabase.from("agent_repositories").select("url").eq("id", task.repository_id).single();
-          if (repo?.url) { const rm = repo.url.match(/github\.com\/(.+?)(?:\.git)?$/); if (rm) repoFullName = rm[1]; }
-        }
-        if (!repoFullName && GH_TOKEN) {
-          try {
-            const searchResp = await fetch(`https://api.github.com/search/issues?q=is:pr+org:dante-alpha-assistant+${prNumber}+in:title`, {
-              headers: { Authorization: `token ${GH_TOKEN}`, Accept: "application/vnd.github.v3+json" },
-            });
-            if (searchResp.ok) {
-              const searchData = await searchResp.json();
-              const match = searchData.items?.find(i => i.number === prNumber);
-              if (match?.repository_url) repoFullName = match.repository_url.replace("https://api.github.com/repos/", "");
-            }
-          } catch {}
-        }
-        if (!repoFullName && task.project_id) {
-          const { data: repos } = await supabase.from("agent_repositories").select("url").eq("project_id", task.project_id).limit(1);
-          if (repos?.[0]?.url) { const rm = repos[0].url.match(/github\.com\/(.+?)(?:\.git)?$/); if (rm) repoFullName = rm[1]; }
-        }
         if (repoFullName) prRefs.push({ repo: repoFullName, number: prNumber });
       }
     }
 
-    // 3. Merge ALL PRs via GitHub API (squash merge, delete branch)
-    if (prRefs.length > 0 && !GH_TOKEN) {
-      return res.status(500).json({ ok: false, error: "GH_TOKEN not configured — cannot merge PRs. Ask an admin to add GH_TOKEN to the queue-dashboard deployment." });
-    }
+    // 3. Merge PRs (shared across all deploy targets)
     const mergedPRs = [];
+    if (prRefs.length > 0 && !GH_TOKEN) {
+      return res.status(500).json({ ok: false, error: "GH_TOKEN not configured — cannot merge PRs." });
+    }
     for (const pr of prRefs) {
       if (!GH_TOKEN) continue;
       const prResp = await fetch(`https://api.github.com/repos/${pr.repo}/pulls/${pr.number}`, {
@@ -311,9 +295,7 @@ router.post("/deploy/:id", async (req, res) => {
         return res.status(400).json({ ok: false, error: `Failed to fetch PR #${pr.number} on ${pr.repo}: ${prResp.status}` });
       }
       const prData = await prResp.json();
-
       if (prData.merged) {
-        console.log(`[DEPLOY] PR #${pr.number} on ${pr.repo} already merged`);
         mergedPRs.push(`#${pr.number} (${pr.repo}) — already merged`);
       } else if (prData.state === "closed") {
         return res.status(400).json({ ok: false, error: `PR #${pr.number} on ${pr.repo} is closed but not merged` });
@@ -327,95 +309,170 @@ router.post("/deploy/:id", async (req, res) => {
           const mergeErr = await mergeResp.json().catch(() => ({}));
           return res.status(400).json({ ok: false, error: `Merge failed on PR #${pr.number} (${pr.repo}): ${mergeErr.message || mergeResp.status}` });
         }
-        console.log(`[DEPLOY] Merged PR #${pr.number} on ${pr.repo} (squash)`);
         mergedPRs.push(`#${pr.number} (${pr.repo}) — merged`);
-        // Delete branch (best effort)
         if (prData.head?.ref) {
           try { await fetch(`https://api.github.com/repos/${pr.repo}/git/refs/heads/${prData.head.ref}`, { method: "DELETE", headers: { Authorization: `token ${GH_TOKEN}` } }); } catch {}
         }
       }
     }
 
-    // 4. Trigger ArgoCD sync
-    let argoToken = ARGOCD_TOKEN_ENV;
-    let syncTriggered = false;
+    // 4. Deploy based on target
+    let deployResult = {};
 
-    try {
-      if (!argoToken && ARGOCD_USERNAME && ARGOCD_PASSWORD) {
-        const sessResp = await fetch(`${ARGOCD_URL}/api/v1/session`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username: ARGOCD_USERNAME, password: ARGOCD_PASSWORD }),
+    if (deployTarget === "none") {
+      // No deployment needed — just mark as deployed
+      console.log(`[DEPLOY] Target is 'none' — skipping deployment, marking deployed`);
+      deployResult = { strategy: "none", message: "No deployment needed" };
+
+    } else if (deployTarget === "vercel") {
+      // Vercel deployment
+      console.log(`[DEPLOY] Target is 'vercel' — triggering Vercel deployment`);
+
+      if (!VERCEL_TOKEN) {
+        return res.status(500).json({ ok: false, error: "VERCEL_TOKEN not configured — cannot deploy to Vercel." });
+      }
+
+      // Determine the repo to deploy
+      const repoUrl = task.repository_url || (prRefs[0] ? `https://github.com/${prRefs[0].repo}` : null);
+      const repoFullName = repoUrl?.match(/github\.com\/(.+?)(?:\.git)?$/)?.[1];
+
+      if (!repoFullName) {
+        return res.status(400).json({ ok: false, error: "No repository URL found — cannot deploy to Vercel." });
+      }
+
+      const vercelHeaders = {
+        Authorization: `Bearer ${VERCEL_TOKEN}`,
+        "Content-Type": "application/json",
+      };
+      const teamParam = VERCEL_TEAM_ID ? `?teamId=${VERCEL_TEAM_ID}` : "";
+
+      // Check if project already exists in Vercel
+      const projectName = repoFullName.split("/")[1]; // e.g. "hello-world-site"
+      let vercelProject = null;
+
+      try {
+        const projResp = await fetch(`https://api.vercel.com/v9/projects/${projectName}${teamParam}`, {
+          headers: vercelHeaders,
         });
-        if (sessResp.ok) {
-          const sessData = await sessResp.json();
-          argoToken = sessData.token;
+        if (projResp.ok) {
+          vercelProject = await projResp.json();
+          console.log(`[DEPLOY] Found existing Vercel project: ${projectName}`);
         }
+      } catch {}
+
+      // If no project, import the repo
+      if (!vercelProject) {
+        console.log(`[DEPLOY] Creating new Vercel project for ${repoFullName}`);
+        const importResp = await fetch(`https://api.vercel.com/v10/projects${teamParam}`, {
+          method: "POST",
+          headers: vercelHeaders,
+          body: JSON.stringify({
+            name: projectName,
+            framework: null, // auto-detect
+            gitRepository: {
+              type: "github",
+              repo: repoFullName,
+            },
+          }),
+        });
+
+        if (!importResp.ok) {
+          const err = await importResp.json().catch(() => ({}));
+          return res.status(400).json({ ok: false, error: `Vercel project creation failed: ${err.error?.message || importResp.status}` });
+        }
+        vercelProject = await importResp.json();
+        console.log(`[DEPLOY] Created Vercel project: ${vercelProject.name}`);
+      }
+
+      // Trigger a new deployment
+      const deployResp = await fetch(`https://api.vercel.com/v13/deployments${teamParam}`, {
+        method: "POST",
+        headers: vercelHeaders,
+        body: JSON.stringify({
+          name: projectName,
+          project: vercelProject.id,
+          gitSource: {
+            type: "github",
+            org: repoFullName.split("/")[0],
+            repo: repoFullName.split("/")[1],
+            ref: "main",
+          },
+        }),
+      });
+
+      if (!deployResp.ok) {
+        const err = await deployResp.json().catch(() => ({}));
+        // If deployment fails, still mark as deployed if PRs were merged
+        console.warn(`[DEPLOY] Vercel deployment trigger failed: ${err.error?.message || deployResp.status}`);
+        deployResult = { strategy: "vercel", error: err.error?.message || `HTTP ${deployResp.status}` };
+      } else {
+        const deployment = await deployResp.json();
+        const deploymentUrl = deployment.url ? `https://${deployment.url}` : null;
+        console.log(`[DEPLOY] Vercel deployment triggered: ${deploymentUrl}`);
+        deployResult = {
+          strategy: "vercel",
+          deployment_url: deploymentUrl,
+          project_url: `https://vercel.com/${VERCEL_TEAM_ID || "~"}/${projectName}`,
+          project_name: projectName,
+        };
+      }
+
+    } else {
+      // Default: kubernetes (ArgoCD)
+      let argoToken = ARGOCD_TOKEN_ENV;
+      let syncTriggered = false;
+      let syncSucceeded = false;
+
+      try {
+        if (!argoToken && ARGOCD_USERNAME && ARGOCD_PASSWORD) {
+          const sessResp = await fetch(`${ARGOCD_URL}/api/v1/session`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: ARGOCD_USERNAME, password: ARGOCD_PASSWORD }),
+          });
+          if (sessResp.ok) {
+            argoToken = (await sessResp.json()).token;
+          }
+        }
+
+        if (argoToken) {
+          const syncResp = await fetch(`${ARGOCD_URL}/api/v1/applications/${ARGOCD_APP}/sync`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${argoToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ prune: false, strategy: { hook: {} } }),
+          });
+          syncTriggered = syncResp.ok;
+        }
+      } catch (e) {
+        console.warn(`[DEPLOY] ArgoCD sync trigger failed: ${e.message}`);
       }
 
       if (argoToken) {
-        const syncResp = await fetch(`${ARGOCD_URL}/api/v1/applications/${ARGOCD_APP}/sync`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${argoToken}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ prune: false, strategy: { hook: {} } }),
-        });
-        syncTriggered = syncResp.ok;
-        if (!syncResp.ok) {
-          console.warn(`[DEPLOY] ArgoCD sync trigger returned ${syncResp.status} — will still poll`);
-        }
-      }
-    } catch (e) {
-      console.warn(`[DEPLOY] ArgoCD sync trigger failed: ${e.message} — will still poll`);
-    }
-
-    // 5. Poll ArgoCD for sync success (timeout 2min)
-    let syncSucceeded = false;
-    if (argoToken) {
-      const startTime = Date.now();
-      while (Date.now() - startTime < SYNC_TIMEOUT) {
-        try {
-          const appResp = await fetch(`${ARGOCD_URL}/api/v1/applications/${ARGOCD_APP}`, {
-            headers: { Authorization: `Bearer ${argoToken}` },
-          });
-          if (appResp.ok) {
-            const app = await appResp.json();
-            const syncStatus = app?.status?.sync?.status;
-            const healthStatus = app?.status?.health?.status;
-            // Accept if: (Synced + any health) OR (any sync + Healthy)
-            // The key is that the app eventually converges; "Progressing" is fine
-            if (syncStatus === "Synced" || healthStatus === "Healthy") {
-              syncSucceeded = true;
-              break;
+        const startTime = Date.now();
+        while (Date.now() - startTime < SYNC_TIMEOUT) {
+          try {
+            const appResp = await fetch(`${ARGOCD_URL}/api/v1/applications/${ARGOCD_APP}`, {
+              headers: { Authorization: `Bearer ${argoToken}` },
+            });
+            if (appResp.ok) {
+              const app = await appResp.json();
+              if (app?.status?.sync?.status === "Synced" || app?.status?.health?.status === "Healthy") {
+                syncSucceeded = true;
+                break;
+              }
             }
-          }
-        } catch {}
-        await new Promise(r => setTimeout(r, SYNC_POLL_INTERVAL));
+          } catch {}
+          await new Promise(r => setTimeout(r, SYNC_POLL_INTERVAL));
+        }
+        if (!syncSucceeded) {
+          console.warn(`[DEPLOY] ArgoCD sync timed out — PR merged, marking deployed anyway`);
+        }
       }
 
-      if (!syncSucceeded) {
-        // PR is already merged — still mark as deployed but warn about sync
-        console.warn(`[DEPLOY] ArgoCD sync timed out for task ${req.params.id} — PR merged, marking deployed anyway`);
-      }
-    } else {
-      // No ArgoCD credentials — try kubectl rollout restart via K8s API (in-cluster)
-      console.log(`[DEPLOY] No ArgoCD credentials configured, attempting K8s rollout restart`);
-      const K8S_NAMESPACE = process.env.K8S_DEPLOY_NAMESPACE;
-      const K8S_DEPLOYMENT = process.env.K8S_DEPLOY_NAME;
-      if (K8S_NAMESPACE && K8S_DEPLOYMENT) {
-        try {
-          const { execSync } = await import("child_process");
-          execSync(`kubectl rollout restart deployment/${K8S_DEPLOYMENT} -n ${K8S_NAMESPACE}`, { timeout: 30000 });
-          console.log(`[DEPLOY] Rollout restart triggered for ${K8S_DEPLOYMENT} in ${K8S_NAMESPACE}`);
-        } catch (e) {
-          console.warn(`[DEPLOY] kubectl rollout restart failed: ${e.message}`);
-        }
-      } else {
-        console.log(`[DEPLOY] No K8S_DEPLOY_NAMESPACE/K8S_DEPLOY_NAME configured, skipping rollout restart`);
-      }
-      syncSucceeded = true;
+      deployResult = { strategy: "kubernetes", argocd_synced: syncSucceeded, sync_triggered: syncTriggered };
     }
 
-    // 6. Update task status to deployed
+    // 5. Update task status to deployed
     const { data: updated, error: updateErr } = await supabase
       .from("agent_tasks")
       .update({
@@ -434,9 +491,9 @@ router.post("/deploy/:id", async (req, res) => {
       ok: true,
       task: updated,
       details: {
+        deploy_target: deployTarget,
         prs_merged: mergedPRs,
-        argocd_synced: syncSucceeded,
-        sync_triggered: syncTriggered,
+        ...deployResult,
       },
     });
   } catch (e) {
