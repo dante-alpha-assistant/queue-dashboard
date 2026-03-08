@@ -35,6 +35,67 @@ agentsRouter.get("/discover", async (req, res) => {
   }
 });
 
+// Pod replicas for an agent (K8s)
+agentsRouter.get("/:name/replicas", async (req, res) => {
+  try {
+    const agentName = req.params.name;
+    const { execSync } = await import("child_process");
+    const kubectl = process.env.KUBECTL_PATH || "/tools/kubectl";
+    const namespace = process.env.K8S_NAMESPACE || "agents";
+
+    let pods = [];
+    try {
+      const raw = execSync(
+        `${kubectl} get pods -n ${namespace} -l app=${agentName} -o json`,
+        { timeout: 10000, encoding: "utf8" }
+      );
+      const parsed = JSON.parse(raw);
+      pods = (parsed.items || []).map((pod) => {
+        const containerStatuses = pod.status?.containerStatuses || [];
+        const mainContainer = containerStatuses[0] || {};
+        const startedAt = mainContainer.state?.running?.startedAt;
+        const ready = mainContainer.ready || false;
+        const restarts = mainContainer.restartCount || 0;
+
+        // Resource usage — try to get from resources requests/limits
+        const container = (pod.spec?.containers || [])[0] || {};
+        const resources = container.resources || {};
+
+        return {
+          name: pod.metadata?.name,
+          node: pod.spec?.nodeName,
+          status: pod.status?.phase,
+          ready,
+          restarts,
+          startedAt,
+          uptime: startedAt ? Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000) : null,
+          resources: {
+            requests: resources.requests || {},
+            limits: resources.limits || {},
+          },
+          image: container.image,
+        };
+      });
+    } catch (e) {
+      // kubectl failed — agent might not be K8s-deployed
+      pods = [];
+    }
+
+    // Also get current tasks for this agent
+    const { data: tasks } = await supabase
+      .from("agent_tasks")
+      .select("id, title, status, type, priority")
+      .eq("assigned_agent", agentName)
+      .in("status", ["in_progress", "assigned", "qa_testing"])
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    res.json({ agent: agentName, pods, activeTasks: tasks || [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Full card + recent tasks
 agentsRouter.get("/:name", async (req, res) => {
   try {
