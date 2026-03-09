@@ -1,4 +1,5 @@
 import SpeedLoader from "../components/SpeedLoader";
+import OrgChart from "../components/OrgChart";
 import { useState, useEffect, useCallback } from "react";
 
 const STATUS_COLORS = {
@@ -363,6 +364,7 @@ export default function Pingboard() {
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [replicas, setReplicas] = useState(null);
   const [replicasLoading, setReplicasLoading] = useState(false);
+  const [viewMode, setViewMode] = useState("grid");
 
   const fetchAgents = useCallback(async () => {
     try {
@@ -549,9 +551,29 @@ export default function Pingboard() {
               width: 240,
             }}
           />
+          <div style={{ display: "flex", borderRadius: 10, overflow: "hidden", border: "1px solid var(--md-surface-variant)" }}>
+            {[{ key: "grid", label: "⊞ Grid" }, { key: "orgchart", label: "⸬ Org Chart" }].map(v => (
+              <button
+                key={v.key}
+                onClick={() => setViewMode(v.key)}
+                style={{
+                  padding: "7px 14px", fontSize: 12, fontWeight: 600, border: "none",
+                  cursor: "pointer", fontFamily: "'Roboto', system-ui, sans-serif",
+                  background: viewMode === v.key ? "var(--md-primary)" : "var(--md-surface)",
+                  color: viewMode === v.key ? "var(--md-on-primary)" : "var(--md-on-surface-variant)",
+                  transition: "all 150ms",
+                }}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Main content: grid + detail panel */}
+        {viewMode === "orgchart" ? (
+          <OrgChart />
+        ) : (
         <div style={{ display: "flex", gap: 24 }}>
           {/* Agent grid */}
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -844,6 +866,7 @@ export default function Pingboard() {
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   );

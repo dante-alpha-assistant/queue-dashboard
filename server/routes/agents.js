@@ -20,6 +20,50 @@ agentsRouter.get("/", async (req, res) => {
   }
 });
 
+// Hierarchy tree — MUST be before /:name
+agentsRouter.get("/hierarchy", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("agent_cards")
+      .select("id, name, parent_agent, status, capabilities, current_load, avatar, emoji, description, role, tier, max_capacity, metrics")
+      .order("name");
+    if (error) throw error;
+
+    const agents = data || [];
+    const byId = {};
+    agents.forEach(a => { byId[a.id] = { ...a, children: [] }; });
+
+    const roots = [];
+    agents.forEach(a => {
+      if (a.parent_agent && byId[a.parent_agent]) {
+        byId[a.parent_agent].children.push(byId[a.id]);
+      } else {
+        roots.push(byId[a.id]);
+      }
+    });
+
+    if (roots.length === 1) {
+      res.json({ tree: roots[0] });
+    } else {
+      res.json({
+        tree: {
+          id: "_root",
+          name: "Organization",
+          role: "Virtual Root",
+          status: "online",
+          capabilities: [],
+          current_load: 0,
+          avatar: null,
+          emoji: "🏢",
+          children: roots,
+        },
+      });
+    }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // A2A discovery — MUST be before /:name
 agentsRouter.get("/discover", async (req, res) => {
   try {
