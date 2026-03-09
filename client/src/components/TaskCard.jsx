@@ -511,6 +511,14 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
           {task.paused && (
             <Badge label="⏸️ Paused" color="#E65100" bg="#E6510020" />
           )}
+          {task.metadata?.health_flags?.length > 0 && (
+            <Badge
+              label={`⚠️ ${task.metadata.health_flags.length} issue${task.metadata.health_flags.length > 1 ? "s" : ""}`}
+              color={task.metadata.health_flags.some(f => f.severity === "critical") ? "#D32F2F" : "#E65100"}
+              bg={task.metadata.health_flags.some(f => f.severity === "critical") ? "#D32F2F20" : "#E6510020"}
+              title={task.metadata.health_flags.map(f => f.message).join("\n")}
+            />
+          )}
           {task.status === "qa_testing" && (
             task.qa_agent && task.assigned_agent
               ? <Badge label={`🔍 QA: ${task.qa_agent}`} color="#2E7D32" bg="#2E7D3220" />
