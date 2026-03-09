@@ -15,4 +15,6 @@ jobs:
           node-version: 22
       - run: npm ci
       - run: npm test
-      - run: npm run build
+      - name: Build client
+        run: cd client && npm ci && npm run build
+        if: hashFiles('client/package.json') != ''
