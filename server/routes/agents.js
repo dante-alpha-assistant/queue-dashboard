@@ -45,6 +45,162 @@ agentsRouter.get("/live-status", async (req, res) => {
   }
 });
 
+// Pipeline stats — task flow between agents
+agentsRouter.get("/pipeline-stats", async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const since = new Date(Date.now() - days * 86400000).toISOString();
+
+    // Get completed/deployed tasks with timing data
+    const { data: tasks, error } = await supabase
+      .from("agent_tasks")
+      .select("id, title, status, type, priority, assigned_agent, qa_agent, created_at, started_at, completed_at, updated_at")
+      .gte("created_at", since)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+
+    // Get activity log for status transitions
+    const { data: activity } = await supabase
+      .from("task_activity_log")
+      .select("task_id, field, old_value, new_value, changed_at")
+      .eq("field", "status")
+      .gte("changed_at", since)
+      .order("changed_at", { ascending: true });
+
+    // Build per-task timeline from activity log
+    const taskTimelines = {};
+    for (const a of (activity || [])) {
+      if (!taskTimelines[a.task_id]) taskTimelines[a.task_id] = [];
+      taskTimelines[a.task_id].push(a);
+    }
+
+    // Compute stage durations
+    const stageDurations = { coding: [], qa: [], end_to_end: [] };
+    const agentStats = {}; // agent -> { coding_tasks, qa_tasks, avg_coding_time, avg_qa_time }
+
+    for (const t of (tasks || [])) {
+      const timeline = taskTimelines[t.id] || [];
+
+      // Find coding duration: in_progress -> qa_testing
+      const startCoding = timeline.find(a => a.new_value === "in_progress");
+      const startQa = timeline.find(a => a.new_value === "qa_testing");
+      const completed = timeline.find(a => a.new_value === "completed" || a.new_value === "deployed");
+
+      if (startCoding && startQa) {
+        const codingMs = new Date(startQa.changed_at) - new Date(startCoding.changed_at);
+        if (codingMs > 0) stageDurations.coding.push(codingMs);
+
+        // Track per-agent coding stats
+        if (t.assigned_agent) {
+          if (!agentStats[t.assigned_agent]) agentStats[t.assigned_agent] = { coding_tasks: 0, qa_tasks: 0, coding_times: [], qa_times: [] };
+          agentStats[t.assigned_agent].coding_tasks++;
+          agentStats[t.assigned_agent].coding_times.push(codingMs);
+        }
+      }
+
+      if (startQa && completed) {
+        const qaMs = new Date(completed.changed_at) - new Date(startQa.changed_at);
+        if (qaMs > 0) stageDurations.qa.push(qaMs);
+
+        // Track per-agent QA stats
+        if (t.qa_agent) {
+          if (!agentStats[t.qa_agent]) agentStats[t.qa_agent] = { coding_tasks: 0, qa_tasks: 0, coding_times: [], qa_times: [] };
+          agentStats[t.qa_agent].qa_tasks++;
+          agentStats[t.qa_agent].qa_times.push(qaMs);
+        }
+      }
+
+      if (startCoding && completed) {
+        const e2eMs = new Date(completed.changed_at) - new Date(startCoding.changed_at);
+        if (e2eMs > 0) stageDurations.end_to_end.push(e2eMs);
+      }
+    }
+
+    const avg = arr => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
+    const median = arr => {
+      if (!arr.length) return null;
+      const sorted = [...arr].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+    };
+
+    // Current pipeline state
+    const pipelineState = {
+      todo: (tasks || []).filter(t => t.status === "todo").length,
+      in_progress: (tasks || []).filter(t => t.status === "in_progress").length,
+      qa_testing: (tasks || []).filter(t => t.status === "qa_testing").length,
+      completed: (tasks || []).filter(t => t.status === "completed").length,
+      deployed: (tasks || []).filter(t => t.status === "deployed").length,
+      blocked: (tasks || []).filter(t => t.status === "blocked").length,
+      failed: (tasks || []).filter(t => t.status === "failed").length,
+    };
+
+    // Current tasks per stage (for live view)
+    const currentByStage = {
+      todo: (tasks || []).filter(t => t.status === "todo").slice(0, 10).map(t => ({ id: t.id, title: t.title, priority: t.priority, agent: t.assigned_agent })),
+      in_progress: (tasks || []).filter(t => t.status === "in_progress").map(t => ({ id: t.id, title: t.title, priority: t.priority, agent: t.assigned_agent })),
+      qa_testing: (tasks || []).filter(t => t.status === "qa_testing").map(t => ({ id: t.id, title: t.title, priority: t.priority, agent: t.assigned_agent, qa_agent: t.qa_agent })),
+      blocked: (tasks || []).filter(t => t.status === "blocked").map(t => ({ id: t.id, title: t.title, priority: t.priority, agent: t.assigned_agent })),
+    };
+
+    // Get agents with capacity info
+    const { data: agents } = await supabase
+      .from("agent_cards")
+      .select("id, name, capabilities, max_capacity, current_load, status")
+      .neq("status", "disabled");
+
+    // Identify bottlenecks
+    const bottlenecks = [];
+    const qaAgents = (agents || []).filter(a => (a.capabilities || []).includes("qa"));
+    const totalQaSlots = qaAgents.reduce((sum, a) => sum + (a.max_capacity || 1), 0);
+    if (pipelineState.qa_testing > totalQaSlots) {
+      bottlenecks.push({ stage: "qa_testing", severity: "high", message: `QA queue (${pipelineState.qa_testing}) exceeds capacity (${totalQaSlots} slots)` });
+    } else if (pipelineState.qa_testing > 0 && pipelineState.qa_testing >= totalQaSlots) {
+      bottlenecks.push({ stage: "qa_testing", severity: "medium", message: `QA queue at capacity (${pipelineState.qa_testing}/${totalQaSlots})` });
+    }
+    if (pipelineState.blocked > 2) {
+      bottlenecks.push({ stage: "blocked", severity: "high", message: `${pipelineState.blocked} tasks blocked` });
+    }
+    if (pipelineState.todo > 10) {
+      bottlenecks.push({ stage: "todo", severity: "medium", message: `${pipelineState.todo} tasks waiting in backlog` });
+    }
+
+    // Per-agent summary
+    const agentSummary = {};
+    for (const [agent, stats] of Object.entries(agentStats)) {
+      agentSummary[agent] = {
+        coding_tasks: stats.coding_tasks,
+        qa_tasks: stats.qa_tasks,
+        avg_coding_ms: avg(stats.coding_times),
+        avg_qa_ms: avg(stats.qa_times),
+      };
+    }
+
+    res.json({
+      period_days: days,
+      pipeline_state: pipelineState,
+      current_by_stage: currentByStage,
+      stage_durations: {
+        coding: { avg_ms: avg(stageDurations.coding), median_ms: median(stageDurations.coding), count: stageDurations.coding.length },
+        qa: { avg_ms: avg(stageDurations.qa), median_ms: median(stageDurations.qa), count: stageDurations.qa.length },
+        end_to_end: { avg_ms: avg(stageDurations.end_to_end), median_ms: median(stageDurations.end_to_end), count: stageDurations.end_to_end.length },
+      },
+      agent_summary: agentSummary,
+      bottlenecks,
+      agents: (agents || []).map(a => ({
+        id: a.id,
+        name: a.name,
+        capabilities: a.capabilities,
+        max_capacity: a.max_capacity,
+        current_load: a.current_load,
+        status: a.status,
+      })),
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // A2A discovery — MUST be before /:name
 agentsRouter.get("/discover", async (req, res) => {
   try {
