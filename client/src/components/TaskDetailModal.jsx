@@ -34,6 +34,7 @@ const STATUS_CONFIG = {
   qa_testing:  { bg: "#5E35B114", color: "#5E35B1", label: "QA Testing",  accent: "#5E35B1" },
   completed:   { bg: "#1B5E2014", color: "#1B5E20", label: "Completed",   accent: "#1B5E20" },
   failed:      { bg: "#BA1A1A14", color: "#BA1A1A", label: "Failed",      accent: "#BA1A1A" },
+  blocked:     { bg: "#E6510014", color: "#E65100", label: "Blocked",     accent: "#E65100" },
   deployed:    { bg: "#00838F14", color: "#00838F", label: "Deployed",    accent: "#00838F" },
   deprecated:  { bg: "#9E9E9E14", color: "#9E9E9E", label: "Deprecated",  accent: "#9E9E9E" },
 };
@@ -67,7 +68,7 @@ const ACTIVE_STATUSES = new Set(["in_progress", "running", "qa_testing", "comple
 const HAS_MARKDOWN = /[#*`\[|]/;
 
 const TIMELINE_STEPS = [
-  { key: 'created', label: 'Created', statuses: ['todo', 'in_progress', 'running', 'completed', 'failed', 'qa', 'qa_testing', 'deploying', 'deployed', 'deploy_failed'] },
+  { key: 'created', label: 'Created', statuses: ['todo', 'blocked', 'in_progress', 'running', 'completed', 'failed', 'qa', 'qa_testing', 'deploying', 'deployed', 'deploy_failed'] },
   { key: 'assigned', label: 'Assigned', statuses: [ 'in_progress', 'running', 'completed', 'failed', 'qa', 'qa_testing', 'deploying', 'deployed', 'deploy_failed'] },
   { key: 'in_progress', label: 'Working', statuses: ['in_progress', 'running', 'completed', 'failed', 'qa', 'qa_testing', 'deploying', 'deployed', 'deploy_failed'] },
   { key: 'qa_testing', label: 'QA Testing', statuses: ['qa_testing', 'completed', 'failed', 'deploying', 'deployed', 'deploy_failed'] },
@@ -1037,6 +1038,32 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
     <div>
       {activeTab === 'details' && (
         <>
+          {task.status === 'blocked' && task.blocked_reason && (
+            <div style={{
+              marginBottom: 16, padding: '12px 16px', borderRadius: 10,
+              background: '#E6510012', border: '1px solid #E6510030',
+              display: 'flex', alignItems: 'flex-start', gap: 10,
+            }}>
+              <span style={{ fontSize: 18, flexShrink: 0, lineHeight: 1.2 }}>🚫</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#E65100', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Blocked</div>
+                <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--md-on-surface, #1C1B1F)' }}>{task.blocked_reason}</div>
+              </div>
+            </div>
+          )}
+          {hasError && (
+            <div style={{
+              marginBottom: 16, padding: '12px 16px', borderRadius: 10,
+              background: '#BA1A1A0A', border: '1px solid #BA1A1A25',
+              display: 'flex', alignItems: 'flex-start', gap: 10,
+            }}>
+              <span style={{ fontSize: 18, flexShrink: 0, lineHeight: 1.2 }}>❌</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#BA1A1A', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Error</div>
+                <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--md-on-surface, #1C1B1F)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{task.error}</div>
+              </div>
+            </div>
+          )}
           {hasDescription && (
             <div style={{ marginBottom: 16 }}>
               <SectionLabel icon="📝" collapsible collapsed={collapsedSections.desc} onToggle={() => toggleSection('desc')}>Description</SectionLabel>
