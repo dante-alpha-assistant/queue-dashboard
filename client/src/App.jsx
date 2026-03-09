@@ -499,9 +499,6 @@ export default function App() {
         </Column>
         <Column title="QA Testing" color="#7B5EA7" count={filterByType(qa).length} agentCount={countActiveTasks(filterByType(qa))} isTablet={isTablet}
           collapsible collapsed={!!collapsedCols.qa_testing} onToggleCollapse={() => toggleCollapse("qa_testing")}>
-          {renderCards(filterByType(qa).slice(0, 30))}
-        </Column>
-        <Column title="QA Testing" color="#7B5EA7" count={filterByType(qa).length} isTablet={isTablet}>
           {renderCards(filterByType(qa).sort((a, b) => {
             const aAssigned = !!a.assigned_agent;
             const bAssigned = !!b.assigned_agent;
@@ -514,7 +511,7 @@ export default function App() {
           collapsible collapsed={!!collapsedCols.completed} onToggleCollapse={() => toggleCollapse("completed")}>
           {renderCards(filterByType(completed).slice(0, 20))}
         </Column>
-        <Column title="Deploying" titleIcon={Clock} color="#E65100" count={filterByType(deploying).length} isTablet={isTablet}
+        <Column title="Deploying" color="#E65100" count={filterByType(deploying).length} isTablet={isTablet}
           collapsible collapsed={!!collapsedCols.deploying} onToggleCollapse={() => toggleCollapse("deploying")}>
           {renderCards(filterByType(deploying))}
         </Column>

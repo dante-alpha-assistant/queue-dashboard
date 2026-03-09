@@ -1,4 +1,17 @@
-import { User } from 'lucide-react';
+import { StatusIcon } from './Icons';
+
+const TITLE_TO_STATUS = {
+  "Todo": "todo",
+  "In Progress": "in_progress",
+  "Blocked": "blocked",
+  "QA Testing": "qa_testing",
+  "Completed": "completed",
+  "Deployed": "deployed",
+  "Deploying": "deploying",
+  "Deploy Failed": "deploy_failed",
+  "Failed": "failed",
+};
+
 export default function Column({ title, color, count, agentCount, children, isTablet, collapsible, collapsed, onToggleCollapse, headerAction }) {
   if (collapsible && collapsed) {
     return (
@@ -21,7 +34,7 @@ export default function Column({ title, color, count, agentCount, children, isTa
         }}
         title={`${title} — click to expand`}
       >
-        <div style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
+        <StatusIcon status={TITLE_TO_STATUS[title] || "todo"} size={16} color={color} />
         <span style={{
           writingMode: "vertical-rl",
           textOrientation: "mixed",
@@ -48,7 +61,8 @@ export default function Column({ title, color, count, agentCount, children, isTa
             fontSize: 11,
             fontWeight: 700,
             flexShrink: 0,
-          }}><User size={14} />{agentCount}</span>
+          display: "inline-flex", alignItems: "center", gap: 2,
+          }}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>{agentCount}</span>
         )}
       </div>
     );
@@ -70,7 +84,7 @@ export default function Column({ title, color, count, agentCount, children, isTa
         cursor: collapsible ? "pointer" : "default",
       }} onClick={collapsible ? onToggleCollapse : undefined}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
+          <StatusIcon status={TITLE_TO_STATUS[title] || "todo"} size={16} color={color} />
           <span style={{ fontWeight: 600, fontSize: 13, color: "var(--md-on-background)" }}>{title}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -86,7 +100,8 @@ export default function Column({ title, color, count, agentCount, children, isTa
               borderRadius: 10,
               fontSize: 11,
               fontWeight: 700,
-            }} title={`${agentCount} active task${agentCount !== 1 ? 's' : ''}`}><User size={14} />{agentCount}</span>
+            display: "inline-flex", alignItems: "center", gap: 2,
+            }} title={`${agentCount} active task${agentCount !== 1 ? 's' : ''}`}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>{agentCount}</span>
           )}
           {headerAction}
           {collapsible && (
