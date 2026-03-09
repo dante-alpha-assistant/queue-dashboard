@@ -170,6 +170,76 @@ agentsRouter.get("/:name/replicas", async (req, res) => {
   }
 });
 
+// Agent stats — tasks completed, success rate, avg duration, recent history
+agentsRouter.get("/:name/stats", async (req, res) => {
+  try {
+    const agentName = req.params.name;
+
+    // All completed/failed tasks for this agent
+    const { data: allTasks, error: allErr } = await supabase
+      .from("agent_tasks")
+      .select("id, status, completed_at, created_at, assigned_at")
+      .eq("assigned_agent", agentName)
+      .in("status", ["completed", "failed", "deployed"])
+      .order("completed_at", { ascending: false });
+    if (allErr) throw allErr;
+
+    const completed = (allTasks || []).filter(t => t.status === "completed" || t.status === "deployed");
+    const failed = (allTasks || []).filter(t => t.status === "failed");
+    const total = completed.length + failed.length;
+    const successRate = total > 0 ? completed.length / total : null;
+
+    // Last 7 days
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+    const completedLast7 = completed.filter(t => t.completed_at && t.completed_at >= sevenDaysAgo).length;
+
+    // Average task duration (from assigned_at or created_at to completed_at)
+    const durations = completed
+      .filter(t => t.completed_at && (t.assigned_at || t.created_at))
+      .map(t => {
+        const start = new Date(t.assigned_at || t.created_at).getTime();
+        const end = new Date(t.completed_at).getTime();
+        return (end - start) / 1000; // seconds
+      })
+      .filter(d => d > 0 && d < 7 * 86400); // filter outliers >7 days
+    const avgDuration = durations.length > 0
+      ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
+      : null;
+
+    // Recent history: last 10 completed/failed
+    const { data: recentTasks } = await supabase
+      .from("agent_tasks")
+      .select("id, title, status, type, completed_at, created_at")
+      .eq("assigned_agent", agentName)
+      .in("status", ["completed", "failed", "deployed"])
+      .order("completed_at", { ascending: false })
+      .limit(10);
+
+    // Current work: in_progress + qa_testing
+    const { data: currentWork } = await supabase
+      .from("agent_tasks")
+      .select("id, title, status, type, priority, created_at, pull_request_url")
+      .eq("assigned_agent", agentName)
+      .in("status", ["in_progress", "assigned", "qa_testing"])
+      .order("created_at", { ascending: false });
+
+    res.json({
+      agent: agentName,
+      stats: {
+        completed_all_time: completed.length,
+        completed_last_7_days: completedLast7,
+        failed_all_time: failed.length,
+        success_rate: successRate,
+        avg_duration_seconds: avgDuration,
+      },
+      current_work: currentWork || [],
+      recent_history: recentTasks || [],
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Full card + recent tasks
 agentsRouter.get("/:name", async (req, res) => {
   try {
