@@ -487,10 +487,12 @@ router.post("/deploy/:id", async (req, res) => {
     }
 
     // 5. Update task status to deployed
+    const deploymentUrl = deployResult.deployment_url || null;
     const { data: updated, error: updateErr } = await supabase
       .from("agent_tasks")
       .update({
         status: "deployed",
+        deployment_url: deploymentUrl,
         updated_at: new Date().toISOString(),
       })
       .eq("id", req.params.id)
