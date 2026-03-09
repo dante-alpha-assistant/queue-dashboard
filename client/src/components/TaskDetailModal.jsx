@@ -65,10 +65,11 @@ const STAGE_COLORS = {
 const STAGES = ["refinery", "foundry", "builder", "inspector", "deployer"];
 const STAGE_LABELS = { refinery: "Refine", foundry: "Found", builder: "Build", inspector: "Inspect", deployer: "Deploy" };
 
-const DEPLOY_TARGETS = ["kubernetes", "vercel", "none"];
+const DEPLOY_TARGETS = ["kubernetes", "vercel", "railway", "none"];
 const DEPLOY_TARGET_CONFIG = {
   kubernetes: { icon: "☸️", color: "#326CE5", label: "Kubernetes" },
   vercel: { icon: "▲", color: "#000000", label: "Vercel" },
+  railway: { icon: "🚂", color: "#7B3FE4", label: "Railway" },
   none: { icon: "⏭️", color: "#79747E", label: "None" },
 };
 const ACTIVE_STATUSES = new Set(["in_progress", "running", "qa_testing", "completed"]);
@@ -85,6 +86,7 @@ const ERROR_SUGGESTIONS = [
   { pattern: /qa rejected/i, suggestion: "QA found issues with this task. Review the QA result, then click Actions → Retry to re-assign." },
   { pattern: /at capacity/i, suggestion: "All agent replicas are busy. Wait for a task to complete, or scale up replicas in gitops." },
   { pattern: /no available agent/i, suggestion: "No agents are available to handle this task. Check agent status on the Pingboard, or wait for an agent to free up." },
+  { pattern: /deploy failed.*railway/i, suggestion: "Check Railway dashboard for deploy logs, ensure RAILWAY_TOKEN is configured, then retry." },
   { pattern: /deploy failed.*vercel/i, suggestion: "Install the Vercel GitHub integration at vercel.com/integrations/github, then retry the deploy." },
   { pattern: /deploy failed/i, suggestion: "The deployment failed. Check the deploy logs for details, then click Actions → Retry." },
   { pattern: /merge conflict/i, suggestion: "The PR has merge conflicts. Click Actions → Rebase PR to attempt an automatic rebase, or resolve conflicts manually." },
@@ -1451,6 +1453,22 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
                   <a href={`https://vercel.com/~/projects/${task.result.project_name}/deployments`} target="_blank" rel="noopener noreferrer" style={{ color: '#6750A4', textDecoration: 'none', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span>📋</span> Deployment History
                   </a>
+                )}
+              </div>
+            )}
+
+            {/* Railway-specific info */}
+            {task.deploy_target === 'railway' && (
+              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {task.result?.project_url && (
+                  <a href={task.result.project_url} target="_blank" rel="noopener noreferrer" style={{ color: '#6750A4', textDecoration: 'none', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>📊</span> Railway Project Dashboard
+                  </a>
+                )}
+                {task.result?.project_name && (
+                  <span style={{ fontSize: 12, color: 'var(--md-on-surface-variant, #49454F)' }}>
+                    🚂 Project: {task.result.project_name}
+                  </span>
                 )}
               </div>
             )}

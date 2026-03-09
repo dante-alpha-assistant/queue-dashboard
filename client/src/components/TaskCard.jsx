@@ -184,6 +184,7 @@ function Badge({ label, color, bg, style: extraStyle }) {
 const DEPLOY_TARGET_OPTIONS = [
   { value: "kubernetes", label: "Kubernetes", icon: "☸️" },
   { value: "vercel", label: "Vercel", icon: "▲" },
+  { value: "railway", label: "Railway", icon: "🚂" },
   { value: "none", label: "None (merge only)", icon: "🔀" },
 ];
 
