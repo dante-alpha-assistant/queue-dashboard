@@ -875,10 +875,10 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const hasCosts = !!task.metadata?.costs && typeof task.metadata.costs === 'object' && Object.keys(task.metadata.costs).length > 0;
 
   const tabs = [{ key: 'details', label: 'Details' }];
-  tabs.push({ key: 'comments', label: '💬 Comments' });
+  tabs.push({ key: 'comments', label: 'Comments' });
   tabs.push({ key: 'activity', label: 'Activity' });
-  if (hasDeployment) tabs.push({ key: 'deployment', label: '🚀 Deployment' });
-  if (hasCosts) tabs.push({ key: 'costs', label: '💰 Costs' });
+  if (hasDeployment) tabs.push({ key: 'deployment', label: 'Deployment' });
+  if (hasCosts) tabs.push({ key: 'costs', label: 'Costs' });
   tabs.push({ key: 'metadata', label: 'Metadata' });
   if (hasQA) tabs.push({ key: 'qa', label: 'QA' });
   if (hasMetadata) tabs.push({ key: 'meta', label: 'Meta' });
