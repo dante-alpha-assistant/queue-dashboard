@@ -213,6 +213,50 @@ agentsRouter.get("/discover", async (req, res) => {
     res.json(data);
   } catch (e) {
     res.status(500).json({ error: e.message });
+
+// Hierarchy tree for org chart (Pingboard)
+agentsRouter.get("/hierarchy", async (_req, res) => {
+  try {
+    const { data: agents, error } = await supabase
+      .from("agent_cards")
+      .select("id, name, status, capabilities, tier, role, parent_agent, avatar, current_load, max_capacity, last_heartbeat, metadata, emoji")
+      .order("name");
+    if (error) throw error;
+
+    // Build Dante (human) as root node
+    const dante = {
+      id: "dante",
+      name: "Dante",
+      tier: "owner",
+      role: "Owner / CEO",
+      status: "online",
+      avatar: null,
+      is_human: true,
+      children: [],
+    };
+
+    // Index agents by id
+    const byId = {};
+    for (const a of agents) {
+      byId[a.id] = { ...a, children: [] };
+    }
+
+    // Build tree: agents with no parent_agent report to Dante
+    for (const a of agents) {
+      const node = byId[a.id];
+      if (a.parent_agent && byId[a.parent_agent]) {
+        byId[a.parent_agent].children.push(node);
+      } else {
+        // Top-level agent reports to Dante
+        dante.children.push(node);
+      }
+    }
+
+    res.json(dante);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
   }
 });
 
@@ -374,7 +418,7 @@ agentsRouter.get("/:name", async (req, res) => {
 // Update allowed fields only
 agentsRouter.patch("/:name", async (req, res) => {
   try {
-    const allowed = ["status", "current_load", "current_tasks", "last_heartbeat", "metrics", "metadata", "max_capacity", "description", "disabled_at", "disabled_by"];
+    const allowed = ["status", "current_load", "current_tasks", "last_heartbeat", "metrics", "metadata", "max_capacity", "description", "disabled_at", "disabled_by", "parent_agent", "tier", "role", "avatar"];
     const updates = { updated_at: new Date().toISOString() };
     for (const key of allowed) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
