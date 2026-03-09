@@ -6,6 +6,7 @@ import { router } from "./routes/tasks.js";
 import { chatRouter } from "./routes/chat.js";
 import { neoChatRouter } from "./routes/neo-chat.js";
 import { agentsRouter } from "./routes/agents.js";
+import { healthRouter } from "./routes/health.js";
 
 const app = express();
 app.use(cors());
@@ -14,6 +15,7 @@ app.use("/api", router);
 app.use("/api/chat", chatRouter);
 app.use("/api/neo-chat", neoChatRouter);
 app.use("/api/agents", agentsRouter);
+app.use("/api/health", healthRouter);
 
 // Serve static frontend in production
 import { serveStatic } from "./static.js";
