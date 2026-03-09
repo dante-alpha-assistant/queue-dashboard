@@ -1,5 +1,6 @@
 import SpeedLoader from "../components/SpeedLoader";
-import { useState, useEffect, useCallback, useRef } from "react";
+import AgentDetailPanel from "../components/AgentDetailPanel";
+import { useState, useEffect, useCallback } from "react";
 
 const STATUS_COLORS = {
   online: "#2E7D32",
@@ -332,7 +333,7 @@ function VerticalConnector({ height = 32, color = "var(--md-surface-variant)", d
 }
 
 /* ─── Org Chart Tree View ─── */
-function OrgChartTree({ agents, allReplicas, loading: replicasLoading }) {
+function OrgChartTree({ agents, allReplicas, loading: replicasLoading, onAgentClick }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
@@ -378,11 +379,21 @@ function OrgChartTree({ agents, allReplicas, loading: replicasLoading }) {
 
   function renderCard(agent) {
     const type = getCardType(agent);
-    switch (type) {
-      case "human": return <HumanCard agent={agent} replicas={allReplicas[agent.id || agent.name]} />;
-      case "manager": return <ManagerCard agent={agent} replicas={allReplicas[agent.id || agent.name]} />;
-      default: return <WorkerCard agent={agent} />;
-    }
+    const card = (() => {
+      switch (type) {
+        case "human": return <HumanCard agent={agent} replicas={allReplicas[agent.id || agent.name]} />;
+        case "manager": return <ManagerCard agent={agent} replicas={allReplicas[agent.id || agent.name]} />;
+        default: return <WorkerCard agent={agent} />;
+      }
+    })();
+    return (
+      <div
+        onClick={() => onAgentClick && onAgentClick(agent)}
+        style={{ cursor: "pointer" }}
+      >
+        {card}
+      </div>
+    );
   }
 
   // Sort roots: human first, then managers, then workers
@@ -545,133 +556,6 @@ function OrgChartTree({ agents, allReplicas, loading: replicasLoading }) {
   );
 }
 
-function ReplicaCard({ pod, activeTasks }) {
-  const podTasks = activeTasks || [];
-  const statusColor = pod.ready ? "#2E7D32" : pod.status === "Running" ? "#E65100" : "#BA1A1A";
-
-  return (
-    <div
-      style={{
-        background: "var(--md-surface)",
-        borderRadius: 12,
-        padding: 14,
-        border: "1px solid var(--md-surface-variant)",
-        transition: "all 150ms",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: "50%",
-            background: `${statusColor}15`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 16,
-          }}
-        >
-          {pod.ready ? "✅" : "⚠️"}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: "var(--md-on-background)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-            title={pod.name}
-          >
-            {pod.name}
-          </div>
-          <div style={{ fontSize: 11, color: "var(--md-on-surface-variant)" }}>
-            {pod.ready ? "Ready" : pod.status || "Unknown"}
-            {pod.restarts > 0 && ` · ${pod.restarts} restart${pod.restarts !== 1 ? "s" : ""}`}
-          </div>
-        </div>
-      </div>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "8px 16px",
-          fontSize: 12,
-          color: "var(--md-on-surface-variant)",
-        }}
-      >
-        <div>
-          <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2, opacity: 0.7 }}>
-            Uptime
-          </div>
-          <div style={{ fontWeight: 500, color: "var(--md-on-background)" }}>
-            {formatUptime(pod.uptime)}
-          </div>
-        </div>
-        <div>
-          <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2, opacity: 0.7 }}>
-            Node
-          </div>
-          <div style={{ fontWeight: 500, color: "var(--md-on-background)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={pod.node}>
-            {pod.node || "—"}
-          </div>
-        </div>
-        {(pod.resources?.requests?.cpu || pod.resources?.limits?.cpu) && (
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2, opacity: 0.7 }}>
-              CPU
-            </div>
-            <div style={{ fontWeight: 500, color: "var(--md-on-background)" }}>
-              {pod.resources.requests?.cpu || "—"} / {pod.resources.limits?.cpu || "—"}
-            </div>
-          </div>
-        )}
-        {(pod.resources?.requests?.memory || pod.resources?.limits?.memory) && (
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2, opacity: 0.7 }}>
-              Memory
-            </div>
-            <div style={{ fontWeight: 500, color: "var(--md-on-background)" }}>
-              {pod.resources.requests?.memory || "—"} / {pod.resources.limits?.memory || "—"}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {podTasks.length > 0 && (
-        <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--md-surface-variant)" }}>
-          <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6, opacity: 0.7, color: "var(--md-on-surface-variant)" }}>
-            Active Tasks
-          </div>
-          {podTasks.map((t) => (
-            <div
-              key={t.id}
-              style={{
-                fontSize: 12,
-                padding: "4px 8px",
-                borderRadius: 6,
-                background: "var(--md-surface-container)",
-                marginBottom: 4,
-                color: "var(--md-on-background)",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-              title={t.title}
-            >
-              <span style={{ opacity: 0.6 }}>{t.type || "task"}</span> · {t.title}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function AgentTile({ agent, isSelected, onClick }) {
   const caps = Array.isArray(agent.capabilities) ? agent.capabilities : [];
   const load = agent.current_load || 0;
@@ -771,8 +655,6 @@ export default function Pingboard() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [selectedAgent, setSelectedAgent] = useState(null);
-  const [replicas, setReplicas] = useState(null);
-  const [replicasLoading, setReplicasLoading] = useState(false);
   const [viewMode, setViewMode] = useState("orgchart"); // default to org chart
   const [allReplicas, setAllReplicas] = useState({});
   const [allReplicasLoading, setAllReplicasLoading] = useState(false);
@@ -792,22 +674,6 @@ export default function Pingboard() {
       setLoading(false);
     }
   }, [statusFilter]);
-
-  const fetchReplicas = useCallback(async (agentName) => {
-    setReplicasLoading(true);
-    try {
-      const res = await fetch(`/api/agents/${agentName}/replicas`);
-      if (res.ok) {
-        const data = await res.json();
-        setReplicas(data);
-      }
-    } catch (e) {
-      console.error("Failed to fetch replicas:", e);
-      setReplicas({ agent: agentName, pods: [], activeTasks: [] });
-    } finally {
-      setReplicasLoading(false);
-    }
-  }, []);
 
   const fetchAllReplicas = useCallback(async () => {
     setAllReplicasLoading(true);
@@ -837,16 +703,6 @@ export default function Pingboard() {
       return () => clearInterval(interval);
     }
   }, [viewMode, fetchAllReplicas]);
-
-  useEffect(() => {
-    if (selectedAgent && viewMode === "grid") {
-      fetchReplicas(selectedAgent.name || selectedAgent.id);
-      const interval = setInterval(() => fetchReplicas(selectedAgent.name || selectedAgent.id), 15000);
-      return () => clearInterval(interval);
-    } else {
-      setReplicas(null);
-    }
-  }, [selectedAgent, fetchReplicas, viewMode]);
 
   const filtered = agents.filter((a) => {
     if (search) {
@@ -995,13 +851,18 @@ export default function Pingboard() {
         </div>
 
         {/* View content */}
-        {viewMode === "orgchart" ? (
-          <OrgChartTree agents={filtered} allReplicas={allReplicas} loading={allReplicasLoading} />
-        ) : (
-          /* Grid view (existing) */
-          <div style={{ display: "flex", gap: 24 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {filtered.length === 0 ? (
+        <div style={{ display: "flex", gap: 24 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {viewMode === "orgchart" ? (
+              <OrgChartTree
+                agents={filtered}
+                allReplicas={allReplicas}
+                loading={allReplicasLoading}
+                onAgentClick={handleSelectAgent}
+              />
+            ) : (
+              /* Grid view */
+              filtered.length === 0 ? (
                 <div style={{ textAlign: "center", color: "var(--md-on-surface-variant)", padding: 60, fontSize: 14 }}>
                   No agents found
                 </div>
@@ -1025,168 +886,18 @@ export default function Pingboard() {
                     />
                   ))}
                 </div>
-              )}
-            </div>
-
-            {/* Detail / Replicas panel */}
-            {selectedAgent && (
-              <div
-                style={{
-                  width: 420,
-                  flexShrink: 0,
-                  background: "var(--md-surface-container)",
-                  borderRadius: 16,
-                  border: "1px solid var(--md-surface-variant)",
-                  padding: 20,
-                  alignSelf: "flex-start",
-                  position: "sticky",
-                  top: 66,
-                  maxHeight: "calc(100vh - 90px)",
-                  overflowY: "auto",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
-                  <AgentAvatar agent={selectedAgent} size={48} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: 16, color: "var(--md-on-background)" }}>
-                      {selectedAgent.name}
-                    </div>
-                    <div style={{ fontSize: 12, color: STATUS_COLORS[selectedAgent.status], fontWeight: 600 }}>
-                      {STATUS_LABELS[selectedAgent.status] || selectedAgent.status}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setSelectedAgent(null)}
-                    style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--md-on-surface-variant)", padding: 4 }}
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                {selectedAgent.role && (
-                  <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)", fontWeight: 500, marginBottom: 4 }}>
-                    {selectedAgent.role}
-                  </div>
-                )}
-                {selectedAgent.description && (
-                  <div style={{ fontSize: 13, color: "var(--md-on-surface-variant)", marginBottom: 16, lineHeight: 1.5 }}>
-                    {selectedAgent.description}
-                  </div>
-                )}
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "12px 20px",
-                    marginBottom: 16,
-                    paddingBottom: 16,
-                    borderBottom: "1px solid var(--md-surface-variant)",
-                  }}
-                >
-                  {selectedAgent.tier && (
-                    <div>
-                      <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--md-on-surface-variant)", opacity: 0.7, marginBottom: 4 }}>
-                        Tier
-                      </div>
-                      <span
-                        style={{
-                          fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 8,
-                          background: selectedAgent.tier === "core" ? "rgba(46,125,50,0.1)" : selectedAgent.tier === "specialist" ? "rgba(230,81,0,0.1)" : "rgba(121,116,126,0.1)",
-                          color: selectedAgent.tier === "core" ? "#2E7D32" : selectedAgent.tier === "specialist" ? "#E65100" : "#79747E",
-                          textTransform: "uppercase",
-                        }}
-                      >
-                        {selectedAgent.tier}
-                      </span>
-                    </div>
-                  )}
-                  {selectedAgent.max_capacity != null && (
-                    <div>
-                      <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--md-on-surface-variant)", opacity: 0.7, marginBottom: 4 }}>
-                        Capacity
-                      </div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--md-on-background)" }}>
-                        {selectedAgent.current_load || 0} / {selectedAgent.max_capacity}
-                      </div>
-                    </div>
-                  )}
-                  {selectedAgent.parent_agent && (
-                    <div>
-                      <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--md-on-surface-variant)", opacity: 0.7, marginBottom: 4 }}>
-                        Parent
-                      </div>
-                      <div style={{ fontSize: 13, color: "var(--md-on-background)" }}>
-                        {selectedAgent.parent_agent}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {Array.isArray(selectedAgent.capabilities) && selectedAgent.capabilities.length > 0 && (
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--md-on-surface-variant)", opacity: 0.7, marginBottom: 6 }}>
-                      Capabilities
-                    </div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                      {selectedAgent.capabilities.map((c, i) => (
-                        <span key={i} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 8, background: "var(--md-surface-variant)", color: "var(--md-on-surface-variant)", fontWeight: 500 }}>
-                          {c}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--md-on-surface-variant)", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
-                    <span>Pod Replicas</span>
-                    {replicas && (
-                      <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: "var(--md-primary-container)", color: "var(--md-on-primary-container)" }}>
-                        {replicas.pods.length}
-                      </span>
-                    )}
-                  </div>
-
-                  {replicasLoading && !replicas ? (
-                    <div style={{ textAlign: "center", padding: 20, color: "var(--md-on-surface-variant)", fontSize: 13 }}>
-                      Loading replicas...
-                    </div>
-                  ) : replicas && replicas.pods.length > 0 ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                      {replicas.pods.map((pod) => (
-                        <ReplicaCard key={pod.name} pod={pod} activeTasks={replicas.activeTasks} />
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{ textAlign: "center", padding: 20, color: "var(--md-on-surface-variant)", fontSize: 13, background: "var(--md-surface)", borderRadius: 12, border: "1px dashed var(--md-surface-variant)" }}>
-                      No K8s pods found for this agent.
-                      <br />
-                      <span style={{ fontSize: 11, opacity: 0.7 }}>Agent may not be K8s-deployed.</span>
-                    </div>
-                  )}
-                </div>
-
-                {selectedAgent.metrics &&
-                  (selectedAgent.metrics.success_rate != null || selectedAgent.metrics.avg_completion_time != null) && (
-                    <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--md-surface-variant)" }}>
-                      <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--md-on-surface-variant)", opacity: 0.7, marginBottom: 6 }}>
-                        Performance
-                      </div>
-                      <div style={{ display: "flex", gap: 16, fontSize: 13 }}>
-                        {selectedAgent.metrics.success_rate != null && (
-                          <span>✅ {Math.round(selectedAgent.metrics.success_rate * 100)}% success</span>
-                        )}
-                        {selectedAgent.metrics.avg_completion_time != null && (
-                          <span>⏱ {selectedAgent.metrics.avg_completion_time}s avg</span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-              </div>
+              )
             )}
           </div>
-        )}
+
+          {/* Agent Detail Panel */}
+          {selectedAgent && (
+            <AgentDetailPanel
+              agent={selectedAgent}
+              onClose={() => setSelectedAgent(null)}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
