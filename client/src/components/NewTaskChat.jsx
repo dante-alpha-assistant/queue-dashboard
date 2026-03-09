@@ -308,6 +308,7 @@ export default function NewTaskChat({ isMobile }) {
   const dragCounter = useRef(0);
   const loadAbortRef = useRef(null);
   const headerRef = useRef(null);
+  const skipConvoLoadRef = useRef(false);
 
   const toggleExpanded = useCallback(() => {
     setAnimating(true);
@@ -383,6 +384,12 @@ export default function NewTaskChat({ isMobile }) {
 
   useEffect(() => {
     if (activeConvoId) {
+      // Skip wiping messages when we just created this conversation in send() —
+      // the optimistic user message + assistant placeholder are already in state.
+      if (skipConvoLoadRef.current) {
+        skipConvoLoadRef.current = false;
+        return;
+      }
       setMessages([]);
       setLoadingMessages(true);
       loadMessages(activeConvoId);
@@ -487,6 +494,7 @@ export default function NewTaskChat({ isMobile }) {
         if (convo?.id) {
           convoId = convo.id;
           setConversations(prev => [convo, ...prev]);
+          skipConvoLoadRef.current = true;
           setActiveConvoId(convoId);
         } else {
           setError("Failed to create conversation: unexpected response");
