@@ -871,7 +871,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const hasDescription = !!task.description;
   const hasMetadata = !!task.metadata && typeof task.metadata === 'object' && Object.keys(task.metadata).length > 0;
 
-  const hasDeployment = ['deploying', 'deployed', 'deploy_failed'].includes(task.status);
+  const hasDeployment = ['deploying', 'deployed', 'deploy_failed'].includes(task.status) || !!task.deployment_url || !!task.deploy_target;
   const hasCosts = !!task.metadata?.costs && typeof task.metadata.costs === 'object' && Object.keys(task.metadata.costs).length > 0;
 
   const tabs = [{ key: 'details', label: 'Details' }];
