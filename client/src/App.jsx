@@ -93,8 +93,8 @@ export default function App() {
       const saved = localStorage.getItem("collapsed-columns");
       if (saved) return JSON.parse(saved);
     } catch {}
-    // Default: completed, deployed, deploy_failed and failed are collapsed
-    return { completed: true, deployed: true, deploy_failed: true, failed: true };
+    // Default: deploying, deployed, deploy_failed and failed are collapsed
+    return { deploying: true, deployed: true, deploy_failed: true, failed: true };
   });
   const toggleCollapse = useCallback((col) => {
     setCollapsedCols(prev => {
