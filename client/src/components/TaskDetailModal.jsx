@@ -782,7 +782,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const [showAssignPicker, setShowAssignPicker] = useState(false);
   const [assigningAgent, setAssigningAgent] = useState(false);
   const [assignErr, setAssignErr] = useState(null);
-  const [deploying, setDeploying] = useState(false);
+  const [deploying, setDeploying] = useState(task.status === 'deploying');
   const [deployError, setDeployError] = useState(null);
   const [deploySuccess, setDeploySuccess] = useState(false);
   const [rebasing, setRebasing] = useState(false);
@@ -792,6 +792,16 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const [editingDeployUrl, setEditingDeployUrl] = useState(false);
   const [deployUrlDraft, setDeployUrlDraft] = useState(task.deployment_url || '');
   const [savingDeployUrl, setSavingDeployUrl] = useState(false);
+
+  // Sync deploying overlay with Realtime status updates
+  useEffect(() => {
+    if (task.status === 'deploying') {
+      setDeploying(true);
+    } else if (task.status === 'deployed' || task.status === 'deploy_failed') {
+      setDeploying(false);
+      setDeploySuccess(task.status === 'deployed');
+    }
+  }, [task.status]);
 
   useEffect(() => { ensureModalStyles(); }, []);
   useEffect(() => {
@@ -847,14 +857,12 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
       if (!resp.ok || !data.ok) {
         throw new Error(data.error || `Deploy failed (HTTP ${resp.status})`);
       }
-      setDeploySuccess(true);
-      // Auto-close after success so the board refreshes
-      setTimeout(() => handleClose(), 1500);
+      // Don't close or reset deploying — the Processing overlay stays
+      // until Realtime updates task.status to deployed/deploy_failed
     } catch (e) {
+      setDeploying(false);
       setDeployError(e.message || "Deploy failed");
       setTimeout(() => setDeployError(null), 5000);
-    } finally {
-      setDeploying(false);
     }
   };
 
@@ -1457,7 +1465,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
         )}
 
         {/* ── Full-card loading overlay (persists across close/reopen via task status) ── */}
-        {(actionProcessing || TRANSITIONAL_STATUSES.has(task.status)) && (
+        {(actionProcessing || deploying || TRANSITIONAL_STATUSES.has(task.status)) && (
           <div style={{
             position: 'absolute', inset: 0, zIndex: 250,
             background: 'rgba(255,251,254,0.7)',
