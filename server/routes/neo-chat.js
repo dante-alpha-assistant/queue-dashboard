@@ -57,10 +57,12 @@ neoChatRouter.post("/conversations", async (req, res) => {
 // Get messages for a conversation
 neoChatRouter.get("/conversations/:id/messages", async (req, res) => {
   try {
+    const convoId = req.params.id;
+    // Query by conversation_id, falling back to project_id for legacy messages
     const { data, error } = await supabase
       .from("chat_messages")
       .select("*")
-      .eq("conversation_id", req.params.id)
+      .or(`conversation_id.eq.${convoId},and(conversation_id.is.null,project_id.eq.${convoId})`)
       .order("created_at", { ascending: true });
     if (error) return res.status(500).json({ error: error.message });
     res.json(data || []);

@@ -80,6 +80,7 @@ export default function NewTaskChat({ isMobile }) {
   const abortRef = useRef(null);
   const fileInputRef = useRef(null);
   const dragCounter = useRef(0);
+  const loadAbortRef = useRef(null);
 
   // Fetch conversations
   const loadConversations = useCallback(async () => {
@@ -101,9 +102,16 @@ export default function NewTaskChat({ isMobile }) {
   // Load messages for a conversation
   const loadMessages = useCallback(async (convoId) => {
     if (!convoId) return;
+    // Cancel any in-flight load
+    if (loadAbortRef.current) loadAbortRef.current.abort();
+    const controller = new AbortController();
+    loadAbortRef.current = controller;
     setLoadingMessages(true);
     try {
-      const resp = await fetch(`/api/neo-chat/conversations/${convoId}/messages`);
+      const resp = await fetch(`/api/neo-chat/conversations/${convoId}/messages`, {
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) return;
       if (!resp.ok) {
         console.error("Failed to load messages:", resp.status);
         setError("Failed to load messages.");
@@ -111,6 +119,7 @@ export default function NewTaskChat({ isMobile }) {
         return;
       }
       const data = await resp.json();
+      if (controller.signal.aborted) return;
       if (Array.isArray(data)) {
         setMessages(data.map(m => ({
           role: m.role,
@@ -120,10 +129,11 @@ export default function NewTaskChat({ isMobile }) {
         })));
       }
     } catch (e) {
+      if (e.name === "AbortError") return;
       console.error("Failed to load messages:", e);
       setError("Failed to load messages.");
     }
-    setLoadingMessages(false);
+    if (!controller.signal.aborted) setLoadingMessages(false);
   }, []);
 
   // On open, load conversations
@@ -136,9 +146,12 @@ export default function NewTaskChat({ isMobile }) {
   // When active conversation changes, load its messages
   useEffect(() => {
     if (activeConvoId) {
+      setMessages([]);
+      setLoadingMessages(true);
       loadMessages(activeConvoId);
     } else {
       setMessages([]);
+      setLoadingMessages(false);
     }
   }, [activeConvoId, loadMessages]);
 
@@ -474,7 +487,7 @@ export default function NewTaskChat({ isMobile }) {
           {loadingMessages && (
             <div style={{ textAlign: "center", padding: 20, color: "var(--md-on-surface-variant)", fontSize: 13 }}>Loading messages...</div>
           )}
-          {!loadingMessages && messages.length === 0 && (
+          {!loadingMessages && messages.length === 0 && !activeConvoId && (
             <div style={{ textAlign: "center", marginTop: 60, color: "var(--md-on-surface-variant)" }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>🤖</div>
               <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6, color: "var(--md-on-surface)" }}>Hey! I'm Neo.</div>
@@ -491,6 +504,12 @@ export default function NewTaskChat({ isMobile }) {
                   >💡 {suggestion}</button>
                 ))}
               </div>
+            </div>
+          )}
+          {!loadingMessages && messages.length === 0 && activeConvoId && (
+            <div style={{ textAlign: "center", marginTop: 60, color: "var(--md-on-surface-variant)" }}>
+              <div style={{ fontSize: 32, marginBottom: 12 }}>💬</div>
+              <div style={{ fontSize: 13 }}>No messages yet. Start the conversation!</div>
             </div>
           )}
           {messages.map((msg, i) => {
