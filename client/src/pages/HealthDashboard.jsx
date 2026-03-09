@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { Bot, HeartPulse, CheckCircle2, Clock, Package, RefreshCw, Wrench, XCircle } from 'lucide-react';
 
 const API = "/api/health";
 
@@ -32,9 +33,9 @@ function HealthBadge({ level, score }) {
 
 function SummaryCards({ summary }) {
   const cards = [
-    { label: "Online Agents", value: `${summary.online_agents}/${summary.total_agents}`, icon: "🤖", color: summary.online_agents === summary.total_agents ? "#16a34a" : "#ca8a04" },
-    { label: "Stuck Tasks", value: summary.stuck_count, icon: "⏳", color: summary.stuck_count === 0 ? "#16a34a" : "#dc2626" },
-    { label: "Failed (24h)", value: summary.failed_24h_count, icon: "❌", color: summary.failed_24h_count === 0 ? "#16a34a" : "#dc2626" },
+    { label: "Online Agents", value: `${summary.online_agents}/${summary.total_agents}`, icon: Bot, color: summary.online_agents === summary.total_agents ? "#16a34a" : "#ca8a04" },
+    { label: "Stuck Tasks", value: summary.stuck_count, icon: Clock, color: summary.stuck_count === 0 ? "#16a34a" : "#dc2626" },
+    { label: "Failed (24h)", value: summary.failed_24h_count, icon: XCircle, color: summary.failed_24h_count === 0 ? "#16a34a" : "#dc2626" },
     { label: "Merge Queue", value: summary.merge_pending, icon: "🔀", color: summary.merge_pending === 0 ? "#16a34a" : "#ca8a04" },
   ];
   return (
@@ -57,7 +58,7 @@ function SummaryCards({ summary }) {
 function StuckTasksList({ tasks }) {
   if (!tasks.length) return (
     <div style={{ padding: 20, textAlign: "center", color: "var(--md-on-surface-variant)", fontSize: 13 }}>
-      ✅ No stuck tasks
+      <CheckCircle2 size={14} /> No stuck tasks
     </div>
   );
   return (
@@ -113,7 +114,7 @@ function AgentHealthList({ agents }) {
               </div>
               {a.active_tasks.length > 0 && (
                 <div style={{ fontSize: 11, color: "var(--md-primary)", marginTop: 3 }}>
-                  🔧 {a.active_tasks.map(t => t.title).join(", ")}
+                  <Wrench size={14} /> {a.active_tasks.map(t => t.title).join(", ")}
                 </div>
               )}
             </div>
@@ -132,7 +133,7 @@ function MergeQueuePanel({ mergeQueue, total }) {
   const repos = Object.keys(mergeQueue);
   if (!repos.length) return (
     <div style={{ padding: 20, textAlign: "center", color: "var(--md-on-surface-variant)", fontSize: 13 }}>
-      ✅ No PRs waiting to merge
+      <CheckCircle2 size={14} /> No PRs waiting to merge
     </div>
   );
   return (
@@ -140,7 +141,7 @@ function MergeQueuePanel({ mergeQueue, total }) {
       {repos.map(repo => (
         <div key={repo}>
           <div style={{ fontSize: 12, fontWeight: 700, color: "var(--md-on-surface-variant)", marginBottom: 4 }}>
-            📦 {repo} ({mergeQueue[repo].length})
+            <Package size={14} /> {repo} ({mergeQueue[repo].length})
           </div>
           {mergeQueue[repo].map(item => (
             <div key={item.id} style={{
@@ -159,7 +160,7 @@ function MergeQueuePanel({ mergeQueue, total }) {
 function FailedTasksList({ tasks }) {
   if (!tasks.length) return (
     <div style={{ padding: 20, textAlign: "center", color: "var(--md-on-surface-variant)", fontSize: 13 }}>
-      ✅ No failures in the last 24h
+      <CheckCircle2 size={14} /> No failures in the last 24h
     </div>
   );
   return (
@@ -217,7 +218,7 @@ export default function HealthDashboard() {
 
   if (error && !data) return (
     <div style={{ padding: 40, textAlign: "center", color: "#dc2626" }}>
-      ❌ Failed to load health data: {error}
+      <XCircle size={14} /> Failed to load health data: {error}
       <br />
       <button onClick={fetchHealth} style={{ marginTop: 12, padding: "8px 16px", borderRadius: 8, border: "1px solid var(--md-surface-variant)", cursor: "pointer", background: "var(--md-surface)" }}>
         Retry
@@ -230,7 +231,7 @@ export default function HealthDashboard() {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "var(--md-on-surface)" }}>💓 Pipeline Health</h2>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "var(--md-on-surface)" }}><HeartPulse size={20} /> Pipeline Health</h2>
           {lastRefresh && (
             <div style={{ fontSize: 11, color: "var(--md-on-surface-variant)", marginTop: 2 }}>
               Auto-refreshes every 30s · Last: {lastRefresh.toLocaleTimeString()}
@@ -241,7 +242,7 @@ export default function HealthDashboard() {
           padding: "6px 14px", borderRadius: 8, border: "1px solid var(--md-surface-variant)",
           background: "var(--md-surface)", cursor: "pointer", fontSize: 12, fontWeight: 600,
           color: "var(--md-on-surface-variant)",
-        }}>🔄 Refresh</button>
+        }}><RefreshCw size={14} /> Refresh</button>
       </div>
 
       {/* Health Score + Summary */}
@@ -253,17 +254,17 @@ export default function HealthDashboard() {
       {/* Main grid */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         {/* Stuck Tasks */}
-        <Section title="⏳ Stuck Tasks" count={data.stuck_tasks.length} alert={data.stuck_tasks.length > 0}>
+        <Section title="Stuck Tasks" icon={<Clock size={16} />} count={data.stuck_tasks.length} alert={data.stuck_tasks.length > 0}>
           <StuckTasksList tasks={data.stuck_tasks} />
         </Section>
 
         {/* Agent Health */}
-        <Section title="🤖 Agent Health" count={data.agent_health.length}>
+        <Section title="Agent Health" icon={<Bot size={16} />} count={data.agent_health.length}>
           <AgentHealthList agents={data.agent_health} />
         </Section>
 
         {/* Failed Tasks (24h) */}
-        <Section title="❌ Failures (24h)" count={data.failed_24h.length} alert={data.failed_24h.length > 0}>
+        <Section title="Failures (24h)" icon={<XCircle size={16} />} count={data.failed_24h.length} alert={data.failed_24h.length > 0}>
           <FailedTasksList tasks={data.failed_24h} />
         </Section>
 

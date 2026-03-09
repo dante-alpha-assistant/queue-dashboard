@@ -60,6 +60,9 @@ if (typeof document !== "undefined" && !document.getElementById(styleId)) {
   `;
   document.head.appendChild(style);
 }
+import OrgChart from "../components/OrgChart";
+import SkillsModal from "../components/SkillsModal";
+import { AlertTriangle, BarChart3, Bot, Building2, CheckCircle2, Circle, ClipboardList, FlaskConical, Puzzle, Rocket, Search, Timer, Wrench, XCircle } from 'lucide-react';
 
 const STATUS_COLORS = {
   online: "#2E7D32",
@@ -199,8 +202,7 @@ function CurrentTaskPreview({ tasks = [], compact = false }) {
         fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
         display: "flex", alignItems: "center", gap: 4,
       }}>
-        {PingboardIcons.wrench(compact ? 10 : 12, "#2E7D32")}
-        {truncated}
+        <Wrench size={14} /> {truncated}
       </div>
       {tasks.length > 1 && (
         <div style={{ fontSize: 9, color: "var(--md-on-surface-variant)", marginTop: 2, textAlign: "center" }}>
@@ -566,11 +568,11 @@ function PipelineView() {
   const { pipeline_state, current_by_stage, stage_durations, agent_summary, bottlenecks, agents } = data;
 
   const stages = [
-    { key: "todo", label: "Backlog", icon: PingboardIcons.clipboard, color: "#79747E" },
-    { key: "in_progress", label: "Coding", icon: PingboardIcons.wrench, color: "#2E7D32" },
-    { key: "qa_testing", label: "QA Review", icon: PingboardIcons.flask, color: "#E65100" },
-    { key: "completed", label: "Completed", icon: PingboardIcons.checkCircle, color: "#1565C0" },
-    { key: "deployed", label: "Deployed", icon: PingboardIcons.rocket, color: "#6A1B9A" },
+    { key: "todo", label: "Backlog", emoji: ClipboardList, color: "#79747E" },
+    { key: "in_progress", label: "Coding", emoji: Wrench, color: "#2E7D32" },
+    { key: "qa_testing", label: "QA Review", emoji: FlaskConical, color: "#E65100" },
+    { key: "completed", label: "Completed", emoji: CheckCircle2, color: "#1565C0" },
+    { key: "deployed", label: "Deployed", emoji: Rocket, color: "#6A1B9A" },
   ];
 
   const qaAgents = (agents || []).filter(a => (a.capabilities || []).includes("qa"));
@@ -606,10 +608,7 @@ function PipelineView() {
               color: b.severity === "high" ? "#BA1A1A" : "#E65100",
               fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8,
             }}>
-              {b.severity === "high"
-                ? PingboardIcons.xCircle(16, "#BA1A1A")
-                : PingboardIcons.warning(16, "#E65100")}
-              {b.message}
+              {b.severity === "high" ? <Circle size={10} fill="#D32F2F" color="#D32F2F" /> : <Circle size={10} fill="#F9A825" color="#F9A825" />} {b.message}
             </div>
           ))}
         </div>
@@ -620,8 +619,8 @@ function PipelineView() {
         background: "var(--md-surface-container)", borderRadius: 16, padding: 24,
         border: "1px solid var(--md-surface-variant)",
       }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--md-on-background)", marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
-          {PingboardIcons.chart(18, "var(--md-on-background)")} Task Pipeline
+        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--md-on-background)", marginBottom: 20 }}>
+          <BarChart3 size={14} /> Task Pipeline
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 0, overflowX: "auto", paddingBottom: 8 }}>
@@ -697,8 +696,8 @@ function PipelineView() {
               </div>
             )}
             {pipeline_state.failed > 0 && (
-              <div style={{ padding: "8px 14px", borderRadius: 10, background: "rgba(186, 26, 26, 0.06)", border: "1px solid rgba(186, 26, 26, 0.2)", fontSize: 12, fontWeight: 600, color: "#BA1A1A", display: "flex", alignItems: "center", gap: 6 }}>
-                {PingboardIcons.xCircle(14, "#BA1A1A")} {pipeline_state.failed} failed
+              <div style={{ padding: "8px 14px", borderRadius: 10, background: "rgba(186, 26, 26, 0.06)", border: "1px solid rgba(186, 26, 26, 0.2)", fontSize: 12, fontWeight: 600, color: "#BA1A1A" }}>
+                <XCircle size={14} /> {pipeline_state.failed} failed
               </div>
             )}
           </div>
@@ -710,13 +709,13 @@ function PipelineView() {
         background: "var(--md-surface-container)", borderRadius: 16, padding: 24,
         border: "1px solid var(--md-surface-variant)",
       }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--md-on-background)", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-          {PingboardIcons.cog(18, "var(--md-on-background)")} Pipeline Roles
+        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--md-on-background)", marginBottom: 16 }}>
+          <Building2 size={14} /> Pipeline Roles
         </div>
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 260, padding: 16, borderRadius: 12, background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#2E7D32", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
-              {PingboardIcons.wrench(14, "#2E7D32")} Coding Agents ({codingAgents.length}) — {totalCodingSlots} slots
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#2E7D32", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10 }}>
+              <Wrench size={14} /> Coding Agents ({codingAgents.length}) — {totalCodingSlots} slots
             </div>
             {codingAgents.map(a => {
               const stats = agent_summary[a.id] || agent_summary[a.name] || {};
@@ -739,8 +738,8 @@ function PipelineView() {
           </div>
 
           <div style={{ flex: 1, minWidth: 260, padding: 16, borderRadius: 12, background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#E65100", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
-              {PingboardIcons.flask(14, "#E65100")} QA Agents ({qaAgents.length}) — {totalQaSlots} slots
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#E65100", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10 }}>
+              <FlaskConical size={14} /> QA Agents ({qaAgents.length}) — {totalQaSlots} slots
             </div>
             {qaAgents.length === 0 && (
               <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)", fontStyle: "italic", padding: "8px 0" }}>No QA agents configured</div>
@@ -766,8 +765,11 @@ function PipelineView() {
           </div>
 
           <div style={{ minWidth: 140, padding: 16, borderRadius: 12, background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)", textAlign: "center", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#6A1B9A", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-              {PingboardIcons.rocket(14, "#6A1B9A")} Deploy
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#6A1B9A", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 }}>
+              <Rocket size={14} /> Deploy
+            </div>
+            <div style={{ fontSize: 11, color: "var(--md-on-surface-variant)" }}>
+              ArgoCD + Vercel
             </div>
             <div style={{ fontSize: 11, color: "var(--md-on-surface-variant)" }}>ArgoCD + Vercel</div>
             <div style={{ fontSize: 20, fontWeight: 800, marginTop: 8 }}>{pipeline_state.deployed || 0}</div>
@@ -781,8 +783,8 @@ function PipelineView() {
         background: "var(--md-surface-container)", borderRadius: 16, padding: 24,
         border: "1px solid var(--md-surface-variant)",
       }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--md-on-background)", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-          {PingboardIcons.clock(18, "var(--md-on-background)")} Flow Statistics ({days} day window)
+        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--md-on-background)", marginBottom: 16 }}>
+          <Timer size={14} /> Flow Statistics ({days} day window)
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
           {[
@@ -824,14 +826,19 @@ function ReplicaCard({ pod, activeTasks, animState, hasActiveTasks }) {
       ...animStyle,
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-        <div style={{
-          width: 36, height: 36, borderRadius: "50%",
-          background: `${statusColor}15`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          {pod.ready
-            ? PingboardIcons.check(18, statusColor)
-            : PingboardIcons.warning(18, statusColor)}
+        <div
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: "50%",
+            background: `${statusColor}15`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 16,
+          }}
+        >
+          {pod.ready ? <CheckCircle2 size={14} color="#16a34a" /> : <AlertTriangle size={14} color="#ca8a04" />}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
@@ -1133,8 +1140,8 @@ export default function Pingboard() {
           marginBottom: 24, flexWrap: "wrap", gap: 12,
         }}>
           <div>
-            <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--md-on-background)", display: "flex", alignItems: "center", gap: 10 }}>
-              {PingboardIcons.robot(24, "var(--md-on-background)")} Agent Pingboard
+            <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--md-on-background)" }}>
+              <Bot size={14} /> Agent Pingboard
             </div>
             <div style={{ fontSize: 13, color: "var(--md-on-surface-variant)", fontWeight: 400, marginTop: 4 }}>
               {agents.length} agent{agents.length !== 1 ? "s" : ""} registered
@@ -1144,42 +1151,46 @@ export default function Pingboard() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button
-              onClick={() => setSkillsOpen(true)}
-              style={{
-                padding: "6px 14px", borderRadius: 10, fontSize: 12, fontWeight: 600,
-                border: "1px solid var(--md-surface-variant)",
-                background: "var(--md-surface)", color: "var(--md-on-surface-variant)",
-                cursor: "pointer", fontFamily: "'Roboto', system-ui, sans-serif",
-                transition: "all 150ms", display: "flex", alignItems: "center", gap: 6,
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = "var(--md-primary-container)"; e.currentTarget.style.color = "var(--md-on-primary-container)"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "var(--md-surface)"; e.currentTarget.style.color = "var(--md-on-surface-variant)"; }}
-            >
-              {PingboardIcons.skills(14, "currentColor")} Skills
-            </button>
-            <div style={{ display: "flex", gap: 4, background: "var(--md-surface-container)", borderRadius: 12, padding: 3 }}>
-              {[
-                { key: "orgchart", label: "Org Chart", icon: PingboardIcons.orgChart },
-                { key: "pipeline", label: "Pipeline", icon: PingboardIcons.pipeline },
-                { key: "grid", label: "Grid", icon: PingboardIcons.grid },
-              ].map((mode) => (
-                <button
-                  key={mode.key}
-                  onClick={() => { setViewMode(mode.key); setSelectedAgent(null); }}
-                  style={{
-                    padding: "6px 14px", borderRadius: 10, fontSize: 12, fontWeight: 600, border: "none",
-                    background: viewMode === mode.key ? "var(--md-primary)" : "transparent",
-                    color: viewMode === mode.key ? "var(--md-on-primary)" : "var(--md-on-surface-variant)",
-                    cursor: "pointer", fontFamily: "'Roboto', system-ui, sans-serif",
-                    transition: "all 150ms", display: "flex", alignItems: "center", gap: 5,
-                  }}
-                >
-                  {mode.icon(14, viewMode === mode.key ? "var(--md-on-primary)" : "var(--md-on-surface-variant)")}
-                  {mode.label}
-                </button>
-              ))}
-            </div>
+          <button
+            onClick={() => setSkillsOpen(true)}
+            style={{
+              padding: "6px 14px", borderRadius: 10, fontSize: 12, fontWeight: 600,
+              border: "1px solid var(--md-surface-variant)",
+              background: "var(--md-surface)", color: "var(--md-on-surface-variant)",
+              cursor: "pointer", fontFamily: "'Roboto', system-ui, sans-serif",
+              transition: "all 150ms",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "var(--md-primary-container)"; e.currentTarget.style.color = "var(--md-on-primary-container)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "var(--md-surface)"; e.currentTarget.style.color = "var(--md-on-surface-variant)"; }}
+          >
+            <Puzzle size={14} /> Skills
+          </button>
+          <div style={{ display: "flex", gap: 4, background: "var(--md-surface-container)", borderRadius: 12, padding: 3 }}>
+            {[
+              { key: "orgchart", label: "🏢 Org Chart" },
+              { key: "pipeline", label: "🔀 Pipeline" },
+              { key: "grid", label: "⊞ Grid" },
+            ].map((mode) => (
+              <button
+                key={mode.key}
+                onClick={() => { setViewMode(mode.key); setSelectedAgent(null); }}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: 10,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  border: "none",
+                  background: viewMode === mode.key ? "var(--md-primary)" : "transparent",
+                  color: viewMode === mode.key ? "var(--md-on-primary)" : "var(--md-on-surface-variant)",
+                  cursor: "pointer",
+                  fontFamily: "'Roboto', system-ui, sans-serif",
+                  transition: "all 150ms",
+                }}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
           </div>
         </div>
 
@@ -1209,22 +1220,39 @@ export default function Pingboard() {
             );
           })}
           <div style={{ flex: 1 }} />
-          <div style={{ position: "relative" }}>
-            <div style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", display: "flex" }}>
-              {PingboardIcons.search(14, "var(--md-on-surface-variant)")}
-            </div>
-            <input
-              type="text"
-              placeholder="Search agents..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{
-                padding: "8px 16px 8px 32px", borderRadius: 12, fontSize: 13,
-                border: "1px solid var(--md-surface-variant)",
-                background: "var(--md-surface)", color: "var(--md-on-background)",
-                fontFamily: "'Roboto', system-ui, sans-serif", outline: "none", width: 240,
-              }}
-            />
+          <input
+            type="text"
+            placeholder="Search agents..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 12,
+              fontSize: 13,
+              border: "1px solid var(--md-surface-variant)",
+              background: "var(--md-surface)",
+              color: "var(--md-on-background)",
+              fontFamily: "'Roboto', system-ui, sans-serif",
+              outline: "none",
+              width: 240,
+            }}
+          />
+          <div style={{ display: "flex", borderRadius: 10, overflow: "hidden", border: "1px solid var(--md-surface-variant)" }}>
+            {[{ key: "grid", label: "⊞ Grid" }, { key: "orgchart", label: "⸬ Org Chart" }].map(v => (
+              <button
+                key={v.key}
+                onClick={() => setViewMode(v.key)}
+                style={{
+                  padding: "7px 14px", fontSize: 12, fontWeight: 600, border: "none",
+                  cursor: "pointer", fontFamily: "'Roboto', system-ui, sans-serif",
+                  background: viewMode === v.key ? "var(--md-primary)" : "var(--md-surface)",
+                  color: viewMode === v.key ? "var(--md-on-primary)" : "var(--md-on-surface-variant)",
+                  transition: "all 150ms",
+                }}
+              >
+                {v.label}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -1338,8 +1366,8 @@ export default function Pingboard() {
 
                 {Array.isArray(selectedAgent.skills) && selectedAgent.skills.length > 0 && (
                   <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--md-on-surface-variant)", opacity: 0.7, marginBottom: 6, display: "flex", alignItems: "center", gap: 4 }}>
-                      {PingboardIcons.skills(10, "var(--md-on-surface-variant)")} Skills
+                    <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--md-on-surface-variant)", opacity: 0.7, marginBottom: 6 }}>
+                      <Puzzle size={14} /> Skills
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                       {selectedAgent.skills.map((s, i) => (
@@ -1407,9 +1435,7 @@ export default function Pingboard() {
                       <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--md-on-surface-variant)", opacity: 0.7, marginBottom: 6 }}>Performance</div>
                       <div style={{ display: "flex", gap: 16, fontSize: 13 }}>
                         {selectedAgent.metrics.success_rate != null && (
-                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                            {PingboardIcons.checkCircle(14, "#2E7D32")} {Math.round(selectedAgent.metrics.success_rate * 100)}% success
-                          </span>
+                          <span><CheckCircle2 size={14} /> {Math.round(selectedAgent.metrics.success_rate * 100)}% success</span>
                         )}
                         {selectedAgent.metrics.avg_completion_time != null && (
                           <span style={{ display: "flex", alignItems: "center", gap: 4 }}>

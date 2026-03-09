@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AlertTriangle, Ban, CheckCircle2, Key, Lightbulb, Link, Unlock } from 'lucide-react';
 
 /**
  * HumanInterventionForm — renders a dynamic form for blocked tasks
@@ -19,13 +20,13 @@ import { useState } from 'react';
  */
 
 const BLOCKER_TYPE_CONFIG = {
-  missing_credential: { color: '#D32F2F', bg: '#D32F2F0A', border: '#D32F2F25', icon: '🔑', label: 'Missing Credential' },
+  missing_credential: { color: '#D32F2F', bg: '#D32F2F0A', border: '#D32F2F25', icon: Key, label: 'Missing Credential' },
   ambiguous_requirement: { color: '#E65100', bg: '#E651000A', border: '#E6510025', icon: '❓', label: 'Needs Clarification' },
   human_decision: { color: '#6750A4', bg: '#6750A40A', border: '#6750A425', icon: '🧑‍⚖️', label: 'Decision Required' },
-  external_dependency: { color: '#00838F', bg: '#00838F0A', border: '#00838F25', icon: '🔗', label: 'External Dependency' },
+  external_dependency: { color: '#00838F', bg: '#00838F0A', border: '#00838F25', icon: Link, label: 'External Dependency' },
   approval_needed: { color: '#1565C0', bg: '#1565C00A', border: '#1565C025', icon: '✋', label: 'Approval Needed' },
 };
-const DEFAULT_TYPE_CONFIG = { color: '#E65100', bg: '#E651000A', border: '#E6510025', icon: '🚫', label: 'Blocked' };
+const DEFAULT_TYPE_CONFIG = { color: '#E65100', bg: '#E651000A', border: '#E6510025', icon: Ban, label: 'Blocked' };
 
 function InputField({ input, value, onChange }) {
   const baseStyle = {
@@ -157,7 +158,7 @@ export default function HumanInterventionForm({ task, onStatusChange, onClose })
         padding: '20px 16px', borderRadius: 12, textAlign: 'center',
         background: '#1B5E200A', border: '1px solid #1B5E2025',
       }}>
-        <span style={{ fontSize: 32 }}>✅</span>
+        <span style={{ fontSize: 32 }}><CheckCircle2 size={14} /></span>
         <div style={{ fontSize: 14, fontWeight: 600, color: '#1B5E20', marginTop: 8 }}>
           Input provided — task unblocked
         </div>
@@ -204,7 +205,7 @@ export default function HumanInterventionForm({ task, onStatusChange, onClose })
               marginTop: 8, fontSize: 12, color: typeConfig.color, fontWeight: 500,
               display: 'flex', alignItems: 'center', gap: 6,
             }}>
-              <span>💡</span> {blocker.suggested_action}
+              <span><Lightbulb size={14} /></span> {blocker.suggested_action}
             </div>
           )}
         </div>
@@ -277,7 +278,7 @@ export default function HumanInterventionForm({ task, onStatusChange, onClose })
             background: '#D32F2F0A', border: '1px solid #D32F2F25',
             fontSize: 12, color: '#D32F2F',
           }}>
-            ⚠️ {error}
+            <AlertTriangle size={14} /> {error}
           </div>
         )}
 
@@ -306,7 +307,7 @@ export default function HumanInterventionForm({ task, onStatusChange, onClose })
                 Submitting…
               </>
             ) : (
-              <>🔓 Provide & Unblock</>
+              <><Unlock size={14} /> Provide & Unblock</>
             )}
           </button>
         </div>

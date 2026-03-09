@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Activity, Pause, Settings } from 'lucide-react';
 
 /**
  * Compact progress indicator for TaskCard — shows current step + optional percent bar.
@@ -158,7 +159,7 @@ export function ProgressDetail({ progress, monitor }) {
               animation: alive !== false ? "spin 2s linear infinite" : "none",
             }}
           >
-            {alive !== false ? "⚙️" : "⏸️"}
+            {alive !== false ? <Settings size={14} /> : <Pause size={14} />}
           </span>
           Live Activity
           {alive !== false && (

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { CheckCircle2 } from 'lucide-react';
 
 const STATUS_COLORS = {
   online: "#2E7D32",
@@ -241,7 +242,7 @@ function DetailPanel({ agent, onClose }) {
         <div style={{ paddingTop: 16, borderTop: "1px solid var(--md-surface-variant)" }}>
           <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--md-on-surface-variant)", opacity: 0.7, marginBottom: 6 }}>Performance</div>
           <div style={{ display: "flex", gap: 16, fontSize: 13 }}>
-            {agent.metrics.success_rate != null && <span>✅ {Math.round(agent.metrics.success_rate * 100)}% success</span>}
+            {agent.metrics.success_rate != null && <span><CheckCircle2 size={14} /> {Math.round(agent.metrics.success_rate * 100)}% success</span>}
             {agent.metrics.avg_completion_time != null && <span>⏱ {agent.metrics.avg_completion_time}s avg</span>}
           </div>
         </div>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Zap } from 'lucide-react';
 
 export default function DispatchButton() {
   const [state, setState] = useState("idle"); // idle | loading | success | error
@@ -57,7 +58,7 @@ export default function DispatchButton() {
       ) : state === "error" ? (
         <span>✗ {message}</span>
       ) : (
-        <span>⚡ Dispatch</span>
+        <span><Zap size={14} /> Dispatch</span>
       )}
     </button>
   );
