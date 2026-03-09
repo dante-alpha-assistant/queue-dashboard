@@ -46,6 +46,17 @@ const FIELD_ICONS = {
   comment: '💬',
 };
 
+const ERROR_CATEGORY_META = {
+  merge_conflict: { label: 'Merge Conflict', color: '#E65100', icon: '🔀' },
+  ci_failure: { label: 'CI Failure', color: '#D32F2F', icon: '🔴' },
+  timeout: { label: 'Timeout', color: '#FF6F00', icon: '⏱️' },
+  session_lost: { label: 'Session Lost', color: '#F57C00', icon: '💀' },
+  qa_rejection: { label: 'QA Rejection', color: '#7B1FA2', icon: '🧪' },
+  auth_error: { label: 'Auth Error', color: '#C62828', icon: '🔑' },
+  resource_error: { label: 'Resource Error', color: '#AD1457', icon: '💾' },
+  unknown: { label: 'Unknown', color: '#9E9E9E', icon: '❓' },
+};
+
 const STATUS_COLORS = {
   todo: '#79747E',
   assigned: '#6750A4',
@@ -221,6 +232,21 @@ function ActivityEntry({ entry, isLast }) {
             maxWidth: 500,
           }}>
             {entry.new_value}
+          </div>
+        )}
+
+        {/* Error category badge */}
+        {entry.error_category && ERROR_CATEGORY_META[entry.error_category] && (
+          <div style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <span style={{
+              fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
+              background: `${ERROR_CATEGORY_META[entry.error_category].color}18`,
+              color: ERROR_CATEGORY_META[entry.error_category].color,
+              border: `1px solid ${ERROR_CATEGORY_META[entry.error_category].color}30`,
+              display: 'inline-flex', alignItems: 'center', gap: 3,
+            }}>
+              {ERROR_CATEGORY_META[entry.error_category].icon} {ERROR_CATEGORY_META[entry.error_category].label}
+            </span>
           </div>
         )}
 

@@ -59,6 +59,53 @@ router.get("/stats", async (req, res) => {
   }
 });
 
+// Error stats — breakdown by error category
+router.get("/error-stats", async (req, res) => {
+  try {
+    const period = req.query.period || "7d";
+    const periodMs = period === "24h" ? 86400000 : period === "7d" ? 604800000 : 604800000;
+    const since = new Date(Date.now() - periodMs).toISOString();
+
+    const { data, error } = await supabase
+      .from("task_activity_log")
+      .select("error_category, changed_at")
+      .in("field", ["error", "dispatch_error"])
+      .gte("changed_at", since)
+      .not("error_category", "is", null);
+
+    if (error) throw error;
+
+    const counts = {};
+    for (const entry of (data || [])) {
+      const cat = entry.error_category || "unknown";
+      counts[cat] = (counts[cat] || 0) + 1;
+    }
+
+    const CATEGORY_META = {
+      merge_conflict: { label: "Merge Conflict", color: "#E65100" },
+      ci_failure: { label: "CI Failure", color: "#D32F2F" },
+      timeout: { label: "Timeout", color: "#FF6F00" },
+      session_lost: { label: "Session Lost", color: "#F57C00" },
+      qa_rejection: { label: "QA Rejection", color: "#7B1FA2" },
+      auth_error: { label: "Auth Error", color: "#C62828" },
+      resource_error: { label: "Resource Error", color: "#AD1457" },
+      unknown: { label: "Unknown", color: "#9E9E9E" },
+    };
+
+    const breakdown = Object.entries(counts)
+      .map(([cat, count]) => ({
+        category: cat,
+        count,
+        ...(CATEGORY_META[cat] || { label: cat, color: "#9E9E9E" }),
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    res.json({ period, since, breakdown, total: (data || []).length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // All tasks
 router.get("/tasks", async (req, res) => {
   try {
