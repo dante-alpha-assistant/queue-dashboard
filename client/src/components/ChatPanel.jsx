@@ -165,15 +165,19 @@ export default function ChatPanel({ isMobile, open: controlledOpen, onClose }) {
                   <img src={msg.avatar} alt="" style={{ width: 18, height: 18, borderRadius: "50%" }} />
                 )}
                 <span style={{
-                  fontSize: 11, fontWeight: 600,
+                  fontSize: 12, fontWeight: 600,
                   color: isUser ? "var(--md-primary)" : "#386A20",
+                  fontFamily: "'Roboto', system-ui, sans-serif",
+                  letterSpacing: "0.02em",
                 }}>{msg.name}</span>
-                <span style={{ fontSize: 10, color: "var(--md-on-surface-variant)" }}>{timeAgo(msg.timestamp)}</span>
+                <span style={{ fontSize: 11, color: "var(--md-on-surface-variant)", fontFamily: "'Roboto', system-ui, sans-serif", letterSpacing: "0.01em" }}>{timeAgo(msg.timestamp)}</span>
               </div>
               <div style={{
-                fontSize: 13, lineHeight: 1.5, paddingLeft: 24,
+                fontSize: 14, lineHeight: 1.55, paddingLeft: 24,
                 wordBreak: "break-word",
                 color: "var(--md-on-background)",
+                fontFamily: "'Roboto', system-ui, sans-serif",
+                letterSpacing: "0.01em",
                 ...(isUser ? { whiteSpace: "pre-wrap" } : {}),
               }}
               className={isUser ? "" : "chat-markdown"}
@@ -183,8 +187,14 @@ export default function ChatPanel({ isMobile, open: controlledOpen, onClose }) {
                     remarkPlugins={[remarkGfm]}
                     rehypePlugins={[rehypeHighlight]}
                     components={{
-                      a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
-                      p: ({ node, ...props }) => <p {...props} style={{ margin: "0 0 8px 0" }} />,
+                      a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" style={{ color: "var(--md-primary)", textDecoration: "none" }} />,
+                      p: ({ node, ...props }) => <p {...props} style={{ margin: "0 0 8px 0", fontFamily: "'Roboto', system-ui, sans-serif" }} />,
+                      h1: ({ node, ...props }) => <h1 {...props} style={{ fontSize: 20, fontWeight: 600, margin: "12px 0 6px 0", fontFamily: "'Roboto', system-ui, sans-serif" }} />,
+                      h2: ({ node, ...props }) => <h2 {...props} style={{ fontSize: 17, fontWeight: 600, margin: "10px 0 4px 0", fontFamily: "'Roboto', system-ui, sans-serif" }} />,
+                      h3: ({ node, ...props }) => <h3 {...props} style={{ fontSize: 15, fontWeight: 600, margin: "8px 0 4px 0", fontFamily: "'Roboto', system-ui, sans-serif" }} />,
+                      strong: ({ node, ...props }) => <strong {...props} style={{ fontWeight: 600 }} />,
+                      em: ({ node, ...props }) => <em {...props} />,
+                      blockquote: ({ node, ...props }) => <blockquote {...props} style={{ borderLeft: "3px solid var(--md-primary)", paddingLeft: 12, margin: "6px 0", color: "var(--md-on-surface-variant)" }} />,
                       ul: ({ node, ...props }) => <ul {...props} style={{ margin: "4px 0", paddingLeft: 20 }} />,
                       ol: ({ node, ...props }) => <ol {...props} style={{ margin: "4px 0", paddingLeft: 20 }} />,
                       li: ({ node, ...props }) => <li {...props} style={{ marginBottom: 2 }} />,
@@ -192,15 +202,22 @@ export default function ChatPanel({ isMobile, open: controlledOpen, onClose }) {
                         if (inline) {
                           return <code style={{
                             background: "var(--md-surface-container-highest, rgba(0,0,0,0.08))",
-                            padding: "2px 5px", borderRadius: 4, fontSize: 12,
+                            padding: "2px 6px", borderRadius: 4, fontSize: 13,
+                            fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
                           }} {...props}>{children}</code>;
                         }
-                        return <code className={className} {...props}>{children}</code>;
+                        return <code className={className} style={{
+                          fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                          fontSize: 13,
+                        }} {...props}>{children}</code>;
                       },
                       pre: ({ node, ...props }) => <pre {...props} style={{
-                        background: "var(--md-surface-container-highest, rgba(0,0,0,0.08))",
-                        padding: 10, borderRadius: 8, overflow: "auto",
-                        fontSize: 12, margin: "6px 0",
+                        background: "#1e1e2e",
+                        color: "#cdd6f4",
+                        padding: 12, borderRadius: 8, overflow: "auto",
+                        fontSize: 13, margin: "8px 0",
+                        fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                        lineHeight: 1.5,
                       }} />,
                     }}
                   >
@@ -230,9 +247,10 @@ export default function ChatPanel({ isMobile, open: controlledOpen, onClose }) {
           style={{
             flex: 1, background: "var(--md-surface-container)",
             border: "1px solid var(--md-surface-variant)",
-            color: "var(--md-on-background)", padding: "10px 14px", fontSize: 13,
+            color: "var(--md-on-background)", padding: "10px 14px", fontSize: 14,
             resize: "none", outline: "none", borderRadius: 12,
             fontFamily: "'Roboto', system-ui, sans-serif",
+            lineHeight: 1.5, letterSpacing: "0.01em",
             minHeight: isMobile ? 44 : "auto",
           }}
           onFocus={e => e.target.style.borderColor = "var(--md-primary)"}
