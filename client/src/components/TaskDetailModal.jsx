@@ -6,6 +6,7 @@ import AgentPicker from './AgentPicker';
 import StatusTimeline from './StatusTimeline';
 import ActivityLog from './ActivityLog';
 import TaskComments from './TaskComments';
+import TaskRelationships from './TaskRelationships';
 import { ProgressDetail } from './ProgressFeed';
 
 /* ── Constants ────────────────────────────────────────────── */
@@ -1089,6 +1090,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
               No description or acceptance criteria provided.
             </div>
           )}
+          <TaskRelationships taskId={task.id} onNavigateToTask={(id) => { window.location.href = `/task/${id}`; }} />
           <div style={{ marginTop: 16 }}>
             <SectionLabel icon="🔗">Links</SectionLabel>
             <div style={{ padding: 14, background: 'var(--md-surface-container-low, #F7F2FA)', borderRadius: 10, border: '1px solid var(--md-surface-variant, #E7E0EC)', display: 'flex', flexDirection: 'column', gap: 8 }}>
