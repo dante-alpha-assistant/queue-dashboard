@@ -914,6 +914,13 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const hasDeploymentStatus = ['deploying', 'deployed', 'deploy_failed'].includes(task.status);
   const hasCosts = !!task.metadata?.costs && typeof task.metadata.costs === 'object' && Object.keys(task.metadata.costs).length > 0;
 
+  // Filter cost-related keys from metadata for the Meta tab
+  const COST_KEYS = new Set(['costs', 'totalCost', 'totalTokens']);
+  const filteredMetadata = hasMetadata
+    ? Object.fromEntries(Object.entries(task.metadata).filter(([k]) => !COST_KEYS.has(k)))
+    : {};
+  const hasFilteredMetadata = Object.keys(filteredMetadata).length > 0;
+
   const tabs = [{ key: 'details', label: 'Details' }];
   tabs.push({ key: 'comments', label: '💬 Comments' });
   tabs.push({ key: 'activity', label: 'Activity' });
@@ -921,7 +928,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   if (hasCosts) tabs.push({ key: 'costs', label: '💰 Costs' });
   tabs.push({ key: 'metadata', label: 'Metadata' });
   if (hasQA) tabs.push({ key: 'qa', label: 'QA' });
-  if (hasMetadata) tabs.push({ key: 'meta', label: 'Meta' });
+  if (hasFilteredMetadata) tabs.push({ key: 'meta', label: 'Meta' });
 
   const useWideLayout = !isMobile && !isTablet;
 
@@ -1424,12 +1431,12 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
         </div>
       )}
 
-      {activeTab === 'meta' && hasMetadata && (
+      {activeTab === 'meta' && hasFilteredMetadata && (
         <div>
           <SectionLabel icon="🔧">Task Metadata</SectionLabel>
           <div style={{ position: 'relative' }}>
             <pre style={{ fontSize: 12, fontFamily: "'Roboto Mono', 'JetBrains Mono', monospace", whiteSpace: 'pre-wrap', overflowX: 'auto', padding: 14, background: 'var(--md-surface-container-low, #F7F2FA)', borderRadius: 10, border: '1px solid var(--md-surface-variant, #E7E0EC)', margin: 0, lineHeight: 1.6 }}>
-              <JsonSyntax data={task.metadata} indent={0} />
+              <JsonSyntax data={filteredMetadata} indent={0} />
             </pre>
           </div>
         </div>
