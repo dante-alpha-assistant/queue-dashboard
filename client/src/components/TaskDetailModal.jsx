@@ -1190,6 +1190,26 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
         <ProgressDetail progress={progress} monitor={monitor} />
       )}
 
+      {/* Health flags */}
+      {task.metadata?.health_flags?.length > 0 && (
+        <div style={{
+          margin: "12px 0", padding: "10px 14px", borderRadius: 12,
+          background: task.metadata.health_flags.some(f => f.severity === "critical") ? "#D32F2F10" : "#E6510010",
+          border: `1px solid ${task.metadata.health_flags.some(f => f.severity === "critical") ? "#D32F2F40" : "#E6510040"}`,
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: task.metadata.health_flags.some(f => f.severity === "critical") ? "#D32F2F" : "#E65100" }}>
+            ⚠️ Health Issues Detected
+          </div>
+          {task.metadata.health_flags.map((flag, i) => (
+            <div key={i} style={{ fontSize: 12, color: "var(--md-on-surface, #1C1B1F)", padding: "2px 0", display: "flex", gap: 6, alignItems: "center" }}>
+              <span>{flag.severity === "critical" ? "🔴" : flag.severity === "warning" ? "🟡" : "🔵"}</span>
+              <span style={{ fontWeight: 600 }}>{flag.code.replace(/_/g, " ")}</span>
+              <span style={{ color: "var(--md-outline, #79747E)" }}>— {flag.message}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Smart retry */}
       <SmartRetryInfo metadata={task.metadata} />
 
