@@ -897,15 +897,29 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const [deployUrlDraft, setDeployUrlDraft] = useState(task.deployment_url || '');
   const [savingDeployUrl, setSavingDeployUrl] = useState(false);
 
+  // Auto-clear deploy success after 3s
+  useEffect(() => {
+    if (deploySuccess) {
+      const t = setTimeout(() => setDeploySuccess(false), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [deploySuccess]);
+
   // Sync deploying overlay with Realtime status updates
   useEffect(() => {
     if (task.status === 'deploying') {
       setDeploying(true);
     } else if (task.status === 'deployed' || task.status === 'deploy_failed') {
+      // Realtime fired — stop any fallback polling/timeout
+      stopDeployPolling();
       setDeploying(false);
       setDeploySuccess(task.status === 'deployed');
+      if (task.status === 'deploy_failed') {
+        setDeployError('Deploy failed');
+        setTimeout(() => setDeployError(null), 5000);
+      }
     }
-  }, [task.status]);
+  }, [task.status, stopDeployPolling]);
 
   useEffect(() => { ensureModalStyles(); }, []);
   useEffect(() => {
@@ -941,6 +955,24 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const [deployConfirm, setDeployConfirm] = useState(false);
   const deployConfirmTimer = useRef(null);
 
+  const deployPollRef = useRef(null);
+  const deployTimeoutRef = useRef(null);
+
+  // Cleanup deploy polling/timeout on unmount
+  useEffect(() => {
+    return () => {
+      clearInterval(deployPollRef.current);
+      clearTimeout(deployTimeoutRef.current);
+    };
+  }, []);
+
+  const stopDeployPolling = useCallback(() => {
+    clearInterval(deployPollRef.current);
+    clearTimeout(deployTimeoutRef.current);
+    deployPollRef.current = null;
+    deployTimeoutRef.current = null;
+  }, []);
+
   const handleDeploy = async () => {
     if (!deployConfirm) {
       setDeployConfirm(true);
@@ -964,8 +996,34 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
       if (task.status === 'deployed' || task.status === 'deploy_failed') {
         setDeploying(false);
         setDeploySuccess(task.status === 'deployed');
+        return;
       }
-      // Otherwise spinner stays until Realtime updates task.status
+      // Start polling as fallback in case Realtime doesn't fire
+      deployPollRef.current = setInterval(async () => {
+        try {
+          const pollResp = await fetch(`/api/tasks/${task.id}`);
+          if (pollResp.ok) {
+            const pollData = await pollResp.json();
+            const st = pollData?.status || pollData?.task?.status;
+            if (st === 'deployed' || st === 'deploy_failed') {
+              stopDeployPolling();
+              setDeploying(false);
+              setDeploySuccess(st === 'deployed');
+              if (st === 'deploy_failed') {
+                setDeployError('Deploy failed');
+                setTimeout(() => setDeployError(null), 5000);
+              }
+            }
+          }
+        } catch (_) { /* ignore poll errors */ }
+      }, 5000);
+      // Timeout: reset spinner after 30s no matter what
+      deployTimeoutRef.current = setTimeout(() => {
+        stopDeployPolling();
+        setDeploying(false);
+        setDeployError('Deploy may still be in progress. Refresh to check status.');
+        setTimeout(() => setDeployError(null), 8000);
+      }, 30000);
     } catch (e) {
       setDeploying(false);
       setDeployError(e.message || "Deploy failed");
@@ -1599,10 +1657,8 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
           }} />
         )}
 
-        {/* ── Full-card loading overlay (persists across close/reopen via task status) ── */}
-        {(actionProcessing || deploying || TRANSITIONAL_STATUSES.has(task.status)) && (
         {/* ── Full-card loading overlay ───────────────────── */}
-        {(actionProcessing || fieldSaving) && (
+        {(actionProcessing || deploying || fieldSaving || TRANSITIONAL_STATUSES.has(task.status)) && (
           <div style={{
             position: 'absolute', inset: 0, zIndex: 250,
             background: 'rgba(255,251,254,0.7)',
@@ -1617,8 +1673,37 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
               animation: 'tdm-spin 0.7s linear infinite',
             }} />
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--md-on-surface-variant, #49454F)', letterSpacing: '0.02em' }}>
-              {fieldSaving ? 'Saving…' : 'Processing…'}
+              {fieldSaving ? 'Saving…' : deploying ? 'Deploying…' : 'Processing…'}
             </span>
+          </div>
+        )}
+
+        {/* ── Deploy success indicator ─────────────────────── */}
+        {deploySuccess && !deploying && (
+          <div style={{
+            position: 'absolute', top: 12, right: 12, zIndex: 260,
+            background: '#00838F', color: '#fff', padding: '6px 14px',
+            borderRadius: 100, fontSize: 12, fontWeight: 600,
+            display: 'flex', alignItems: 'center', gap: 6,
+            boxShadow: '0 4px 12px rgba(0,131,143,0.3)',
+            animation: 'tdm-overlay-in 0.2s ease-out',
+          }}>
+            ✓ Deployed
+          </div>
+        )}
+
+        {/* ── Deploy error indicator ──────────────────────── */}
+        {deployError && !deploying && (
+          <div style={{
+            position: 'absolute', top: 12, right: 12, zIndex: 260,
+            background: '#B3261E', color: '#fff', padding: '6px 14px',
+            borderRadius: 100, fontSize: 12, fontWeight: 600,
+            display: 'flex', alignItems: 'center', gap: 6,
+            boxShadow: '0 4px 12px rgba(179,38,30,0.3)',
+            animation: 'tdm-overlay-in 0.2s ease-out',
+            maxWidth: '80%',
+          }}>
+            ⚠️ {deployError}
           </div>
         )}
 
