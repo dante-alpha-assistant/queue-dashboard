@@ -15,7 +15,7 @@ const STATUS_LABELS = {
   disabled: "Disabled",
 };
 
-const STATUS_FILTERS = ["all", "online", "busy", "offline", "disabled"];
+const STATUS_FILTERS = ["all", "online", "busy", "offline"];
 
 function formatUptime(seconds) {
   if (!seconds || seconds < 0) return "—";
@@ -383,6 +383,11 @@ function OrgAgentNode({ agent, replicas, children, isRoot }) {
             <div style={{ fontWeight: 700, fontSize: isRoot ? 15 : 13, color: "var(--md-on-background)" }}>
               {agent.name}
             </div>
+            {agent.role && (
+              <div style={{ fontSize: 10, color: "var(--md-on-surface-variant)", fontWeight: 500 }}>
+                {agent.role}
+              </div>
+            )}
             <div style={{ fontSize: 10, color: statusColor, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
               {STATUS_LABELS[agent.status] || agent.status}
             </div>
@@ -588,6 +593,11 @@ function AgentTile({ agent, isSelected, onClick }) {
         <div style={{ fontWeight: 700, fontSize: 14, color: "var(--md-on-background)", marginBottom: 2 }}>
           {agent.name}
         </div>
+        {agent.role && (
+          <div style={{ fontSize: 11, color: "var(--md-on-surface-variant)", fontWeight: 500, marginBottom: 2 }}>
+            {agent.role}
+          </div>
+        )}
         <div style={{ fontSize: 11, color: statusColor, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
           {STATUS_LABELS[agent.status] || agent.status}
         </div>
@@ -910,6 +920,11 @@ export default function Pingboard() {
                   </button>
                 </div>
 
+                {selectedAgent.role && (
+                  <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)", fontWeight: 500, marginBottom: 4 }}>
+                    {selectedAgent.role}
+                  </div>
+                )}
                 {selectedAgent.description && (
                   <div style={{ fontSize: 13, color: "var(--md-on-surface-variant)", marginBottom: 16, lineHeight: 1.5 }}>
                     {selectedAgent.description}
