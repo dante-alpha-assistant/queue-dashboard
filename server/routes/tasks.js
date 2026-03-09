@@ -807,3 +807,111 @@ router.delete("/tasks/:id", async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// ===== Task Relationships =====
+
+// Get relationships for a task (both directions)
+router.get("/tasks/:id/relationships", async (req, res) => {
+  try {
+    // Get where this task is the source (this task depends_on/blocks/etc other tasks)
+    const { data: outgoing, error: e1 } = await supabase
+      .from("task_relationships")
+      .select("id, target_task_id, relationship_type, created_at, created_by")
+      .eq("source_task_id", req.params.id);
+
+    // Get where this task is the target (other tasks depend_on/block/etc this task)
+    const { data: incoming, error: e2 } = await supabase
+      .from("task_relationships")
+      .select("id, source_task_id, relationship_type, created_at, created_by")
+      .eq("target_task_id", req.params.id);
+
+    if (e1 || e2) return res.status(500).json({ ok: false, error: (e1 || e2).message });
+
+    // Collect all related task IDs to fetch their titles
+    const relatedIds = [
+      ...(outgoing || []).map(r => r.target_task_id),
+      ...(incoming || []).map(r => r.source_task_id),
+    ];
+
+    let taskMap = {};
+    if (relatedIds.length > 0) {
+      const { data: tasks } = await supabase
+        .from("agent_tasks")
+        .select("id, title, status, priority, type")
+        .in("id", relatedIds);
+      taskMap = Object.fromEntries((tasks || []).map(t => [t.id, t]));
+    }
+
+    // Format: "this task depends_on X" = outgoing depends_on
+    // "X depends_on this task" = incoming depends_on (meaning X is blocked by this)
+    const relationships = [
+      ...(outgoing || []).map(r => ({
+        id: r.id,
+        type: r.relationship_type,
+        direction: "outgoing", // this task → target
+        task: taskMap[r.target_task_id] || { id: r.target_task_id },
+        created_at: r.created_at,
+      })),
+      ...(incoming || []).map(r => ({
+        id: r.id,
+        type: r.relationship_type,
+        direction: "incoming", // source → this task
+        task: taskMap[r.source_task_id] || { id: r.source_task_id },
+        created_at: r.created_at,
+      })),
+    ];
+
+    res.json({ ok: true, relationships });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Add a relationship
+router.post("/tasks/:id/relationships", async (req, res) => {
+  try {
+    const { target_task_id, relationship_type = "depends_on" } = req.body;
+    if (!target_task_id) return res.status(400).json({ ok: false, error: "target_task_id required" });
+    if (target_task_id === req.params.id) return res.status(400).json({ ok: false, error: "Cannot relate task to itself" });
+
+    const validTypes = ["depends_on", "blocks", "related_to", "subtask_of"];
+    if (!validTypes.includes(relationship_type)) {
+      return res.status(400).json({ ok: false, error: `Invalid type. Valid: ${validTypes.join(", ")}` });
+    }
+
+    const { data, error } = await supabase
+      .from("task_relationships")
+      .insert({
+        source_task_id: req.params.id,
+        target_task_id,
+        relationship_type,
+        created_by: "dashboard",
+      })
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === "23505") return res.status(409).json({ ok: false, error: "Relationship already exists" });
+      return res.status(500).json({ ok: false, error: error.message });
+    }
+
+    res.json({ ok: true, relationship: data });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Delete a relationship
+router.delete("/relationships/:id", async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from("task_relationships")
+      .delete()
+      .eq("id", req.params.id);
+
+    if (error) return res.status(500).json({ ok: false, error: error.message });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
