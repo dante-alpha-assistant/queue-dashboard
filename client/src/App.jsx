@@ -36,6 +36,7 @@ const BOTTOM_TABS = [
   { key: "deploying", label: "Deploying", icon: "⏳", color: "#E65100" },
   { key: "deployed", label: "Deployed", icon: "🚀", color: "#00897B" },
   { key: "failed", label: "Failed", icon: "❌", color: "#BA1A1A" },
+  { key: "chat", label: "Chat", icon: "💬", color: "#6750A4" },
 ];
 
 export default function App() {
@@ -57,6 +58,7 @@ export default function App() {
   const [view, setView] = useState("board");
   const [timeFilter, setTimeFilter] = useState({ range: "today", customFrom: "", customTo: "" });
   const [searchQuery, setSearchQuery] = useState("");
+  const [chatOpen, setChatOpen] = useState(false);
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
   const { progress: taskProgress, monitor: taskMonitor, connected: sseConnected } = useTaskEvents();
 
@@ -308,7 +310,7 @@ export default function App() {
         </div>
 
         <NewTaskChat isMobile={isMobile} />
-        <ChatPanel isMobile={isMobile} />
+        <ChatPanel isMobile={isMobile} open={activeTab === "chat"} onClose={() => setActiveTab("todo")} />
         {selectedTask && !selectedTask._notFound && (
           <TaskDetailModal
             task={selectedTask}
@@ -449,6 +451,14 @@ export default function App() {
             )}
           </div>
           <TimeFilter allTasks={allTasksRaw} value={timeFilter} onChange={setTimeFilter} isMobile={false} />
+          <button onClick={() => setChatOpen(o => !o)} style={{
+            padding: "8px 14px", borderRadius: 20, fontSize: 13, fontWeight: 500, cursor: "pointer",
+            border: chatOpen ? "2px solid var(--md-primary)" : "1px solid var(--md-surface-variant)",
+            background: chatOpen ? "var(--md-primary-container)" : "var(--md-surface)",
+            color: chatOpen ? "var(--md-on-primary-container)" : "var(--md-on-surface-variant)",
+            fontFamily: "'Roboto', system-ui, sans-serif", transition: "all 150ms",
+            display: "flex", alignItems: "center", gap: 4,
+          }}>💬 Chat</button>
         </div>
       </div>
 
@@ -490,7 +500,7 @@ export default function App() {
       </div>
 
       <NewTaskChat isMobile={false} />
-      <ChatPanel isMobile={false} />
+      <ChatPanel isMobile={false} open={chatOpen} onClose={() => setChatOpen(false)} />
       {selectedTask && !selectedTask._notFound && (
         <TaskDetailModal
           task={selectedTask}
