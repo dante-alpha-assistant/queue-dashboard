@@ -887,6 +887,76 @@ router.get("/tasks/:id/mergeability", async (req, res) => {
   }
 });
 
+// Human intervention — provide values for blocked tasks and unblock
+router.post("/tasks/:id/intervene", async (req, res) => {
+  try {
+    const { provided_values, human_response, changed_by } = req.body;
+
+    // 1. Fetch current task
+    const { data: task, error: fetchErr } = await supabase
+      .from("agent_tasks")
+      .select("*")
+      .eq("id", req.params.id)
+      .single();
+    if (fetchErr || !task) return res.status(404).json({ error: "Task not found" });
+    if (task.status !== "blocked") {
+      return res.status(400).json({ error: `Task status is '${task.status}', must be 'blocked' to intervene` });
+    }
+
+    // 2. Build updated metadata
+    const metadata = { ...(task.metadata || {}) };
+    if (provided_values && Object.keys(provided_values).length > 0) {
+      if (!metadata.blocker) metadata.blocker = {};
+      metadata.blocker.provided_values = provided_values;
+      metadata.blocker.resolved_at = new Date().toISOString();
+    }
+    if (human_response) {
+      if (!metadata.blocker) metadata.blocker = {};
+      metadata.blocker.human_response = human_response;
+      metadata.blocker.resolved_at = new Date().toISOString();
+    }
+    // Also store top-level human_input for agent convenience
+    const humanInput = human_response || (provided_values ? JSON.stringify(provided_values) : null);
+
+    // 3. Move task back to todo
+    const { data: updated, error: updateErr } = await supabase
+      .from("agent_tasks")
+      .update({
+        status: "todo",
+        blocked_reason: null,
+        error: null,
+        assigned_agent: null,
+        started_at: null,
+        completed_at: null,
+        metadata,
+        human_input: humanInput,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", req.params.id)
+      .select()
+      .single();
+    if (updateErr) throw updateErr;
+
+    // 4. Log the intervention
+    const logDetails = [];
+    if (provided_values) logDetails.push(`values: ${Object.keys(provided_values).join(", ")}`);
+    if (human_response) logDetails.push(`response: "${human_response.slice(0, 100)}${human_response.length > 100 ? '…' : ''}"`);
+
+    await supabase.from("task_activity_log").insert({
+      task_id: req.params.id,
+      field: "human_intervention",
+      old_value: "blocked",
+      new_value: `Unblocked with human input (${logDetails.join("; ")})`,
+      changed_by: changed_by || "dashboard",
+      changed_at: new Date().toISOString(),
+    }).catch(() => {});
+
+    res.json({ ok: true, task: updated });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Reopen task — human-only action to move completed/deployed tasks back to todo
 router.post("/tasks/:id/reopen", async (req, res) => {
   try {
