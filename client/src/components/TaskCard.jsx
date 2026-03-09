@@ -181,12 +181,21 @@ function Badge({ label, color, bg, style: extraStyle }) {
 }
 
 /* ── Action Bar ───────────────────────────────────────────── */
+const DEPLOY_TARGET_OPTIONS = [
+  { value: "kubernetes", label: "Kubernetes", icon: "☸️" },
+  { value: "vercel", label: "Vercel", icon: "▲" },
+  { value: "none", label: "None (merge only)", icon: "🔀" },
+];
+
 function ActionBar({ task, onStatusChange, isMobile }) {
   const [showPicker, setShowPicker] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState(null);
   const [humanInput, setHumanInput] = useState("");
   const [unblocking, setUnblocking] = useState(false);
+  const [deploying, setDeploying] = useState(false);
+  const [deployError, setDeployError] = useState(null);
+  const [showDeployTargetPicker, setShowDeployTargetPicker] = useState(false);
 
   const btnBase = {
     fontSize: 12, border: "none", padding: isMobile ? "8px 18px" : "7px 16px",
@@ -225,6 +234,104 @@ function ActionBar({ task, onStatusChange, isMobile }) {
         </svg>
         Retry
       </button>
+    );
+  }
+
+  const handleDeploy = async (targetOverride) => {
+    setDeploying(true);
+    setDeployError(null);
+    try {
+      // If no deploy_target set and no override, prompt user to pick one
+      if (!task.deploy_target && !targetOverride) {
+        setShowDeployTargetPicker(true);
+        setDeploying(false);
+        return;
+      }
+      // If we need to set deploy_target first
+      if (targetOverride) {
+        await onStatusChange?.(task.id, { deploy_target: targetOverride });
+        setShowDeployTargetPicker(false);
+      }
+      const resp = await fetch(`/api/deploy/${task.id}`, { method: "POST" });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        throw new Error(data.error || `Deploy failed (HTTP ${resp.status})`);
+      }
+    } catch (e) {
+      setDeployError(e.message || "Deploy failed");
+      setTimeout(() => setDeployError(null), 5000);
+    } finally {
+      setDeploying(false);
+    }
+  };
+
+  if (task.status === "completed") {
+    actions.push(
+      <div key="deploy" style={{ position: "relative" }}>
+        <button
+          onClick={(e) => { e.stopPropagation(); handleDeploy(); }}
+          disabled={deploying}
+          style={{
+            ...btnBase,
+            background: deploying ? "var(--md-outline, #79747E)" : "#00838F",
+            color: "#fff",
+            opacity: deploying ? 0.7 : 1,
+          }}
+        >
+          {deploying ? (
+            <span style={{ display: "inline-block", width: 14, height: 14, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+          ) : (
+            <span style={{ fontSize: 14, lineHeight: 1 }}>🚀</span>
+          )}
+          {deploying ? "Deploying…" : "Deploy"}
+        </button>
+        {showDeployTargetPicker && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "absolute", bottom: "calc(100% + 4px)", right: 0,
+              background: "var(--md-surface, #FFFBFE)",
+              border: "1px solid var(--md-surface-variant, #E7E0EC)",
+              borderRadius: 12, padding: 8, zIndex: 20,
+              boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+              minWidth: 180,
+            }}
+          >
+            <div style={{ fontSize: 11, fontWeight: 600, color: "var(--md-outline, #79747E)", padding: "4px 8px 8px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              Select deploy target
+            </div>
+            {DEPLOY_TARGET_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={(e) => { e.stopPropagation(); handleDeploy(opt.value); }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8, width: "100%",
+                  padding: "8px 12px", border: "none", background: "transparent",
+                  borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 500,
+                  color: "var(--md-on-surface, #1C1B1F)",
+                  fontFamily: "'Roboto', system-ui, sans-serif",
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "var(--md-surface-container-low, #F7F2FA)"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+              >
+                <span>{opt.icon}</span>
+                <span>{opt.label}</span>
+              </button>
+            ))}
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowDeployTargetPicker(false); }}
+              style={{
+                display: "block", width: "100%", padding: "6px 12px", border: "none",
+                background: "transparent", borderRadius: 8, cursor: "pointer",
+                fontSize: 11, color: "var(--md-outline, #79747E)", textAlign: "center",
+                marginTop: 4, fontFamily: "'Roboto', system-ui, sans-serif",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -316,7 +423,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
     );
   }
 
-  if (actions.length === 0 && !assignError) return null;
+  if (actions.length === 0 && !assignError && !deployError) return null;
 
   return (
     <div style={{
@@ -325,9 +432,9 @@ function ActionBar({ task, onStatusChange, isMobile }) {
       borderTop: "1px solid var(--md-surface-variant, #E7E0EC)",
       flexWrap: "wrap",
     }}>
-      {assignError && (
+      {(assignError || deployError) && (
         <span style={{ fontSize: 12, color: "#BA1A1A", fontWeight: 500, marginRight: "auto" }}>
-          ⚠️ {assignError}
+          ⚠️ {assignError || deployError}
         </span>
       )}
       {actions}
