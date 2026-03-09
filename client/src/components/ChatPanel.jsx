@@ -1,4 +1,8 @@
 import { useState, useEffect, useRef } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
+import "highlight.js/styles/github-dark.min.css";
 
 function timeAgo(iso) {
   if (!iso) return "";
@@ -146,10 +150,49 @@ export default function ChatPanel({ isMobile, open: controlledOpen, onClose }) {
               </div>
               <div style={{
                 fontSize: 13, lineHeight: 1.5, paddingLeft: 24,
-                whiteSpace: "pre-wrap", wordBreak: "break-word",
+                wordBreak: "break-word",
                 color: "var(--md-on-background)",
+                ...(isUser ? { whiteSpace: "pre-wrap" } : {}),
               }}>
-                {cleaned}
+                {isUser ? cleaned : (
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeHighlight]}
+                    components={{
+                      a: ({ children, ...props }) => (
+                        <a {...props} target="_blank" rel="noopener noreferrer" style={{ color: "var(--md-primary)" }}>
+                          {children}
+                        </a>
+                      ),
+                      p: ({ children }) => (
+                        <p style={{ margin: "4px 0" }}>{children}</p>
+                      ),
+                      code: ({ inline, className, children, ...props }) => (
+                        inline
+                          ? <code style={{
+                              background: "var(--md-surface-container)", padding: "1px 5px",
+                              borderRadius: 4, fontSize: 12, fontFamily: "'Fira Code', monospace",
+                            }} {...props}>{children}</code>
+                          : <code className={className} {...props}>{children}</code>
+                      ),
+                      pre: ({ children }) => (
+                        <pre style={{
+                          background: "var(--md-surface-container)", padding: 10,
+                          borderRadius: 8, overflow: "auto", fontSize: 12,
+                          margin: "6px 0", fontFamily: "'Fira Code', monospace",
+                        }}>{children}</pre>
+                      ),
+                      ul: ({ children }) => <ul style={{ margin: "4px 0", paddingLeft: 20 }}>{children}</ul>,
+                      ol: ({ children }) => <ol style={{ margin: "4px 0", paddingLeft: 20 }}>{children}</ol>,
+                      li: ({ children }) => <li style={{ margin: "2px 0" }}>{children}</li>,
+                      h1: ({ children }) => <h1 style={{ fontSize: 16, fontWeight: 700, margin: "8px 0 4px" }}>{children}</h1>,
+                      h2: ({ children }) => <h2 style={{ fontSize: 15, fontWeight: 600, margin: "6px 0 4px" }}>{children}</h2>,
+                      h3: ({ children }) => <h3 style={{ fontSize: 14, fontWeight: 600, margin: "4px 0 2px" }}>{children}</h3>,
+                    }}
+                  >
+                    {cleaned}
+                  </ReactMarkdown>
+                )}
               </div>
             </div>
           );
