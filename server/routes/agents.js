@@ -21,6 +21,30 @@ agentsRouter.get("/", async (req, res) => {
   }
 });
 
+// Live status: active tasks per agent (lightweight, no kubectl)
+agentsRouter.get("/live-status", async (req, res) => {
+  try {
+    const { data: tasks, error } = await supabase
+      .from("agent_tasks")
+      .select("id, title, status, type, priority, assigned_agent, started_at, updated_at")
+      .in("status", ["in_progress", "qa_testing"])
+      .order("updated_at", { ascending: false });
+    if (error) throw error;
+
+    // Group by assigned_agent
+    const byAgent = {};
+    for (const t of (tasks || [])) {
+      const agent = t.assigned_agent;
+      if (!agent) continue;
+      if (!byAgent[agent]) byAgent[agent] = [];
+      byAgent[agent].push(t);
+    }
+    res.json(byAgent);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // A2A discovery — MUST be before /:name
 agentsRouter.get("/discover", async (req, res) => {
   try {

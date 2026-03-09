@@ -1,6 +1,48 @@
 import SpeedLoader from "../components/SpeedLoader";
 import { useState, useEffect, useCallback, useRef } from "react";
 
+/* ─── CSS Keyframes (injected once) ─── */
+const styleId = "pingboard-animations";
+if (typeof document !== "undefined" && !document.getElementById(styleId)) {
+  const style = document.createElement("style");
+  style.id = styleId;
+  style.textContent = `
+    @keyframes pulse-dot {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.4); opacity: 0.6; }
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(1); opacity: 0.4; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+    .pingboard-tooltip {
+      visibility: hidden;
+      opacity: 0;
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1a1a2e;
+      color: #e0e0e0;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 12px;
+      white-space: nowrap;
+      z-index: 100;
+      pointer-events: none;
+      transition: opacity 150ms, visibility 150ms;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+      max-width: 320px;
+      white-space: normal;
+    }
+    .pingboard-tooltip-trigger:hover .pingboard-tooltip {
+      visibility: visible;
+      opacity: 1;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 const STATUS_COLORS = {
   online: "#2E7D32",
   busy: "#E65100",
@@ -81,23 +123,118 @@ function AgentAvatar({ agent, size = 64 }) {
   );
 }
 
-function StatusDot({ status, size = 10 }) {
+function StatusDot({ status, size = 10, isWorking = false }) {
+  const color = STATUS_COLORS[status] || "#79747E";
   return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        background: STATUS_COLORS[status] || "#79747E",
-        border: "2px solid var(--md-surface-container)",
-        flexShrink: 0,
-      }}
-    />
+    <div style={{ width: size, height: size, position: "relative", flexShrink: 0 }}>
+      {isWorking && (
+        <div style={{
+          position: "absolute", inset: -2, borderRadius: "50%",
+          border: `2px solid ${color}`,
+          animation: "pulse-ring 1.5s ease-out infinite",
+        }} />
+      )}
+      <div
+        style={{
+          width: size,
+          height: size,
+          borderRadius: "50%",
+          background: color,
+          border: "2px solid var(--md-surface-container)",
+          animation: isWorking ? "pulse-dot 2s ease-in-out infinite" : "none",
+        }}
+      />
+    </div>
   );
 }
 
+/* ─── Capacity Bar ─── */
+function CapacityBar({ load, max, style: outerStyle }) {
+  if (!max || max <= 0) return null;
+  const pct = Math.min((load / max) * 100, 100);
+  const color = load >= max ? "#E65100" : load > 0 ? "#2E7D32" : "#79747E";
+  return (
+    <div style={{ width: "100%", ...outerStyle }}>
+      <div style={{
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        fontSize: 10, fontWeight: 600, marginBottom: 3, color: "var(--md-on-surface-variant)",
+      }}>
+        <span>{load}/{max} slots</span>
+        <span style={{ color }}>{load >= max ? "Full" : load > 0 ? "Active" : "Free"}</span>
+      </div>
+      <div style={{
+        height: 4, borderRadius: 2, background: "var(--md-surface-variant)", overflow: "hidden",
+      }}>
+        <div style={{
+          height: "100%", borderRadius: 2, background: color,
+          width: `${pct}%`, transition: "width 300ms ease",
+        }} />
+      </div>
+    </div>
+  );
+}
+
+/* ─── Current Task Preview ─── */
+function CurrentTaskPreview({ tasks = [], compact = false }) {
+  if (!tasks || tasks.length === 0) return (
+    <div style={{
+      fontSize: compact ? 10 : 11, color: "#79747E", fontStyle: "italic",
+      padding: compact ? "2px 0" : "4px 0",
+    }}>
+      Idle
+    </div>
+  );
+
+  const task = tasks[0];
+  const title = task.title || "Untitled";
+  const truncated = title.length > (compact ? 28 : 40) ? title.slice(0, compact ? 25 : 37) + "..." : title;
+  const startTime = task.started_at || task.updated_at;
+  const elapsed = startTime ? formatElapsed(startTime) : null;
+
+  return (
+    <div className="pingboard-tooltip-trigger" style={{ position: "relative", width: "100%" }}>
+      <div style={{
+        fontSize: compact ? 10 : 11, padding: "3px 8px", borderRadius: 6,
+        background: "rgba(46, 125, 50, 0.08)", color: "#2E7D32",
+        fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+      }}>
+        🔧 {truncated}
+      </div>
+      {tasks.length > 1 && (
+        <div style={{ fontSize: 9, color: "var(--md-on-surface-variant)", marginTop: 2, textAlign: "center" }}>
+          +{tasks.length - 1} more task{tasks.length - 1 > 1 ? "s" : ""}
+        </div>
+      )}
+      <div className="pingboard-tooltip">
+        <div style={{ fontWeight: 600, marginBottom: 4 }}>{title}</div>
+        <div style={{ fontSize: 11, opacity: 0.7 }}>
+          Status: {task.status}{elapsed ? ` · Working for ${elapsed}` : ""}
+        </div>
+        {tasks.length > 1 && tasks.slice(1).map(t => (
+          <div key={t.id} style={{ marginTop: 6, paddingTop: 6, borderTop: "1px solid rgba(255,255,255,0.1)" }}>
+            <div style={{ fontWeight: 500 }}>{t.title}</div>
+            <div style={{ fontSize: 11, opacity: 0.7 }}>Status: {t.status}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function formatElapsed(isoDate) {
+  if (!isoDate) return null;
+  const ms = Date.now() - new Date(isoDate).getTime();
+  if (ms < 0) return null;
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return "<1m";
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ${mins % 60}m`;
+  return `${Math.floor(hrs / 24)}d ${hrs % 24}h`;
+}
+
 /* ─── Org Chart: Dante (Human) Card ─── */
-function HumanCard({ agent, replicas }) {
+function HumanCard({ agent, replicas, liveTasks = [] }) {
   const load = agent.current_load || 0;
   const maxCap = agent.max_capacity || 0;
 
@@ -151,10 +288,11 @@ function HumanCard({ agent, replicas }) {
 }
 
 /* ─── Org Chart: Manager Card ─── */
-function ManagerCard({ agent, replicas }) {
-  const load = agent.current_load || 0;
+function ManagerCard({ agent, replicas, liveTasks = [] }) {
+  const load = liveTasks.length || agent.current_load || 0;
   const maxCap = agent.max_capacity || 0;
   const caps = Array.isArray(agent.capabilities) ? agent.capabilities : [];
+  const isWorking = liveTasks.length > 0;
 
   return (
     <div
@@ -183,12 +321,9 @@ function ManagerCard({ agent, replicas }) {
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginTop: 8 }}>
         <div style={{ position: "relative" }}>
           <AgentAvatar agent={agent} size={56} />
-          <div style={{
-            position: "absolute", bottom: 0, right: -4,
-            width: 14, height: 14, borderRadius: "50%",
-            background: STATUS_COLORS[agent.status] || "#79747E",
-            border: "2px solid var(--md-surface-container)",
-          }} />
+          <div style={{ position: "absolute", bottom: 0, right: -4 }}>
+            <StatusDot status={agent.status} size={14} isWorking={isWorking} />
+          </div>
         </div>
         <div>
           <div style={{ fontWeight: 700, fontSize: 16, color: "var(--md-on-background)" }}>
@@ -199,16 +334,11 @@ function ManagerCard({ agent, replicas }) {
           </div>
         </div>
 
-        {/* Capacity */}
-        {maxCap > 0 && (
-          <div style={{
-            fontSize: 11, color: "var(--md-on-surface-variant)", fontWeight: 500,
-            padding: "3px 10px", borderRadius: 8,
-            background: "var(--md-surface-variant)",
-          }}>
-            {load}/{maxCap} {load >= maxCap ? "busy" : "available"}
-          </div>
-        )}
+        {/* Capacity bar */}
+        {maxCap > 0 && <CapacityBar load={load} max={maxCap} />}
+
+        {/* Current task preview */}
+        <CurrentTaskPreview tasks={liveTasks} />
 
         {/* Capabilities */}
         {caps.length > 0 && (
@@ -235,11 +365,12 @@ function ManagerCard({ agent, replicas }) {
 }
 
 /* ─── Org Chart: Worker Card ─── */
-function WorkerCard({ agent }) {
-  const load = agent.current_load || 0;
+function WorkerCard({ agent, liveTasks = [] }) {
+  const load = liveTasks.length || agent.current_load || 0;
   const maxCap = agent.max_capacity || 0;
   const caps = Array.isArray(agent.capabilities) ? agent.capabilities : [];
   const statusColor = STATUS_COLORS[agent.status] || "#79747E";
+  const isWorking = liveTasks.length > 0;
 
   return (
     <div
@@ -247,10 +378,10 @@ function WorkerCard({ agent }) {
         background: "var(--md-surface-container)",
         borderRadius: 14,
         padding: 16,
-        border: `1px solid var(--md-surface-variant)`,
+        border: `1px solid ${isWorking ? "rgba(46, 125, 50, 0.3)" : "var(--md-surface-variant)"}`,
         borderLeft: `3px solid ${statusColor}`,
         textAlign: "center",
-        width: 180,
+        width: 200,
         position: "relative",
         transition: "all 200ms",
       }}
@@ -266,12 +397,9 @@ function WorkerCard({ agent }) {
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
         <div style={{ position: "relative" }}>
           <AgentAvatar agent={agent} size={40} />
-          <div style={{
-            position: "absolute", bottom: -1, right: -3,
-            width: 12, height: 12, borderRadius: "50%",
-            background: statusColor,
-            border: "2px solid var(--md-surface-container)",
-          }} />
+          <div style={{ position: "absolute", bottom: -1, right: -3 }}>
+            <StatusDot status={agent.status} size={12} isWorking={isWorking} />
+          </div>
         </div>
         <div>
           <div style={{ fontWeight: 600, fontSize: 13, color: "var(--md-on-background)" }}>
@@ -282,17 +410,11 @@ function WorkerCard({ agent }) {
           </div>
         </div>
 
-        {/* Capacity indicator */}
-        {maxCap > 0 && (
-          <div style={{
-            fontSize: 10, fontWeight: 600,
-            padding: "2px 8px", borderRadius: 6,
-            background: load >= maxCap ? "rgba(230, 81, 0, 0.1)" : "rgba(46, 125, 50, 0.1)",
-            color: load >= maxCap ? "#E65100" : "#2E7D32",
-          }}>
-            {load}/{maxCap} {load >= maxCap ? "busy" : "available"}
-          </div>
-        )}
+        {/* Capacity bar */}
+        {maxCap > 0 && <CapacityBar load={load} max={maxCap} />}
+
+        {/* Current task or idle */}
+        <CurrentTaskPreview tasks={liveTasks} compact />
 
         {/* Capabilities as tags */}
         {caps.length > 0 && (
@@ -332,7 +454,7 @@ function VerticalConnector({ height = 32, color = "var(--md-surface-variant)", d
 }
 
 /* ─── Org Chart Tree View ─── */
-function OrgChartTree({ agents, allReplicas, loading: replicasLoading }) {
+function OrgChartTree({ agents, allReplicas, loading: replicasLoading, liveStatus = {} }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
@@ -378,10 +500,12 @@ function OrgChartTree({ agents, allReplicas, loading: replicasLoading }) {
 
   function renderCard(agent) {
     const type = getCardType(agent);
+    const agentId = agent.id || agent.name;
+    const tasks = liveStatus[agentId] || liveStatus[agent.name] || [];
     switch (type) {
-      case "human": return <HumanCard agent={agent} replicas={allReplicas[agent.id || agent.name]} />;
-      case "manager": return <ManagerCard agent={agent} replicas={allReplicas[agent.id || agent.name]} />;
-      default: return <WorkerCard agent={agent} />;
+      case "human": return <HumanCard agent={agent} replicas={allReplicas[agentId]} liveTasks={tasks} />;
+      case "manager": return <ManagerCard agent={agent} replicas={allReplicas[agentId]} liveTasks={tasks} />;
+      default: return <WorkerCard agent={agent} liveTasks={tasks} />;
     }
   }
 
@@ -672,10 +796,12 @@ function ReplicaCard({ pod, activeTasks }) {
   );
 }
 
-function AgentTile({ agent, isSelected, onClick }) {
+function AgentTile({ agent, isSelected, onClick, liveTasks = [] }) {
   const caps = Array.isArray(agent.capabilities) ? agent.capabilities : [];
-  const load = agent.current_load || 0;
+  const load = liveTasks.length || agent.current_load || 0;
+  const maxCap = agent.max_capacity || 0;
   const statusColor = STATUS_COLORS[agent.status] || "#79747E";
+  const isWorking = liveTasks.length > 0;
 
   return (
     <div
@@ -710,7 +836,7 @@ function AgentTile({ agent, isSelected, onClick }) {
       }}
     >
       <div style={{ position: "absolute", top: 12, right: 12 }}>
-        <StatusDot status={agent.status} />
+        <StatusDot status={agent.status} isWorking={isWorking} />
       </div>
 
       {load > 0 && (
@@ -747,6 +873,12 @@ function AgentTile({ agent, isSelected, onClick }) {
         </div>
       </div>
 
+      {/* Capacity bar in grid tile */}
+      {maxCap > 0 && <CapacityBar load={load} max={maxCap} style={{ marginTop: 4 }} />}
+
+      {/* Current task preview */}
+      <CurrentTaskPreview tasks={liveTasks} compact />
+
       {caps.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "center", marginTop: 4 }}>
           {caps.slice(0, 3).map((c, i) => (
@@ -776,6 +908,7 @@ export default function Pingboard() {
   const [viewMode, setViewMode] = useState("orgchart"); // default to org chart
   const [allReplicas, setAllReplicas] = useState({});
   const [allReplicasLoading, setAllReplicasLoading] = useState(false);
+  const [liveStatus, setLiveStatus] = useState({});
 
   const fetchAgents = useCallback(async () => {
     try {
@@ -824,11 +957,22 @@ export default function Pingboard() {
     }
   }, []);
 
+  const fetchLiveStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/agents/live-status");
+      if (res.ok) setLiveStatus(await res.json());
+    } catch (e) {
+      console.error("Failed to fetch live status:", e);
+    }
+  }, []);
+
   useEffect(() => {
     fetchAgents();
+    fetchLiveStatus();
     const interval = setInterval(fetchAgents, 10000);
-    return () => clearInterval(interval);
-  }, [fetchAgents]);
+    const liveInterval = setInterval(fetchLiveStatus, 30000);
+    return () => { clearInterval(interval); clearInterval(liveInterval); };
+  }, [fetchAgents, fetchLiveStatus]);
 
   useEffect(() => {
     if (viewMode === "orgchart") {
@@ -996,7 +1140,7 @@ export default function Pingboard() {
 
         {/* View content */}
         {viewMode === "orgchart" ? (
-          <OrgChartTree agents={filtered} allReplicas={allReplicas} loading={allReplicasLoading} />
+          <OrgChartTree agents={filtered} allReplicas={allReplicas} loading={allReplicasLoading} liveStatus={liveStatus} />
         ) : (
           /* Grid view (existing) */
           <div style={{ display: "flex", gap: 24 }}>
@@ -1022,6 +1166,7 @@ export default function Pingboard() {
                       agent={agent}
                       isSelected={selectedAgent?.name === agent.name}
                       onClick={() => handleSelectAgent(agent)}
+                      liveTasks={liveStatus[agent.id || agent.name] || liveStatus[agent.name] || []}
                     />
                   ))}
                 </div>
