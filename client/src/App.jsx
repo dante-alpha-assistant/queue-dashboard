@@ -152,7 +152,7 @@ export default function App() {
     switch (activeTab) {
       case "todo": return filterByType(todo);
       case "active": return [...filterByType(assigned), ...filterByType(inProgress)];
-      case "blocked": return filterByType(blocked);
+      case "blocked": return [...filterByType(blocked)].sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at));
       case "qa": return filterByType(qa);
       case "completed": return filterByType(completed);
       case "deploying": return filterByType(deploying);
@@ -467,7 +467,7 @@ export default function App() {
         </Column>
         <Column title="Blocked" color="#D84315" count={filterByType(blocked).length} isTablet={isTablet}
           collapsible collapsed={!!collapsedCols.blocked} onToggleCollapse={() => toggleCollapse("blocked")}>
-          {renderCards(filterByType(blocked))}
+          {renderCards([...filterByType(blocked)].sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at)))}
         </Column>
         <Column title="QA Testing" color="#7B5EA7" count={filterByType(qa).length} agentCount={countActiveTasks(filterByType(qa))} isTablet={isTablet}
           collapsible collapsed={!!collapsedCols.qa_testing} onToggleCollapse={() => toggleCollapse("qa_testing")}>

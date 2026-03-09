@@ -2,6 +2,18 @@ import { useState, useEffect } from 'react';
 import AgentPicker from './AgentPicker';
 import { ProgressBadge } from './ProgressFeed';
 
+const BLOCKER_TYPE_STYLES = {
+  missing_credential: { color: "#E65100", bg: "#E6510018", label: "Missing Credential", icon: "🔑" },
+  missing_config: { color: "#E65100", bg: "#E6510018", label: "Missing Config", icon: "⚙️" },
+  permission_denied: { color: "#C62828", bg: "#C6282818", label: "Permission Denied", icon: "🔒" },
+  permission: { color: "#C62828", bg: "#C6282818", label: "Permission", icon: "🔒" },
+  ambiguous_requirement: { color: "#1565C0", bg: "#1565C018", label: "Ambiguous", icon: "❓" },
+  ambiguous: { color: "#1565C0", bg: "#1565C018", label: "Ambiguous", icon: "❓" },
+  external_dependency: { color: "#6A1B9A", bg: "#6A1B9A18", label: "External Dep", icon: "🔗" },
+  infrastructure: { color: "#AD1457", bg: "#AD145718", label: "Infrastructure", icon: "🏗️" },
+  human_decision: { color: "#00695C", bg: "#00695C18", label: "Human Decision", icon: "🧑" },
+};
+
 const AGENT_ICONS = { neo: "🕶️", mu: "🔧", beta: "⚡", alpha: "🧠", flow: "🌊", ifra: "🛠️" };
 const AGENT_ROLES = { neo: "Builder", alpha: "Leader", beta: "QA", mu: "Builder", flow: "Orchestrator", ifra: "Ops" };
 const STATUS_COLORS = {
@@ -177,6 +189,125 @@ function Badge({ label, color, bg, style: extraStyle }) {
       display: "inline-block",
       ...extraStyle,
     }}>{label}</span>
+  );
+}
+
+/* ── Blocker Badge ────────────────────────────────────────── */
+function BlockerBadge({ task }) {
+  const blockerType = task.metadata?.blocker?.type;
+  if (!blockerType) return null;
+  const style = BLOCKER_TYPE_STYLES[blockerType] || { color: "#79747E", bg: "#79747E18", label: blockerType.replace(/_/g, " "), icon: "⚠️" };
+  return (
+    <Badge label={`${style.icon} ${style.label}`} color={style.color} bg={style.bg} />
+  );
+}
+
+/* ── Blocked Duration Ticker ──────────────────────────────── */
+function BlockedDurationTicker({ task }) {
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Use updated_at as when task entered blocked status
+  const blockedSince = task.updated_at;
+  if (!blockedSince) return null;
+  const elapsed = now - new Date(blockedSince).getTime();
+  if (elapsed < 0) return null;
+
+  const isLong = elapsed > 3600000; // > 1 hour
+
+  return (
+    <span style={{
+      fontSize: 11, fontWeight: 600, fontVariantNumeric: "tabular-nums",
+      color: isLong ? "#C62828" : "#D84315",
+      fontFamily: "'Roboto Mono', 'SF Mono', monospace",
+      display: "inline-flex", alignItems: "center", gap: 4,
+      padding: "3px 8px", borderRadius: 100,
+      background: isLong ? "#C6282812" : "#D8431512",
+    }}>
+      🚫 Blocked {formatDuration(elapsed)}
+    </span>
+  );
+}
+
+/* ── Quick Action Buttons for Blocked Cards ───────────────── */
+function BlockedQuickActions({ task, onStatusChange }) {
+  const [input, setInput] = useState("");
+  const [showInput, setShowInput] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const blockerType = task.metadata?.blocker?.type;
+  const requiredInputs = task.metadata?.blocker?.required_inputs || [];
+
+  const btnStyle = {
+    fontSize: 11, border: "none", padding: "6px 12px", borderRadius: 100,
+    cursor: "pointer", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4,
+    transition: "all 150ms ease", fontFamily: "'Roboto', system-ui, sans-serif",
+  };
+
+  const handleUnblock = async (humanInput) => {
+    setSubmitting(true);
+    try {
+      await onStatusChange?.(task.id, {
+        status: "todo", human_input: humanInput || null,
+        assigned_agent: null, dispatch_retries: 0, idle_retries: 0,
+      });
+      setInput("");
+      setShowInput(false);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }} onClick={e => e.stopPropagation()}>
+      {(blockerType === "missing_credential" || blockerType === "missing_config" || requiredInputs.length > 0) && (
+        <button
+          onClick={() => setShowInput(v => !v)}
+          style={{ ...btnStyle, background: "#E6510018", color: "#E65100" }}
+        >🔑 Provide Keys</button>
+      )}
+      {(blockerType === "ambiguous_requirement" || blockerType === "ambiguous" || blockerType === "human_decision") && (
+        <button
+          onClick={() => setShowInput(v => !v)}
+          style={{ ...btnStyle, background: "#1565C018", color: "#1565C0" }}
+        >💬 Clarify</button>
+      )}
+      <button
+        onClick={() => handleUnblock(null)}
+        disabled={submitting}
+        style={{ ...btnStyle, background: "#2E7D3218", color: "#2E7D32", opacity: submitting ? 0.6 : 1 }}
+      >🔄 Retry</button>
+
+      {showInput && (
+        <div style={{
+          width: "100%", display: "flex", gap: 6, marginTop: 4,
+        }}>
+          <input
+            type="text"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            placeholder={requiredInputs[0]?.placeholder || "Enter response..."}
+            onClick={e => e.stopPropagation()}
+            style={{
+              flex: 1, fontSize: 12, padding: "6px 10px", borderRadius: 8,
+              border: "1px solid var(--md-surface-variant, #E7E0EC)",
+              background: "var(--md-surface, #FFFBFE)",
+              fontFamily: "'Roboto', system-ui, sans-serif",
+              outline: "none",
+            }}
+          />
+          <button
+            onClick={() => handleUnblock(input)}
+            disabled={submitting || !input.trim()}
+            style={{ ...btnStyle, background: "#2E7D32", color: "#fff", opacity: (submitting || !input.trim()) ? 0.5 : 1 }}
+          >Submit</button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -369,20 +500,6 @@ function ActionBar({ task, onStatusChange, isMobile }) {
   }
 
   if (task.status === "blocked") {
-    const handleUnblock = async (e) => {
-      e.stopPropagation();
-      setUnblocking(true);
-      try {
-        await onStatusChange?.(task.id, { status: "todo", human_input: humanInput || null, assigned_agent: null, dispatch_retries: 0, idle_retries: 0 });
-        setHumanInput("");
-      } catch (err) {
-        setAssignError(err.message || "Unblock failed");
-        setTimeout(() => setAssignError(null), 3000);
-      } finally {
-        setUnblocking(false);
-      }
-    };
-
     return (
       <div style={{
         padding: "10px 16px 12px",
@@ -397,24 +514,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
             <span>{task.blocked_reason}</span>
           </div>
         )}
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span style={{ flex: 1, fontSize: 12, color: "var(--md-outline, #79747E)", fontStyle: "italic" }}>
-            💬 Open task details to add comments before unblocking
-          </span>
-          <button
-            onClick={handleUnblock}
-            disabled={unblocking}
-            style={{
-              ...btnBase,
-              background: unblocking ? "var(--md-outline, #79747E)" : "#2E7D32",
-              color: "#fff",
-              opacity: unblocking ? 0.7 : 1,
-              whiteSpace: "nowrap",
-            }}
-          >
-            {unblocking ? "⏳" : "✅"} Unblock
-          </button>
-        </div>
+        <BlockedQuickActions task={task} onStatusChange={onStatusChange} />
         {assignError && (
           <span style={{ fontSize: 12, color: "#BA1A1A", fontWeight: 500, marginTop: 6, display: "block" }}>
             ⚠️ {assignError}
@@ -453,6 +553,11 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
   const priority = PRIORITY_MAP[task.priority];
   const typeColor = TYPE_COLORS[task.type] || "#79747E";
 
+  // Blocked > 1 hour pulse
+  const blockedMs = task.status === "blocked" && task.updated_at
+    ? Date.now() - new Date(task.updated_at).getTime() : 0;
+  const blockedLong = blockedMs > 3600000;
+
   const resultText = task.result
     ? (typeof task.result === "string" ? task.result : (task.result.summary || JSON.stringify(task.result)))
     : null;
@@ -478,6 +583,15 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
     onMouseEnter={(e) => { if (!transitioning) e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)"; }}
     onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}
     >
+      {/* Blocked > 1hr pulse dot */}
+      {blockedLong && (
+        <div style={{
+          position: "absolute", top: 10, right: 10, zIndex: 5,
+          width: 10, height: 10, borderRadius: "50%",
+          background: "#C62828",
+          animation: "blocked-pulse 2s ease-in-out infinite",
+        }} />
+      )}
       {/* Transition loading overlay */}
       {transitioning && (
         <div style={{
@@ -509,6 +623,7 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
           {false && priority && (
             <Badge label={priority.label} color={priority.color} bg={priority.bg} />
           )}
+          {task.status === "blocked" && <BlockerBadge task={task} />}
           {task.paused && (
             <Badge label="⏸️ Paused" color="#E65100" bg="#E6510020" />
           )}
@@ -518,7 +633,10 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
               : <Badge label="⏳ Waiting for QA" color="#7B5EA7" bg="#7B5EA720" />
           )}
         </div>
-        <DurationTicker updatedAt={task.updated_at} startedAt={task.started_at} completedAt={task.completed_at} active={isActive} status={task.status} />
+        {task.status === "blocked"
+          ? <BlockedDurationTicker task={task} />
+          : <DurationTicker updatedAt={task.updated_at} startedAt={task.started_at} completedAt={task.completed_at} active={isActive} status={task.status} />
+        }
       </div>
 
       {/* ── Body ────────────────────────────────────────── */}
