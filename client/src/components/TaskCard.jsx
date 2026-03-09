@@ -6,6 +6,9 @@ import {
   RefreshIcon, UserPlusIcon, RocketIcon, KeyIcon, MessageSquareIcon,
   FolderIcon, SearchCheckIcon, PauseIcon, SlashIcon,
   KubernetesIcon, GitMergeIcon,
+  PriorityDot, TaskTypeIcon, AgentAvatar, BlockerIcon,
+  RetryIcon, DeployIcon, AssignIcon, KeyIcon, ChatIcon,
+  PauseIcon, QAIcon, WaitingIcon, FolderIcon, BlockedIcon, UserIcon,
 } from './Icons';
 
 const BLOCKER_TYPE_STYLES = {
