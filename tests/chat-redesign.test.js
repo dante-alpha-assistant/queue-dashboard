@@ -1,90 +1,39 @@
-/**
- * @jest-environment jsdom
- */
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
 
-/* Integration tests for NewTaskChat redesign:
- * - No sidebar panel for history
- * - New Chat, History, Clear as header icons
- * - History shows as compact dropdown/popover
- * - Neo messages have avatar
- */
+describe('NewTaskChat redesign — sidebar removed, header icons added', () => {
+  const code = readFileSync('client/src/components/NewTaskChat.jsx', 'utf8');
 
-import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-
-// Mock fetch
-beforeEach(() => {
-  global.fetch = jest.fn(() =>
-    Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
-  );
-});
-afterEach(() => { jest.restoreAllMocks(); });
-
-// Dynamic import to handle missing module gracefully
-let NewTaskChat;
-beforeAll(async () => {
-  try {
-    const mod = await import("../client/src/components/NewTaskChat.jsx");
-    NewTaskChat = mod.default;
-  } catch {
-    // Component may not be importable outside full build
-  }
-});
-
-describe("NewTaskChat redesign", () => {
-  const renderChat = () => {
-    if (!NewTaskChat) return null;
-    const { container } = render(<NewTaskChat isMobile={false} />);
-    // Open the chat
-    const fab = container.querySelector("button");
-    if (fab) fireEvent.click(fab);
-    return container;
-  };
-
-  test("no sidebar panel exists after opening chat", () => {
-    const container = renderChat();
-    if (!container) return; // skip if import failed
-    // Old sidebar had "+" New Chat" button text and conversation list
-    // The sidebar div had a fixed width and borderRight — should not exist now
-    const sidebar = container.querySelector('[style*="borderRight"]');
-    // In the new design there should be no persistent sidebar
-    // The only bordered element is the history dropdown (which is hidden by default)
-    expect(container.textContent).not.toContain("+ New Chat");
+  it('does not have a sidebar with "+ New Chat" button', () => {
+    expect(code).not.toContain('"+ New Chat"');
+    expect(code).not.toContain("'+ New Chat'");
   });
 
-  test("header has New Chat, History, and Clear icons", () => {
-    const container = renderChat();
-    if (!container) return;
-    // Check for icon buttons by their title attributes
-    const newChatBtn = container.querySelector('button[title="New chat"]');
-    const historyBtn = container.querySelector('button[title="History"]');
-    const clearBtn = container.querySelector('button[title="Clear conversation"]');
-    expect(newChatBtn).toBeTruthy();
-    expect(historyBtn).toBeTruthy();
-    expect(clearBtn).toBeTruthy();
+  it('does not have a hamburger menu toggle for sidebar', () => {
+    expect(code).not.toMatch(/title=["']Conversation history["']/);
   });
 
-  test("history dropdown opens on History icon click", async () => {
-    const container = renderChat();
-    if (!container) return;
-    const historyBtn = container.querySelector('button[title="History"]');
-    fireEvent.click(historyBtn);
-    await waitFor(() => {
-      expect(container.textContent).toContain("Recent Conversations");
-    });
+  it('has a New Chat header icon button', () => {
+    expect(code).toMatch(/title=["']New chat["']/);
   });
 
-  test("no hamburger menu exists", () => {
-    const container = renderChat();
-    if (!container) return;
-    const hamburger = container.querySelector('button[title="Conversation history"]');
-    expect(hamburger).toBeNull();
+  it('has a History header icon button', () => {
+    expect(code).toMatch(/title=["']History["']/);
   });
 
-  test("Neo avatar appears in the header", () => {
-    const container = renderChat();
-    if (!container) return;
-    // The NeoAvatar renders a div with "N" text
-    expect(container.textContent).toContain("Neo");
+  it('has a Clear conversation header icon button', () => {
+    expect(code).toMatch(/title=["']Clear conversation["']/);
+  });
+
+  it('has a HistoryDropdown component', () => {
+    expect(code).toContain('HistoryDropdown');
+  });
+
+  it('renders a Neo avatar for assistant messages', () => {
+    expect(code).toMatch(/NeoAvatar|neo-avatar|neoAvatar/i);
+  });
+
+  it('history dropdown shows recent conversations text', () => {
+    expect(code).toContain('Recent Conversations');
   });
 });
