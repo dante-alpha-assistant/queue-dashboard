@@ -149,7 +149,16 @@ neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
     if (!response.ok) {
       const err = await response.text();
       console.error("Neo gateway error:", response.status, err);
-      return res.status(response.status).json({ error: `Gateway error: ${response.status}` });
+      const friendlyErrors = {
+        405: "Neo's chat endpoint is not enabled. The gateway needs chatCompletions enabled in its config.",
+        401: "Authentication failed with Neo's gateway. Check NEO_GATEWAY_TOKEN.",
+        403: "Access denied by Neo's gateway.",
+        429: "Neo is rate-limited. Please try again in a moment.",
+        502: "Neo's gateway is unreachable. The service may be restarting.",
+        503: "Neo is temporarily unavailable. Please try again shortly.",
+      };
+      const message = friendlyErrors[response.status] || `Neo is unavailable (error ${response.status}). Please try again later.`;
+      return res.status(502).json({ error: message });
     }
 
     // Stream SSE to client and accumulate response
@@ -252,7 +261,16 @@ neoChatRouter.post("/", async (req, res) => {
     if (!response.ok) {
       const err = await response.text();
       console.error("Neo gateway error:", response.status, err);
-      return res.status(response.status).json({ error: `Gateway error: ${response.status}` });
+      const friendlyErrors = {
+        405: "Neo's chat endpoint is not enabled. The gateway needs chatCompletions enabled in its config.",
+        401: "Authentication failed with Neo's gateway.",
+        403: "Access denied by Neo's gateway.",
+        429: "Neo is rate-limited. Please try again in a moment.",
+        502: "Neo's gateway is unreachable.",
+        503: "Neo is temporarily unavailable.",
+      };
+      const message = friendlyErrors[response.status] || `Neo is unavailable (error ${response.status}).`;
+      return res.status(502).json({ error: message });
     }
 
     res.setHeader("Content-Type", "text/event-stream");
