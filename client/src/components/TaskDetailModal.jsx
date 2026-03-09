@@ -874,6 +874,9 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
 export default function TaskDetailModal({ task, onClose, onStatusChange, isMobile, isTablet, progress, monitor }) {
   const [closing, setClosing] = useState(false);
   const [actionProcessing, setActionProcessing] = useState(false);
+  const [fieldSaving, setFieldSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState(null);
   const [activeTab, setActiveTab] = useState('details');
   const [collapsedSections, setCollapsedSections] = useState({});
   const [idCopied, setIdCopied] = useState(false);
@@ -1004,6 +1007,21 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
     }
   };
 
+  const handleFieldChange = useCallback(async (updates) => {
+    setFieldSaving(true);
+    setSaveError(null);
+    try {
+      await onStatusChange(task.id, updates);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 1200);
+    } catch (err) {
+      setSaveError(err.message || 'Failed to save');
+      setTimeout(() => setSaveError(null), 4000);
+    } finally {
+      setFieldSaving(false);
+    }
+  }, [task?.id, onStatusChange]);
+
   if (!task) return null;
 
   const agent = task.assigned_agent?.toLowerCase();
@@ -1103,7 +1121,8 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
             <select
               className="tdm-stage-select"
               value={task.type || "general"}
-              onChange={e => onStatusChange(task.id, { type: e.target.value })}
+              disabled={fieldSaving || actionProcessing}
+              onChange={e => handleFieldChange({ type: e.target.value })}
               onClick={e => e.stopPropagation()}
               style={{ color: TYPE_COLORS[task.type] || '#79747E' }}
             >
@@ -1127,7 +1146,8 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
             <select
               className="tdm-stage-select"
               value={task.deploy_target || "kubernetes"}
-              onChange={e => onStatusChange(task.id, { deploy_target: e.target.value })}
+              disabled={fieldSaving || actionProcessing}
+              onChange={e => handleFieldChange({ deploy_target: e.target.value })}
               onClick={e => e.stopPropagation()}
               style={{ color: DEPLOY_TARGET_CONFIG[task.deploy_target || 'kubernetes']?.color || '#79747E' }}
             >
@@ -1160,7 +1180,8 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
             <select
               className="tdm-stage-select"
               value={task.stage || ""}
-              onChange={e => onStatusChange(task.id, { stage: e.target.value || null })}
+              disabled={fieldSaving || actionProcessing}
+              onChange={e => handleFieldChange({ stage: e.target.value || null })}
               onClick={e => e.stopPropagation()}
               style={{ color: task.stage ? (STAGE_COLORS[task.stage] || 'var(--md-on-surface-variant, #49454F)') : 'var(--md-outline, #79747E)' }}
             >
@@ -1576,6 +1597,8 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
 
         {/* ── Full-card loading overlay (persists across close/reopen via task status) ── */}
         {(actionProcessing || deploying || TRANSITIONAL_STATUSES.has(task.status)) && (
+        {/* ── Full-card loading overlay ───────────────────── */}
+        {(actionProcessing || fieldSaving) && (
           <div style={{
             position: 'absolute', inset: 0, zIndex: 250,
             background: 'rgba(255,251,254,0.7)',
@@ -1589,7 +1612,23 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
               borderTopColor: 'var(--md-primary, #6750A4)', borderRadius: '50%',
               animation: 'tdm-spin 0.7s linear infinite',
             }} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--md-on-surface-variant, #49454F)', letterSpacing: '0.02em' }}>Processing…</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--md-on-surface-variant, #49454F)', letterSpacing: '0.02em' }}>
+              {fieldSaving ? 'Saving…' : 'Processing…'}
+            </span>
+          </div>
+        )}
+
+        {/* ── Save success indicator ──────────────────────── */}
+        {saveSuccess && !fieldSaving && (
+          <div style={{
+            position: 'absolute', top: 12, right: 12, zIndex: 260,
+            background: '#386A20', color: '#fff', padding: '6px 14px',
+            borderRadius: 100, fontSize: 12, fontWeight: 600,
+            display: 'flex', alignItems: 'center', gap: 6,
+            boxShadow: '0 4px 12px rgba(56,106,32,0.3)',
+            animation: 'tdm-overlay-in 0.2s ease-out',
+          }}>
+            ✓ Saved
           </div>
         )}
 
@@ -1684,6 +1723,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
           borderTop: '1px solid var(--md-surface-variant, #E7E0EC)',
           display: 'flex', gap: 6, alignItems: 'center',
         }}>
+          {saveError && <span style={{ color: '#D32F2F', fontSize: 12, wordBreak: 'break-word' }}>⚠️ {saveError}</span>}
           {mergeConflict && <span style={{ color: '#E65100', fontSize: 12, fontWeight: 600 }}>⚠️ PR has merge conflicts</span>}
           {deployError && <span style={{ color: '#D32F2F', fontSize: 12, wordBreak: 'break-word' }}>⚠️ {deployError}</span>}
           {rebaseError && <span style={{ color: '#D32F2F', fontSize: 12, wordBreak: 'break-word' }}>⚠️ {rebaseError}</span>}
