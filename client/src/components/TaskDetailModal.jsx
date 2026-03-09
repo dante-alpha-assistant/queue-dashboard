@@ -621,17 +621,30 @@ function SmartRetryInfo({ metadata }) {
 
 /* ── Actions Dropdown ─────────────────────────────────────── */
 
+const FORCE_STATUS_OPTIONS = [
+  { value: "todo", label: "Todo", color: "#79747E" },
+  { value: "in_progress", label: "In Progress", color: "#E8A317" },
+  { value: "qa_testing", label: "QA Testing", color: "#5E35B1" },
+  { value: "completed", label: "Completed", color: "#1B5E20" },
+  { value: "blocked", label: "Blocked", color: "#D84315" },
+  { value: "deployed", label: "Deployed", color: "#00838F" },
+  { value: "failed", label: "Failed", color: "#BA1A1A" },
+];
+
 function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deploying, deploySuccess, deployConfirm, handleRebase, rebasing, rebaseSuccess, rebaseError, handleDeprecate, deprecating, deprecateConfirm, isMobile, dropUp = true, actionProcessing, setActionProcessing }) {
   const [open, setOpen] = useState(false);
   const [showAssignPicker, setShowAssignPicker] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const [forceCompleteConfirm, setForceCompleteConfirm] = useState(false);
+  const [showStatusPicker, setShowStatusPicker] = useState(false);
+  const [forceStatusConfirm, setForceStatusConfirm] = useState(null); // status value pending confirmation
   const isTransitional = TRANSITIONAL_STATUSES.has(task.status);
   const actionLoading = actionProcessing || isTransitional;
   const setActionLoading = setActionProcessing;
   const ref = useRef(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) { setForceCompleteConfirm(false); return; }
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -670,11 +683,57 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
     const rebaseLabel = rebasing ? '⏳ Rebasing…' : rebaseSuccess ? '✅ Rebase Sent' : '🔄 Rebase PR';
     actions.push({ label: rebaseLabel, key: 'rebase', color: '#E65100', disabled: rebasing || rebaseSuccess });
   }
+  // Force Complete — for non-terminal tasks
+  const TERMINAL = new Set(['completed', 'deployed', 'deprecated']);
+  if (!TERMINAL.has(s)) {
+    actions.push({ label: forceCompleteConfirm ? '⚠️ Confirm Force Complete' : '✅ Force Complete', key: 'force_complete', color: forceCompleteConfirm ? '#E65100' : '#1B5E20' });
+  }
+  // Change Status — always available (except deprecated)
+  if (s !== 'deprecated') {
+    actions.push({ label: '🔀 Change Status', key: 'change_status', color: '#6750A4' });
+  }
+
   if (s !== 'deprecated') {
     actions.push({ label: deprecating ? '⏳…' : '🗑️ Deprecate', key: 'deprecate', color: '#9E9E9E', disabled: deprecating });
   }
 
+  const handleForceStatus = async (newStatus) => {
+    setActionLoading(true);
+    setShowStatusPicker(false);
+    setForceStatusConfirm(null);
+    try {
+      const resp = await fetch(`/api/tasks/${task.id}/force-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus, changed_by: 'dashboard' }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'Force status failed');
+      // Trigger UI refresh via onStatusChange with empty update (task already updated server-side)
+      if (onStatusChange) await onStatusChange(task.id, {});
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleAction = async (key) => {
+    // Force Complete — two-click confirmation
+    if (key === 'force_complete' && !forceCompleteConfirm) {
+      setForceCompleteConfirm(true);
+      return; // keep dropdown open
+    }
+    if (key === 'force_complete' && forceCompleteConfirm) {
+      setOpen(false);
+      setForceCompleteConfirm(false);
+      await handleForceStatus('completed');
+      return;
+    }
+    // Change Status — show status picker
+    if (key === 'change_status') {
+      setShowStatusPicker(true);
+      setOpen(false);
+      return;
+    }
     // For deploy confirmation step, keep dropdown open so user sees the confirm button
     if (key === 'deploy' && !deployConfirm) {
       // First click — don't close dropdown, just trigger confirm state
@@ -762,6 +821,45 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
             onSelect={handleAssign}
             onCancel={() => setShowAssignPicker(false)}
           />
+        </div>
+      )}
+      {showStatusPicker && (
+        <div style={{
+          position: 'absolute',
+          ...(dropUp ? { bottom: '100%', marginBottom: 4 } : { top: '100%', marginTop: 4 }),
+          right: 0, background: 'var(--md-surface, #FFFBFE)',
+          border: '1px solid var(--md-surface-variant, #E7E0EC)',
+          borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+          minWidth: 200, zIndex: 301, overflow: 'hidden',
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--md-outline, #79747E)', padding: '10px 16px 6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Change status to:
+          </div>
+          {FORCE_STATUS_OPTIONS.filter(o => o.value !== task.status).map(opt => (
+            forceStatusConfirm === opt.value ? (
+              <button key={opt.value}
+                onClick={() => handleForceStatus(opt.value)}
+                style={{ display: 'block', width: '100%', padding: '10px 16px', background: '#FFF3E0', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, textAlign: 'left', color: '#E65100' }}
+              >
+                ⚠️ Confirm → {opt.label}
+              </button>
+            ) : (
+              <button key={opt.value}
+                onClick={() => setForceStatusConfirm(opt.value)}
+                style={{ display: 'block', width: '100%', padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, textAlign: 'left', color: opt.color }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--md-surface-container-low, #F7F2FA)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}
+              >
+                {opt.label}
+              </button>
+            )
+          ))}
+          <button
+            onClick={() => { setShowStatusPicker(false); setForceStatusConfirm(null); }}
+            style={{ display: 'block', width: '100%', padding: '8px 16px', background: 'none', border: 'none', borderTop: '1px solid var(--md-surface-variant, #E7E0EC)', cursor: 'pointer', fontSize: 12, color: 'var(--md-outline, #79747E)', textAlign: 'center' }}
+          >
+            Cancel
+          </button>
         </div>
       )}
     </div>
