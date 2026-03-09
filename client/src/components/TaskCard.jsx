@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import AgentPicker from './AgentPicker';
 import { ProgressBadge } from './ProgressFeed';
 import {
@@ -342,7 +342,43 @@ function ActionBar({ task, onStatusChange, isMobile }) {
   const [unblocking, setUnblocking] = useState(false);
   const [deploying, setDeploying] = useState(false);
   const [deployError, setDeployError] = useState(null);
+  const [deploySuccess, setDeploySuccess] = useState(false);
   const [showDeployTargetPicker, setShowDeployTargetPicker] = useState(false);
+  const deployPollRef = useRef(null);
+  const deployTimeoutRef = useRef(null);
+
+  const stopDeployPolling = useCallback(() => {
+    clearInterval(deployPollRef.current);
+    clearTimeout(deployTimeoutRef.current);
+    deployPollRef.current = null;
+    deployTimeoutRef.current = null;
+  }, []);
+
+  // Cleanup polling on unmount
+  useEffect(() => () => stopDeployPolling(), [stopDeployPolling]);
+
+  // Auto-clear deploy success after 3s
+  useEffect(() => {
+    if (deploySuccess) {
+      const t = setTimeout(() => setDeploySuccess(false), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [deploySuccess]);
+
+  // Sync with Realtime status updates
+  useEffect(() => {
+    if (task.status === 'deployed' || task.status === 'deploy_failed') {
+      stopDeployPolling();
+      if (deploying) {
+        setDeploying(false);
+        setDeploySuccess(task.status === 'deployed');
+        if (task.status === 'deploy_failed') {
+          setDeployError('Deploy failed');
+          setTimeout(() => setDeployError(null), 5000);
+        }
+      }
+    }
+  }, [task.status, stopDeployPolling, deploying]);
 
   const btnBase = {
     fontSize: 12, border: "none", padding: isMobile ? "8px 18px" : "7px 16px",
@@ -385,6 +421,8 @@ function ActionBar({ task, onStatusChange, isMobile }) {
   const handleDeploy = async (targetOverride) => {
     setDeploying(true);
     setDeployError(null);
+    setDeploySuccess(false);
+    stopDeployPolling();
     try {
       // If no deploy_target set and no override, prompt user to pick one
       if (!task.deploy_target && !targetOverride) {
@@ -402,11 +440,43 @@ function ActionBar({ task, onStatusChange, isMobile }) {
       if (!resp.ok || !data.ok) {
         throw new Error(data.error || `Deploy failed (HTTP ${resp.status})`);
       }
+      // If task is already deployed/deploy_failed, no Realtime update will come
+      if (task.status === 'deployed' || task.status === 'deploy_failed') {
+        setDeploying(false);
+        setDeploySuccess(task.status === 'deployed');
+        return;
+      }
+      // Start polling as fallback in case Realtime doesn't fire
+      deployPollRef.current = setInterval(async () => {
+        try {
+          const pollResp = await fetch(`/api/tasks/${task.id}`);
+          if (pollResp.ok) {
+            const pollData = await pollResp.json();
+            const st = pollData?.status || pollData?.task?.status;
+            if (st === 'deployed' || st === 'deploy_failed') {
+              stopDeployPolling();
+              setDeploying(false);
+              setDeploySuccess(st === 'deployed');
+              if (st === 'deploy_failed') {
+                setDeployError('Deploy failed');
+                setTimeout(() => setDeployError(null), 5000);
+              }
+            }
+          }
+        } catch (_) { /* ignore poll errors */ }
+      }, 5000);
+      // Timeout: reset spinner after 30s no matter what
+      deployTimeoutRef.current = setTimeout(() => {
+        stopDeployPolling();
+        setDeploying(false);
+        setDeployError('Deploy may still be in progress. Refresh to check status.');
+        setTimeout(() => setDeployError(null), 8000);
+      }, 30000);
     } catch (e) {
+      stopDeployPolling();
+      setDeploying(false);
       setDeployError(e.message || "Deploy failed");
       setTimeout(() => setDeployError(null), 5000);
-    } finally {
-      setDeploying(false);
     }
   };
 
@@ -418,17 +488,19 @@ function ActionBar({ task, onStatusChange, isMobile }) {
           disabled={deploying}
           style={{
             ...btnBase,
-            background: deploying ? "var(--md-outline, #79747E)" : "#00838F",
+            background: deploying ? "var(--md-outline, #79747E)" : deploySuccess ? "#2E7D32" : "#00838F",
             color: "#fff",
             opacity: deploying ? 0.7 : 1,
           }}
         >
           {deploying ? (
             <span style={{ display: "inline-block", width: 14, height: 14, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+          ) : deploySuccess ? (
+            <span style={{ fontSize: 14, lineHeight: 1 }}>✅</span>
           ) : (
             <RocketIcon size={14} />
           )}
-          {deploying ? "Deploying…" : "Deploy"}
+          {deploying ? "Deploying…" : deploySuccess ? "Deployed!" : "Deploy"}
         </button>
         {showDeployTargetPicker && (
           <div
