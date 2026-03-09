@@ -406,7 +406,7 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
           )}
           {task.status === "qa_testing" && (
             task.qa_agent
-              ? <Badge label={`🔍 ${task.qa_agent}`} color="#2E7D32" bg="#2E7D3220" />
+              ? <Badge label={`🔍 QA: ${task.qa_agent}`} color="#2E7D32" bg="#2E7D3220" />
               : <Badge label="⏳ Waiting for QA" color="#7B5EA7" bg="#7B5EA720" />
           )}
         </div>
