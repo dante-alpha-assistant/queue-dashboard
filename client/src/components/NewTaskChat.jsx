@@ -73,6 +73,7 @@ export default function NewTaskChat({ isMobile }) {
   const [dragging, setDragging] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [error, setError] = useState(null);
 
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
@@ -84,9 +85,17 @@ export default function NewTaskChat({ isMobile }) {
   const loadConversations = useCallback(async () => {
     try {
       const resp = await fetch("/api/neo-chat/conversations");
+      if (!resp.ok) {
+        console.error("Failed to load conversations:", resp.status);
+        setError("Failed to load conversations. The chat service may be unavailable.");
+        return;
+      }
       const data = await resp.json();
       if (Array.isArray(data)) setConversations(data);
-    } catch {}
+    } catch (e) {
+      console.error("Failed to load conversations:", e);
+      setError("Failed to connect to chat service.");
+    }
   }, []);
 
   // Load messages for a conversation
@@ -95,6 +104,12 @@ export default function NewTaskChat({ isMobile }) {
     setLoadingMessages(true);
     try {
       const resp = await fetch(`/api/neo-chat/conversations/${convoId}/messages`);
+      if (!resp.ok) {
+        console.error("Failed to load messages:", resp.status);
+        setError("Failed to load messages.");
+        setLoadingMessages(false);
+        return;
+      }
       const data = await resp.json();
       if (Array.isArray(data)) {
         setMessages(data.map(m => ({
@@ -104,7 +119,10 @@ export default function NewTaskChat({ isMobile }) {
           id: m.id,
         })));
       }
-    } catch {}
+    } catch (e) {
+      console.error("Failed to load messages:", e);
+      setError("Failed to load messages.");
+    }
     setLoadingMessages(false);
   }, []);
 
@@ -207,15 +225,27 @@ export default function NewTaskChat({ isMobile }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({}),
         });
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({}));
+          setError(`Failed to create conversation: ${errData.error || resp.statusText}`);
+          return;
+        }
         const convo = await resp.json();
         if (convo?.id) {
           convoId = convo.id;
           setConversations(prev => [convo, ...prev]);
           setActiveConvoId(convoId);
-        } else return;
-      } catch { return; }
+        } else {
+          setError("Failed to create conversation: unexpected response");
+          return;
+        }
+      } catch (e) {
+        setError(`Failed to create conversation: ${e.message}`);
+        return;
+      }
     }
 
+    setError(null);
     const content = text;
     const userMsg = { role: "user", content, time: new Date().toISOString() };
     const newMessages = [...messages, userMsg];
@@ -487,6 +517,21 @@ export default function NewTaskChat({ isMobile }) {
           <div ref={bottomRef} />
         </div>
 
+        {/* Error banner */}
+        {error && (
+          <div style={{
+            padding: "8px 14px", margin: "0 12px", borderRadius: 8,
+            background: "rgba(179, 38, 30, 0.12)", color: "var(--md-error, #B3261E)",
+            fontSize: 12, display: "flex", justifyContent: "space-between", alignItems: "center",
+          }}>
+            <span>⚠️ {error}</span>
+            <button onClick={() => setError(null)} style={{
+              background: "none", border: "none", color: "var(--md-error, #B3261E)",
+              cursor: "pointer", fontSize: 14, padding: "0 4px",
+            }}>✕</button>
+          </div>
+        )}
+
         {/* Image previews */}
         {pendingImages.length > 0 && (
           <div style={{ padding: "8px 12px 0", display: "flex", gap: 8, flexWrap: "wrap", borderTop: "1px solid var(--md-surface-variant)" }}>
@@ -518,7 +563,7 @@ export default function NewTaskChat({ isMobile }) {
               border: "none", padding: "10px 16px", borderRadius: 20, fontWeight: 600, fontSize: 13,
               cursor: hasInput && !streaming ? "pointer" : "default", fontFamily: "'Roboto', system-ui, sans-serif",
               minHeight: isMobile ? 44 : "auto", minWidth: 60, flexShrink: 0,
-            }}>{streaming ? "..." : "Send"}</button>
+            }}>{streaming ? "Sending…" : "Send"}</button>
         </div>
       </div>
     </div>
