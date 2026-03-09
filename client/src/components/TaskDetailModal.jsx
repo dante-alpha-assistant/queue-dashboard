@@ -960,7 +960,12 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
       if (!resp.ok || !data.ok) {
         throw new Error(data.error || `Deploy failed (HTTP ${resp.status})`);
       }
-      // Don't close or reset deploying — the Processing overlay stays
+      // If task is already deployed/deploy_failed, no Realtime update will come — reset now
+      if (task.status === 'deployed' || task.status === 'deploy_failed') {
+        setDeploying(false);
+        setDeploySuccess(task.status === 'deployed');
+      }
+      // Otherwise spinner stays until Realtime updates task.status
     } catch (e) {
       setDeploying(false);
       setDeployError(e.message || "Deploy failed");
