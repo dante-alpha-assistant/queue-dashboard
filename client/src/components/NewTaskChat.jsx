@@ -337,7 +337,7 @@ export default function NewTaskChat({ isMobile }) {
         style={{
           position: "fixed",
           bottom: isMobile ? 80 : 24,
-          right: isMobile ? 16 : 88,
+          right: isMobile ? 16 : 24,
           height: 48,
           paddingLeft: 16,
           paddingRight: 18,
