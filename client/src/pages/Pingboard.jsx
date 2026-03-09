@@ -956,9 +956,44 @@ function PipelineView() {
   );
 }
 
-function ReplicaCard({ pod, activeTasks }) {
+// CSS keyframes injected once
+const ANIMATION_STYLES_ID = "pingboard-animations";
+if (typeof document !== "undefined" && !document.getElementById(ANIMATION_STYLES_ID)) {
+  const style = document.createElement("style");
+  style.id = ANIMATION_STYLES_ID;
+  style.textContent = `
+    @keyframes pb-slide-in {
+      from { opacity: 0; transform: translateY(20px) scale(0.95); max-height: 0; }
+      to { opacity: 1; transform: translateY(0) scale(1); max-height: 400px; }
+    }
+    @keyframes pb-fade-out {
+      from { opacity: 1; transform: scale(1); max-height: 400px; }
+      to { opacity: 0; transform: scale(0.9); max-height: 0; padding: 0; margin: 0; }
+    }
+    @keyframes pb-pulse-glow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+      50% { box-shadow: 0 0 12px 4px rgba(99, 102, 241, 0.25); }
+    }
+    @keyframes pb-status-flash {
+      0% { background-color: rgba(99, 102, 241, 0.2); }
+      100% { background-color: transparent; }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function ReplicaCard({ pod, activeTasks, animState, hasActiveTasks }) {
   const podTasks = activeTasks || [];
   const statusColor = pod.ready ? "#2E7D32" : pod.status === "Running" ? "#E65100" : "#BA1A1A";
+  const isWorking = hasActiveTasks || podTasks.length > 0;
+
+  const animStyle = animState === "entering"
+    ? { animation: "pb-slide-in 400ms ease-out forwards" }
+    : animState === "exiting"
+    ? { animation: "pb-fade-out 400ms ease-in forwards", pointerEvents: "none" }
+    : animState === "status-changed"
+    ? { animation: "pb-status-flash 800ms ease-out" }
+    : {};
 
   return (
     <div
@@ -968,6 +1003,9 @@ function ReplicaCard({ pod, activeTasks }) {
         padding: 14,
         border: "1px solid var(--md-surface-variant)",
         transition: "all 150ms",
+        overflow: "hidden",
+        ...(isWorking && !animState ? { animation: "pb-pulse-glow 2s ease-in-out infinite" } : {}),
+        ...animStyle,
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
@@ -1202,6 +1240,9 @@ export default function Pingboard() {
   const [allReplicasLoading, setAllReplicasLoading] = useState(false);
   const [liveStatus, setLiveStatus] = useState({});
   const [viewMode, setViewMode] = useState("grid");
+  const prevPodsRef = useRef([]);
+  const [animatingPods, setAnimatingPods] = useState(new Map()); // podName -> "entering"|"exiting"|"status-changed"
+  const exitingPodsRef = useRef([]); // pods that are fading out
 
   const fetchAgents = useCallback(async () => {
     try {
@@ -1225,7 +1266,50 @@ export default function Pingboard() {
       const res = await fetch(`/api/agents/${agentName}/replicas`);
       if (res.ok) {
         const data = await res.json();
+        const prevPods = prevPodsRef.current;
+        const newPods = data.pods || [];
+        const prevNames = new Set(prevPods.map(p => p.name));
+        const newNames = new Set(newPods.map(p => p.name));
+        const newAnims = new Map();
+
+        // Detect new pods (scale up)
+        for (const pod of newPods) {
+          if (!prevNames.has(pod.name) && prevPods.length > 0) {
+            newAnims.set(pod.name, "entering");
+          }
+        }
+
+        // Detect status changes
+        for (const pod of newPods) {
+          if (prevNames.has(pod.name) && !newAnims.has(pod.name)) {
+            const prev = prevPods.find(p => p.name === pod.name);
+            if (prev && (prev.ready !== pod.ready || prev.status !== pod.status)) {
+              newAnims.set(pod.name, "status-changed");
+            }
+          }
+        }
+
+        // Detect removed pods (scale down) — keep them temporarily for fade-out
+        const exiting = [];
+        for (const pod of prevPods) {
+          if (!newNames.has(pod.name)) {
+            exiting.push({ ...pod, _exiting: true });
+            newAnims.set(pod.name, "exiting");
+          }
+        }
+
+        exitingPodsRef.current = exiting;
+        setAnimatingPods(newAnims);
         setReplicas(data);
+        prevPodsRef.current = newPods;
+
+        // Clear animations after they complete
+        if (newAnims.size > 0) {
+          setTimeout(() => {
+            exitingPodsRef.current = [];
+            setAnimatingPods(new Map());
+          }, 450);
+        }
       }
     } catch (e) {
       console.error("Failed to fetch replicas:", e);
@@ -1277,11 +1361,16 @@ export default function Pingboard() {
 
   useEffect(() => {
     if (selectedAgent && viewMode === "grid") {
+    if (selectedAgent) {
+      prevPodsRef.current = [];
+      exitingPodsRef.current = [];
+      setAnimatingPods(new Map());
       fetchReplicas(selectedAgent.name || selectedAgent.id);
-      const interval = setInterval(() => fetchReplicas(selectedAgent.name || selectedAgent.id), 15000);
+      const interval = setInterval(() => fetchReplicas(selectedAgent.name || selectedAgent.id), 12000);
       return () => clearInterval(interval);
     } else {
       setReplicas(null);
+      prevPodsRef.current = [];
     }
   }, [selectedAgent, fetchReplicas, viewMode]);
 
@@ -1703,6 +1792,90 @@ export default function Pingboard() {
 
                 {Array.isArray(selectedAgent.capabilities) && selectedAgent.capabilities.length > 0 && (
                   <div style={{ marginBottom: 16 }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    Pod Replicas
+                    <span style={{
+                      width: 6, height: 6, borderRadius: "50%",
+                      background: "#2E7D32",
+                      display: "inline-block",
+                      animation: "pb-pulse-glow 2s ease-in-out infinite",
+                    }} title="Auto-refreshing every 12s" />
+                  </span>
+                  {replicas && (
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: "2px 8px",
+                        borderRadius: 10,
+                        background: "var(--md-primary-container)",
+                        color: "var(--md-on-primary-container)",
+                      }}
+                    >
+                      {replicas.pods.length}
+                    </span>
+                  )}
+                </div>
+
+                {replicasLoading && !replicas ? (
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: 20,
+                      color: "var(--md-on-surface-variant)",
+                      fontSize: 13,
+                    }}
+                  >
+                    Loading replicas...
+                  </div>
+                ) : replicas && (replicas.pods.length > 0 || exitingPodsRef.current.length > 0) ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {[...replicas.pods, ...exitingPodsRef.current].map((pod) => (
+                      <ReplicaCard
+                        key={pod.name}
+                        pod={pod}
+                        activeTasks={replicas.activeTasks}
+                        animState={animatingPods.get(pod.name) || null}
+                        hasActiveTasks={
+                          (replicas.activeTasks || []).some(t =>
+                            t.assigned_agent === (selectedAgent?.name || selectedAgent?.id)
+                          )
+                        }
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: 20,
+                      color: "var(--md-on-surface-variant)",
+                      fontSize: 13,
+                      background: "var(--md-surface)",
+                      borderRadius: 12,
+                      border: "1px dashed var(--md-surface-variant)",
+                    }}
+                  >
+                    No K8s pods found for this agent.
+                    <br />
+                    <span style={{ fontSize: 11, opacity: 0.7 }}>
+                      Agent may not be K8s-deployed.
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Metrics */}
+              {selectedAgent.metrics &&
+                (selectedAgent.metrics.success_rate != null ||
+                  selectedAgent.metrics.avg_completion_time != null) && (
+                  <div
+                    style={{
+                      marginTop: 16,
+                      paddingTop: 16,
+                      borderTop: "1px solid var(--md-surface-variant)",
+                    }}
+                  >
                     <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--md-on-surface-variant)", opacity: 0.7, marginBottom: 6 }}>
                       Capabilities
                     </div>
