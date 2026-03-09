@@ -910,7 +910,6 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
     if (task.status === 'deploying') {
       setDeploying(true);
     } else if (task.status === 'deployed' || task.status === 'deploy_failed') {
-      // Realtime fired — stop any fallback polling/timeout
       stopDeployPolling();
       setDeploying(false);
       setDeploySuccess(task.status === 'deployed');
@@ -954,6 +953,18 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
 
   const [deployConfirm, setDeployConfirm] = useState(false);
   const deployConfirmTimer = useRef(null);
+  const deployPollRef = useRef(null);
+  const deployTimeoutRef = useRef(null);
+
+  const stopDeployPolling = useCallback(() => {
+    clearInterval(deployPollRef.current);
+    clearTimeout(deployTimeoutRef.current);
+    deployPollRef.current = null;
+    deployTimeoutRef.current = null;
+  }, []);
+
+  // Cleanup deploy polling on unmount
+  useEffect(() => () => stopDeployPolling(), [stopDeployPolling]);
 
   const deployPollRef = useRef(null);
   const deployTimeoutRef = useRef(null);
@@ -986,6 +997,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
     setDeploying(true);
     setDeployError(null);
     setDeploySuccess(false);
+    stopDeployPolling();
     try {
       const resp = await fetch(`/api/deploy/${task.id}`, { method: "POST" });
       const data = await resp.json();
@@ -1025,6 +1037,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
         setTimeout(() => setDeployError(null), 8000);
       }, 30000);
     } catch (e) {
+      stopDeployPolling();
       setDeploying(false);
       setDeployError(e.message || "Deploy failed");
       setTimeout(() => setDeployError(null), 5000);
@@ -1652,7 +1665,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
         )}
 
         {/* ── Full-card loading overlay ───────────────────── */}
-        {(actionProcessing || deploying || fieldSaving || TRANSITIONAL_STATUSES.has(task.status)) && (
+        {(actionProcessing || deploying || fieldSaving) && (
           <div style={{
             position: 'absolute', inset: 0, zIndex: 250,
             background: 'rgba(255,251,254,0.7)',
@@ -1667,7 +1680,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
               animation: 'tdm-spin 0.7s linear infinite',
             }} />
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--md-on-surface-variant, #49454F)', letterSpacing: '0.02em' }}>
-              {fieldSaving ? 'Saving…' : deploying ? 'Deploying…' : 'Processing…'}
+              {deploying ? 'Deploying…' : fieldSaving ? 'Saving…' : 'Processing…'}
             </span>
           </div>
         )}
