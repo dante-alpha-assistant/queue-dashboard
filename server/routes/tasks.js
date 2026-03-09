@@ -395,9 +395,19 @@ router.post("/deploy/:id", async (req, res) => {
 
         if (!importResp.ok) {
           const err = await importResp.json().catch(() => ({}));
-          const errMsg = `Vercel project creation failed: ${err.error?.message || importResp.status}`;
+          const rawMsg = err.error?.message || `HTTP ${importResp.status}`;
+          let errMsg = `Vercel project creation failed: ${rawMsg}`;
+          let actionRequired = null;
+
+          // Detect missing GitHub integration and provide actionable guidance
+          if (rawMsg.toLowerCase().includes('github integration') || rawMsg.toLowerCase().includes('install the github')) {
+            errMsg = `Vercel GitHub integration not installed. Cannot link repo '${repoFullName}'.`;
+            actionRequired = 'Install the Vercel GitHub integration at https://vercel.com/integrations/github for the GitHub org/account, then retry.';
+            errMsg += ` Action required: ${actionRequired}`;
+          }
+
           await supabase.from('agent_tasks').update({ status: 'deploy_failed', error: errMsg, updated_at: new Date().toISOString() }).eq('id', req.params.id);
-          return res.status(400).json({ ok: false, error: errMsg });
+          return res.status(400).json({ ok: false, error: errMsg, action_required: actionRequired });
         }
         vercelProject = await importResp.json();
         console.log(`[DEPLOY] Created Vercel project: ${vercelProject.name}`);
