@@ -44,6 +44,51 @@ router.get("/repositories", async (req, res) => {
   }
 });
 
+// Error stats — error count by category in last 24h/7d
+router.get("/error-stats", async (req, res) => {
+  try {
+    const now = new Date();
+    const day = new Date(now - 24 * 60 * 60 * 1000).toISOString();
+    const week = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const categories = [
+      'merge_conflict', 'ci_failure', 'timeout', 'session_lost',
+      'qa_rejection', 'auth_error', 'resource_error', 'unknown',
+    ];
+
+    const [dayRes, weekRes] = await Promise.all([
+      supabase
+        .from('task_activity_log')
+        .select('error_category')
+        .not('error_category', 'is', null)
+        .gte('changed_at', day),
+      supabase
+        .from('task_activity_log')
+        .select('error_category')
+        .not('error_category', 'is', null)
+        .gte('changed_at', week),
+    ]);
+
+    const count = (data) => {
+      const counts = {};
+      for (const cat of categories) counts[cat] = 0;
+      for (const row of (data || [])) {
+        counts[row.error_category] = (counts[row.error_category] || 0) + 1;
+      }
+      return counts;
+    };
+
+    res.json({
+      last_24h: count(dayRes.data),
+      last_7d: count(weekRes.data),
+      total_24h: (dayRes.data || []).length,
+      total_7d: (weekRes.data || []).length,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Stats
 router.get("/stats", async (req, res) => {
   try {
