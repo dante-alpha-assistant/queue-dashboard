@@ -9,6 +9,7 @@ import TaskComments from './TaskComments';
 import TaskRelationships from './TaskRelationships';
 import { ProgressDetail } from './ProgressFeed';
 import CostsTab from './CostsTab';
+import HumanInterventionForm from './HumanInterventionForm';
 
 /* ── Constants ────────────────────────────────────────────── */
 
@@ -1215,17 +1216,9 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
     <div>
       {activeTab === 'details' && (
         <>
-          {task.status === 'blocked' && task.blocked_reason && (
-            <div style={{
-              marginBottom: 16, padding: '12px 16px', borderRadius: 10,
-              background: '#E6510012', border: '1px solid #E6510030',
-              display: 'flex', alignItems: 'flex-start', gap: 10,
-            }}>
-              <span style={{ fontSize: 18, flexShrink: 0, lineHeight: 1.2 }}>🚫</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#E65100', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Blocked</div>
-                <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--md-on-surface, #1C1B1F)' }}>{task.blocked_reason}</div>
-              </div>
+          {task.status === 'blocked' && (
+            <div style={{ marginBottom: 16 }}>
+              <HumanInterventionForm task={task} onStatusChange={onStatusChange} onClose={handleClose} />
             </div>
           )}
           {hasError && (
