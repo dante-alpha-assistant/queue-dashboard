@@ -752,6 +752,9 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const [rebaseError, setRebaseError] = useState(null);
   const [rebaseSuccess, setRebaseSuccess] = useState(false);
   const [mergeConflict, setMergeConflict] = useState(null); // null = unchecked, true/false = checked
+  const [editingDeployUrl, setEditingDeployUrl] = useState(false);
+  const [deployUrlDraft, setDeployUrlDraft] = useState(task.deployment_url || '');
+  const [savingDeployUrl, setSavingDeployUrl] = useState(false);
 
   useEffect(() => { ensureModalStyles(); }, []);
   useEffect(() => {
@@ -871,13 +874,13 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const hasDescription = !!task.description;
   const hasMetadata = !!task.metadata && typeof task.metadata === 'object' && Object.keys(task.metadata).length > 0;
 
-  const hasDeployment = ['deploying', 'deployed', 'deploy_failed'].includes(task.status);
+  const hasDeploymentStatus = ['deploying', 'deployed', 'deploy_failed'].includes(task.status);
   const hasCosts = !!task.metadata?.costs && typeof task.metadata.costs === 'object' && Object.keys(task.metadata.costs).length > 0;
 
   const tabs = [{ key: 'details', label: 'Details' }];
   tabs.push({ key: 'comments', label: '💬 Comments' });
   tabs.push({ key: 'activity', label: 'Activity' });
-  if (hasDeployment) tabs.push({ key: 'deployment', label: '🚀 Deployment' });
+  tabs.push({ key: 'deployment', label: '🚀 Deployment' });
   if (hasCosts) tabs.push({ key: 'costs', label: '💰 Costs' });
   tabs.push({ key: 'metadata', label: 'Metadata' });
   if (hasQA) tabs.push({ key: 'qa', label: 'QA' });
@@ -976,6 +979,15 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
             >
               {DEPLOY_TARGETS.map(t => <option key={t} value={t}>{DEPLOY_TARGET_CONFIG[t].icon} {DEPLOY_TARGET_CONFIG[t].label}</option>)}
             </select>
+            {task.deployment_url ? (
+              <a href={task.deployment_url} target="_blank" rel="noopener noreferrer" style={{
+                color: '#6750A4', textDecoration: 'none', fontSize: 11, display: 'flex',
+                alignItems: 'center', gap: 4, marginTop: 4, wordBreak: 'break-all',
+              }}>
+                <span style={{ fontSize: 10 }}>🔗</span>
+                {task.deployment_url.replace(/^https?:\/\//, '').slice(0, 30)}{task.deployment_url.replace(/^https?:\/\//, '').length > 30 ? '…' : ''}
+              </a>
+            ) : null}
           </MetaCell>
           <MetaCell label="Created">
             <span title={task.created_at}>{formatDateShort(task.created_at)}</span>
@@ -1136,44 +1148,116 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
         </div>
       )}
 
-      {activeTab === 'deployment' && hasDeployment && (
+      {activeTab === 'deployment' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* Deployment Status */}
-          <div style={{
-            padding: '14px 16px', borderRadius: 10,
-            background: task.status === 'deployed' ? '#00838F0A' : task.status === 'deploy_failed' ? '#BA1A1A0A' : '#E8A3170A',
-            border: `1px solid ${task.status === 'deployed' ? '#00838F25' : task.status === 'deploy_failed' ? '#BA1A1A25' : '#E8A31725'}`,
-            display: 'flex', alignItems: 'center', gap: 12,
-          }}>
-            <span style={{ fontSize: 24 }}>
-              {task.status === 'deployed' ? '✅' : task.status === 'deploy_failed' ? '❌' : '⏳'}
-            </span>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: task.status === 'deployed' ? '#00838F' : task.status === 'deploy_failed' ? '#BA1A1A' : '#E8A317' }}>
-                {task.status === 'deployed' ? 'Deployed' : task.status === 'deploy_failed' ? 'Deploy Failed' : 'Deploying…'}
-              </div>
-              {task.updated_at && (
-                <div style={{ fontSize: 11, color: 'var(--md-outline, #79747E)', marginTop: 2 }}>
-                  {formatDate(task.updated_at)}
+          {hasDeploymentStatus && (
+            <div style={{
+              padding: '14px 16px', borderRadius: 10,
+              background: task.status === 'deployed' ? '#00838F0A' : task.status === 'deploy_failed' ? '#BA1A1A0A' : '#E8A3170A',
+              border: `1px solid ${task.status === 'deployed' ? '#00838F25' : task.status === 'deploy_failed' ? '#BA1A1A25' : '#E8A31725'}`,
+              display: 'flex', alignItems: 'center', gap: 12,
+            }}>
+              <span style={{ fontSize: 24 }}>
+                {task.status === 'deployed' ? '✅' : task.status === 'deploy_failed' ? '❌' : '⏳'}
+              </span>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: task.status === 'deployed' ? '#00838F' : task.status === 'deploy_failed' ? '#BA1A1A' : '#E8A317' }}>
+                  {task.status === 'deployed' ? 'Deployed' : task.status === 'deploy_failed' ? 'Deploy Failed' : 'Deploying…'}
                 </div>
-              )}
+                {task.updated_at && (
+                  <div style={{ fontSize: 11, color: 'var(--md-outline, #79747E)', marginTop: 2 }}>
+                    {formatDate(task.updated_at)}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Deployment URL */}
+          {/* Deployment URL — editable */}
           <div className="tdm-sidebar-card">
             <SectionLabel icon="🔗">Deployment URL</SectionLabel>
-            {task.deployment_url ? (
-              <a href={task.deployment_url} target="_blank" rel="noopener noreferrer" style={{
-                color: '#6750A4', textDecoration: 'none', fontWeight: 500, fontSize: 13,
-                display: 'flex', alignItems: 'center', gap: 6, wordBreak: 'break-all',
-              }}>
-                <span>🌐</span> {task.deployment_url}
-              </a>
+            {editingDeployUrl ? (
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input
+                  type="text"
+                  value={deployUrlDraft}
+                  onChange={e => setDeployUrlDraft(e.target.value)}
+                  placeholder="https://example.com"
+                  autoFocus
+                  style={{
+                    flex: 1, padding: '6px 10px', fontSize: 13, borderRadius: 8,
+                    border: '1px solid var(--md-surface-variant, #E7E0EC)',
+                    background: 'var(--md-surface, #FFFBFE)',
+                    fontFamily: "'Roboto Mono', monospace", outline: 'none',
+                  }}
+                  onFocus={e => e.target.style.borderColor = 'var(--md-primary, #6750A4)'}
+                  onBlur={e => e.target.style.borderColor = 'var(--md-surface-variant, #E7E0EC)'}
+                  onKeyDown={async e => {
+                    if (e.key === 'Enter') {
+                      setSavingDeployUrl(true);
+                      try {
+                        await onStatusChange(task.id, { deployment_url: deployUrlDraft || null });
+                        setEditingDeployUrl(false);
+                      } finally { setSavingDeployUrl(false); }
+                    } else if (e.key === 'Escape') {
+                      setEditingDeployUrl(false);
+                      setDeployUrlDraft(task.deployment_url || '');
+                    }
+                  }}
+                />
+                <button
+                  disabled={savingDeployUrl}
+                  onClick={async () => {
+                    setSavingDeployUrl(true);
+                    try {
+                      await onStatusChange(task.id, { deployment_url: deployUrlDraft || null });
+                      setEditingDeployUrl(false);
+                    } finally { setSavingDeployUrl(false); }
+                  }}
+                  style={{
+                    padding: '6px 12px', fontSize: 12, fontWeight: 600, borderRadius: 8,
+                    background: 'var(--md-primary, #6750A4)', color: '#fff', border: 'none',
+                    cursor: savingDeployUrl ? 'not-allowed' : 'pointer', opacity: savingDeployUrl ? 0.6 : 1,
+                  }}
+                >{savingDeployUrl ? '…' : '✓'}</button>
+                <button
+                  onClick={() => { setEditingDeployUrl(false); setDeployUrlDraft(task.deployment_url || ''); }}
+                  style={{
+                    padding: '6px 10px', fontSize: 12, borderRadius: 8,
+                    background: 'var(--md-surface-container-low, #F7F2FA)', color: 'var(--md-outline, #79747E)',
+                    border: '1px solid var(--md-surface-variant, #E7E0EC)', cursor: 'pointer',
+                  }}
+                >✕</button>
+              </div>
             ) : (
-              <span style={{ color: 'var(--md-outline, #79747E)', fontSize: 13, fontStyle: 'italic' }}>
-                No deployment URL recorded
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                {task.deployment_url ? (
+                  <a href={task.deployment_url} target="_blank" rel="noopener noreferrer" style={{
+                    color: '#6750A4', textDecoration: 'none', fontWeight: 500, fontSize: 13,
+                    display: 'flex', alignItems: 'center', gap: 6, wordBreak: 'break-all', flex: 1, minWidth: 0,
+                  }}>
+                    <span>🔗</span> {task.deployment_url}
+                  </a>
+                ) : (
+                  <span style={{ color: 'var(--md-outline, #79747E)', fontSize: 13, fontStyle: 'italic' }}>
+                    No deployment URL yet
+                  </span>
+                )}
+                <button
+                  onClick={() => { setDeployUrlDraft(task.deployment_url || ''); setEditingDeployUrl(true); }}
+                  title="Edit deployment URL"
+                  style={{
+                    padding: '4px 8px', fontSize: 11, borderRadius: 6,
+                    background: 'var(--md-surface-container-low, #F7F2FA)',
+                    border: '1px solid var(--md-surface-variant, #E7E0EC)',
+                    cursor: 'pointer', color: 'var(--md-outline, #79747E)',
+                    flexShrink: 0, transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.color = 'var(--md-on-surface, #1C1B1F)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = 'var(--md-outline, #79747E)'; }}
+                >✏️</button>
+              </div>
             )}
           </div>
 
