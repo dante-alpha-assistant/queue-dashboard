@@ -9,6 +9,7 @@ agentsRouter.get("/", async (req, res) => {
     const { status, capability, task_type, tier } = req.query;
     let query = supabase.from("agent_cards").select("*").order("name");
     if (status) query = query.eq("status", status);
+    else query = query.neq("status", "disabled");
     if (capability) query = query.contains("capabilities", [capability]);
     if (task_type) query = query.contains("task_types", [task_type]);
     if (tier) query = query.eq("tier", tier);
