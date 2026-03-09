@@ -1,5 +1,5 @@
 import SpeedLoader from "../components/SpeedLoader";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 const STATUS_COLORS = {
   online: "#2E7D32",
@@ -93,6 +93,455 @@ function StatusDot({ status, size = 10 }) {
         flexShrink: 0,
       }}
     />
+  );
+}
+
+/* ─── Org Chart: Dante (Human) Card ─── */
+function HumanCard({ agent, replicas }) {
+  const load = agent.current_load || 0;
+  const maxCap = agent.max_capacity || 0;
+
+  return (
+    <div
+      style={{
+        background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)",
+        borderRadius: 20,
+        padding: 24,
+        border: "2px solid #ffd700",
+        boxShadow: "0 0 20px rgba(255, 215, 0, 0.15), 0 8px 32px rgba(0,0,0,0.2)",
+        textAlign: "center",
+        minWidth: 220,
+        maxWidth: 280,
+        position: "relative",
+      }}
+    >
+      {/* Crown icon */}
+      <div style={{ position: "absolute", top: -16, left: "50%", transform: "translateX(-50%)", fontSize: 28 }}>
+        👑
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginTop: 8 }}>
+        <div style={{ position: "relative" }}>
+          <AgentAvatar agent={agent} size={64} />
+          <div style={{
+            position: "absolute", bottom: 0, right: -4,
+            width: 16, height: 16, borderRadius: "50%",
+            background: STATUS_COLORS[agent.status] || "#79747E",
+            border: "2px solid #1a1a2e",
+          }} />
+        </div>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 18, color: "#ffd700", letterSpacing: "0.5px" }}>
+            {agent.name}
+          </div>
+          <div style={{ fontSize: 12, color: "#e0e0e0", fontWeight: 500, marginTop: 2 }}>
+            {agent.role || "Human"}
+          </div>
+          <div style={{
+            fontSize: 10, color: "#ffd700", fontWeight: 600,
+            textTransform: "uppercase", letterSpacing: "1px", marginTop: 4,
+            opacity: 0.8,
+          }}>
+            {STATUS_LABELS[agent.status] || agent.status}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Org Chart: Manager Card ─── */
+function ManagerCard({ agent, replicas }) {
+  const load = agent.current_load || 0;
+  const maxCap = agent.max_capacity || 0;
+  const caps = Array.isArray(agent.capabilities) ? agent.capabilities : [];
+
+  return (
+    <div
+      style={{
+        background: "linear-gradient(135deg, var(--md-surface-container) 0%, var(--md-surface) 100%)",
+        borderRadius: 18,
+        padding: 20,
+        border: "2px solid #7c4dff",
+        boxShadow: "0 0 12px rgba(124, 77, 255, 0.1), 0 6px 24px rgba(0,0,0,0.1)",
+        textAlign: "center",
+        minWidth: 200,
+        maxWidth: 260,
+        position: "relative",
+      }}
+    >
+      {/* Manager badge */}
+      <div style={{
+        position: "absolute", top: -10, left: "50%", transform: "translateX(-50%)",
+        fontSize: 10, fontWeight: 700, padding: "3px 12px", borderRadius: 10,
+        background: "#7c4dff", color: "#fff",
+        textTransform: "uppercase", letterSpacing: "1px",
+      }}>
+        Manager
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginTop: 8 }}>
+        <div style={{ position: "relative" }}>
+          <AgentAvatar agent={agent} size={56} />
+          <div style={{
+            position: "absolute", bottom: 0, right: -4,
+            width: 14, height: 14, borderRadius: "50%",
+            background: STATUS_COLORS[agent.status] || "#79747E",
+            border: "2px solid var(--md-surface-container)",
+          }} />
+        </div>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 16, color: "var(--md-on-background)" }}>
+            {agent.name}
+          </div>
+          <div style={{ fontSize: 11, color: "#7c4dff", fontWeight: 600, marginTop: 2 }}>
+            {agent.role || "Engineering Manager"}
+          </div>
+        </div>
+
+        {/* Capacity */}
+        {maxCap > 0 && (
+          <div style={{
+            fontSize: 11, color: "var(--md-on-surface-variant)", fontWeight: 500,
+            padding: "3px 10px", borderRadius: 8,
+            background: "var(--md-surface-variant)",
+          }}>
+            {load}/{maxCap} {load >= maxCap ? "busy" : "available"}
+          </div>
+        )}
+
+        {/* Capabilities */}
+        {caps.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 3, justifyContent: "center", marginTop: 2 }}>
+            {caps.slice(0, 4).map((c, i) => (
+              <span key={i} style={{
+                fontSize: 9, padding: "2px 7px", borderRadius: 6,
+                background: "rgba(124, 77, 255, 0.1)", color: "#7c4dff",
+                fontWeight: 600,
+              }}>
+                {c}
+              </span>
+            ))}
+            {caps.length > 4 && (
+              <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 6, background: "var(--md-surface-variant)", color: "var(--md-on-surface-variant)", fontWeight: 500 }}>
+                +{caps.length - 4}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Org Chart: Worker Card ─── */
+function WorkerCard({ agent }) {
+  const load = agent.current_load || 0;
+  const maxCap = agent.max_capacity || 0;
+  const caps = Array.isArray(agent.capabilities) ? agent.capabilities : [];
+  const statusColor = STATUS_COLORS[agent.status] || "#79747E";
+
+  return (
+    <div
+      style={{
+        background: "var(--md-surface-container)",
+        borderRadius: 14,
+        padding: 16,
+        border: `1px solid var(--md-surface-variant)`,
+        borderLeft: `3px solid ${statusColor}`,
+        textAlign: "center",
+        width: 180,
+        position: "relative",
+        transition: "all 200ms",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = "translateY(-2px)";
+        e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.1)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = "none";
+        e.currentTarget.style.boxShadow = "none";
+      }}
+    >
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+        <div style={{ position: "relative" }}>
+          <AgentAvatar agent={agent} size={40} />
+          <div style={{
+            position: "absolute", bottom: -1, right: -3,
+            width: 12, height: 12, borderRadius: "50%",
+            background: statusColor,
+            border: "2px solid var(--md-surface-container)",
+          }} />
+        </div>
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 13, color: "var(--md-on-background)" }}>
+            {agent.name}
+          </div>
+          <div style={{ fontSize: 10, color: "var(--md-on-surface-variant)", fontWeight: 500, marginTop: 1 }}>
+            {agent.role || "Worker"}
+          </div>
+        </div>
+
+        {/* Capacity indicator */}
+        {maxCap > 0 && (
+          <div style={{
+            fontSize: 10, fontWeight: 600,
+            padding: "2px 8px", borderRadius: 6,
+            background: load >= maxCap ? "rgba(230, 81, 0, 0.1)" : "rgba(46, 125, 50, 0.1)",
+            color: load >= maxCap ? "#E65100" : "#2E7D32",
+          }}>
+            {load}/{maxCap} {load >= maxCap ? "busy" : "available"}
+          </div>
+        )}
+
+        {/* Capabilities as tags */}
+        {caps.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 3, justifyContent: "center", marginTop: 2 }}>
+            {caps.slice(0, 3).map((c, i) => (
+              <span key={i} style={{
+                fontSize: 9, padding: "1px 6px", borderRadius: 5,
+                background: "var(--md-surface-variant)",
+                color: "var(--md-on-surface-variant)",
+                fontWeight: 500,
+              }}>
+                {c}
+              </span>
+            ))}
+            {caps.length > 3 && (
+              <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 5, background: "var(--md-surface-variant)", color: "var(--md-on-surface-variant)" }}>
+                +{caps.length - 3}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Styled connector line (vertical) ─── */
+function VerticalConnector({ height = 32, color = "var(--md-surface-variant)", dashed = false }) {
+  return (
+    <div style={{
+      width: 0,
+      height,
+      borderLeft: `2px ${dashed ? "dashed" : "solid"} ${color}`,
+      margin: "0 auto",
+    }} />
+  );
+}
+
+/* ─── Org Chart Tree View ─── */
+function OrgChartTree({ agents, allReplicas, loading: replicasLoading }) {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Build hierarchy: filter out disabled/manually_disabled
+  const activeAgents = agents.filter(a =>
+    a.status !== "disabled" && !a.manually_disabled
+  );
+
+  const agentMap = {};
+  activeAgents.forEach(a => { agentMap[a.id || a.name] = a; });
+
+  // Find roots (no parent or parent not in active set)
+  const roots = [];
+  const childrenMap = {};
+
+  activeAgents.forEach(a => {
+    const id = a.id || a.name;
+    const parentId = a.parent_agent;
+    if (parentId && agentMap[parentId]) {
+      if (!childrenMap[parentId]) childrenMap[parentId] = [];
+      childrenMap[parentId].push(a);
+    } else {
+      roots.push(a);
+    }
+  });
+
+  // Determine card type: "human" for tier=0 or name contains "dante", "manager" for has children, else "worker"
+  function getCardType(agent) {
+    const id = agent.id || agent.name;
+    const hasKids = (childrenMap[id] || []).length > 0;
+    const name = (agent.name || "").toLowerCase();
+    // Dante = human (top of tree)
+    if (agent.tier === "human" || agent.tier === 0 || name === "dante") return "human";
+    // Has children = manager
+    if (hasKids) return "manager";
+    return "worker";
+  }
+
+  function renderCard(agent) {
+    const type = getCardType(agent);
+    switch (type) {
+      case "human": return <HumanCard agent={agent} replicas={allReplicas[agent.id || agent.name]} />;
+      case "manager": return <ManagerCard agent={agent} replicas={allReplicas[agent.id || agent.name]} />;
+      default: return <WorkerCard agent={agent} />;
+    }
+  }
+
+  // Sort roots: human first, then managers, then workers
+  const sortedRoots = [...roots].sort((a, b) => {
+    const typeOrder = { human: 0, manager: 1, worker: 2 };
+    return (typeOrder[getCardType(a)] || 2) - (typeOrder[getCardType(b)] || 2);
+  });
+
+  // Recursive tree render (desktop)
+  function renderTree(agent, depth = 0) {
+    const id = agent.id || agent.name;
+    const kids = childrenMap[id] || [];
+
+    return (
+      <div key={id} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+        {renderCard(agent)}
+
+        {kids.length > 0 && (
+          <>
+            {/* Connector from parent down */}
+            <VerticalConnector height={28} color={getCardType(agent) === "human" ? "#ffd700" : "#7c4dff"} />
+
+            {/* Horizontal bar spanning all children */}
+            {kids.length > 1 && (
+              <div style={{
+                display: "flex",
+                justifyContent: "center",
+                width: "100%",
+                position: "relative",
+              }}>
+                <div style={{
+                  position: "absolute",
+                  top: 0,
+                  left: `calc(50% / ${kids.length})`,
+                  right: `calc(50% / ${kids.length})`,
+                  height: 0,
+                  borderTop: `2px solid ${getCardType(agent) === "human" ? "#ffd70060" : "#7c4dff40"}`,
+                }} />
+              </div>
+            )}
+
+            {/* Children row */}
+            <div style={{
+              display: "flex",
+              gap: 20,
+              justifyContent: "center",
+              flexWrap: "nowrap",
+              position: "relative",
+            }}>
+              {kids.map((child, i) => {
+                const connColor = getCardType(agent) === "human" ? "#ffd70060" : "#7c4dff40";
+                return (
+                  <div key={child.id || child.name} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                    <VerticalConnector height={20} color={connColor} />
+                    {renderTree(child, depth + 1)}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // Mobile: vertical list grouped by manager
+  function renderMobileList() {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+        {sortedRoots.map(root => {
+          const rootId = root.id || root.name;
+          const kids = childrenMap[rootId] || [];
+          return (
+            <div key={rootId}>
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: kids.length > 0 ? 12 : 0 }}>
+                {renderCard(root)}
+              </div>
+              {kids.length > 0 && (
+                <div style={{
+                  marginLeft: 20,
+                  paddingLeft: 16,
+                  borderLeft: `2px solid ${getCardType(root) === "human" ? "#ffd70040" : "#7c4dff30"}`,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                }}>
+                  {kids.map(child => {
+                    const childId = child.id || child.name;
+                    const grandKids = childrenMap[childId] || [];
+                    return (
+                      <div key={childId}>
+                        <div style={{ display: "flex", justifyContent: "center", marginBottom: grandKids.length > 0 ? 12 : 0 }}>
+                          {renderCard(child)}
+                        </div>
+                        {grandKids.length > 0 && (
+                          <div style={{
+                            marginLeft: 20,
+                            paddingLeft: 16,
+                            borderLeft: "2px solid var(--md-surface-variant)",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 10,
+                            marginTop: 8,
+                          }}>
+                            {grandKids.map(gk => (
+                              <div key={gk.id || gk.name} style={{ display: "flex", justifyContent: "center" }}>
+                                {renderCard(gk)}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (replicasLoading && Object.keys(allReplicas).length === 0) {
+    return (
+      <div style={{ textAlign: "center", padding: 40, color: "var(--md-on-surface-variant)" }}>
+        Loading org chart...
+      </div>
+    );
+  }
+
+  if (activeAgents.length === 0) {
+    return (
+      <div style={{ textAlign: "center", padding: 40, color: "var(--md-on-surface-variant)" }}>
+        No active agents found.
+      </div>
+    );
+  }
+
+  if (isMobile) {
+    return (
+      <div style={{ padding: "16px 0" }}>
+        {renderMobileList()}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ overflowX: "auto", padding: "30px 0" }}>
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        minWidth: "fit-content",
+        gap: 0,
+      }}>
+        {sortedRoots.map(root => renderTree(root))}
+      </div>
+    </div>
   );
 }
 
@@ -223,311 +672,6 @@ function ReplicaCard({ pod, activeTasks }) {
   );
 }
 
-/* ─── Org Chart: mini replica card (employee card) ─── */
-function OrgReplicaCard({ pod, activeTasks }) {
-  const podTasks = activeTasks || [];
-  const statusColor = pod.ready ? "#2E7D32" : pod.status === "Running" ? "#E65100" : "#BA1A1A";
-  const shortName = pod.name || "unknown";
-
-  return (
-    <div
-      style={{
-        background: "var(--md-surface)",
-        borderRadius: 12,
-        padding: 12,
-        border: `1px solid ${statusColor}30`,
-        borderLeft: `3px solid ${statusColor}`,
-        width: 220,
-        fontSize: 12,
-        transition: "all 150ms",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = "translateY(-1px)";
-        e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = "none";
-        e.currentTarget.style.boxShadow = "none";
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-        <div
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: "50%",
-            background: `${statusColor}15`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 13,
-            flexShrink: 0,
-          }}
-        >
-          {pod.ready ? "✅" : "⚠️"}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: "var(--md-on-background)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-            title={shortName}
-          >
-            {shortName}
-          </div>
-          <div style={{ fontSize: 10, color: "var(--md-on-surface-variant)" }}>
-            {pod.ready ? "Ready" : pod.status || "Unknown"}
-            {pod.restarts > 0 && ` · ${pod.restarts}↻`}
-          </div>
-        </div>
-      </div>
-
-      <div style={{ display: "flex", gap: 12, fontSize: 10, color: "var(--md-on-surface-variant)", marginBottom: podTasks.length > 0 ? 6 : 0 }}>
-        <span>⏱ {formatUptime(pod.uptime)}</span>
-        {(pod.resources?.requests?.memory || pod.resources?.limits?.memory) && (
-          <span>💾 {pod.resources.requests?.memory || pod.resources.limits?.memory}</span>
-        )}
-        {(pod.resources?.requests?.cpu || pod.resources?.limits?.cpu) && (
-          <span>⚡ {pod.resources.requests?.cpu || pod.resources.limits?.cpu}</span>
-        )}
-      </div>
-
-      {podTasks.length > 0 && (
-        <div style={{ marginTop: 4, paddingTop: 6, borderTop: "1px solid var(--md-surface-variant)" }}>
-          {podTasks.slice(0, 2).map((t) => (
-            <div
-              key={t.id}
-              style={{
-                fontSize: 10,
-                padding: "3px 6px",
-                borderRadius: 4,
-                background: "var(--md-primary-container)",
-                color: "var(--md-on-primary-container)",
-                marginBottom: 3,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-              title={t.title}
-            >
-              🔧 {t.title}
-            </div>
-          ))}
-          {podTasks.length > 2 && (
-            <div style={{ fontSize: 10, color: "var(--md-on-surface-variant)", opacity: 0.7 }}>
-              +{podTasks.length - 2} more
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─── Org Chart: Agent node with expandable replicas ─── */
-function OrgAgentNode({ agent, replicas, children, isRoot }) {
-  const [expanded, setExpanded] = useState(false);
-  const pods = replicas?.pods || [];
-  const activeTasks = replicas?.activeTasks || [];
-  const statusColor = STATUS_COLORS[agent.status] || "#79747E";
-  const hasChildren = (children && children.length > 0) || pods.length > 0;
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-      {/* Agent card */}
-      <div
-        style={{
-          background: "var(--md-surface-container)",
-          borderRadius: 16,
-          padding: isRoot ? 20 : 16,
-          border: `2px solid ${statusColor}40`,
-          textAlign: "center",
-          minWidth: isRoot ? 200 : 170,
-          maxWidth: 240,
-          position: "relative",
-          cursor: hasChildren ? "pointer" : "default",
-          transition: "all 200ms",
-        }}
-        onClick={() => hasChildren && setExpanded(!expanded)}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = "translateY(-2px)";
-          e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = "none";
-          e.currentTarget.style.boxShadow = "none";
-        }}
-      >
-        <div style={{ position: "absolute", top: 10, right: 10 }}>
-          <StatusDot status={agent.status} />
-        </div>
-        {agent.current_load > 0 && (
-          <div style={{
-            position: "absolute", top: 8, left: 10,
-            fontSize: 9, fontWeight: 700, padding: "2px 6px",
-            borderRadius: 8, background: "var(--md-primary-container)",
-            color: "var(--md-on-primary-container)",
-          }}>
-            {agent.current_load} task{agent.current_load !== 1 ? "s" : ""}
-          </div>
-        )}
-
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-          <AgentAvatar agent={agent} size={isRoot ? 52 : 44} />
-          <div>
-            <div style={{ fontWeight: 700, fontSize: isRoot ? 15 : 13, color: "var(--md-on-background)" }}>
-              {agent.name}
-            </div>
-            {agent.role && (
-              <div style={{ fontSize: 10, color: "var(--md-on-surface-variant)", fontWeight: 500 }}>
-                {agent.role}
-              </div>
-            )}
-            <div style={{ fontSize: 10, color: statusColor, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
-              {STATUS_LABELS[agent.status] || agent.status}
-            </div>
-            {agent.description && (
-              <div style={{ fontSize: 10, color: "var(--md-on-surface-variant)", marginTop: 4, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={agent.description}>
-                {agent.description}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Replica toggle */}
-        {pods.length > 0 && (
-          <div
-            style={{
-              marginTop: 8,
-              padding: "4px 10px",
-              borderRadius: 10,
-              background: expanded ? "var(--md-primary-container)" : "var(--md-surface-variant)",
-              color: expanded ? "var(--md-on-primary-container)" : "var(--md-on-surface-variant)",
-              fontSize: 11,
-              fontWeight: 600,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-              cursor: "pointer",
-              transition: "all 150ms",
-            }}
-          >
-            <span>{pods.length} replica{pods.length !== 1 ? "s" : ""}</span>
-            <span style={{ fontSize: 9, transition: "transform 200ms", transform: expanded ? "rotate(180deg)" : "rotate(0)" }}>▼</span>
-          </div>
-        )}
-      </div>
-
-      {/* Connector line down */}
-      {hasChildren && expanded && (
-        <div style={{ width: 2, height: 20, background: "var(--md-surface-variant)" }} />
-      )}
-
-      {/* Expanded children: replicas + child agents */}
-      {expanded && hasChildren && (
-        <div style={{ position: "relative" }}>
-          {/* Horizontal connector bar */}
-          {(pods.length + (children?.length || 0)) > 1 && (
-            <div style={{
-              position: "absolute",
-              top: 0,
-              left: "10%",
-              right: "10%",
-              height: 2,
-              background: "var(--md-surface-variant)",
-            }} />
-          )}
-
-          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", justifyContent: "center", paddingTop: 0 }}>
-            {/* Replica employee cards */}
-            {pods.map((pod) => (
-              <div key={pod.name} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                <div style={{ width: 2, height: 16, background: "var(--md-surface-variant)" }} />
-                <OrgReplicaCard pod={pod} activeTasks={activeTasks} />
-              </div>
-            ))}
-
-            {/* Child agent nodes (recursive) */}
-            {children?.map((child) => (
-              <div key={child.agent.id || child.agent.name} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                <div style={{ width: 2, height: 16, background: "var(--md-surface-variant)" }} />
-                <OrgAgentNode
-                  agent={child.agent}
-                  replicas={child.replicas}
-                  children={child.children}
-                  isRoot={false}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─── Org Chart View ─── */
-function OrgChartView({ agents, allReplicas, loading: replicasLoading }) {
-  // Build hierarchy tree from parent_agent relationships
-  const agentMap = {};
-  agents.forEach(a => { agentMap[a.id || a.name] = a; });
-
-  const roots = [];
-  const childrenMap = {};
-
-  agents.forEach(a => {
-    const id = a.id || a.name;
-    const parentId = a.parent_agent;
-    if (parentId && agentMap[parentId]) {
-      if (!childrenMap[parentId]) childrenMap[parentId] = [];
-      childrenMap[parentId].push(a);
-    } else {
-      roots.push(a);
-    }
-  });
-
-  function buildTree(agent) {
-    const id = agent.id || agent.name;
-    const kids = (childrenMap[id] || []).map(buildTree);
-    return {
-      agent,
-      replicas: allReplicas[id] || { pods: [], activeTasks: [] },
-      children: kids,
-    };
-  }
-
-  const tree = roots.map(buildTree);
-
-  if (replicasLoading && Object.keys(allReplicas).length === 0) {
-    return (
-      <div style={{ textAlign: "center", padding: 40, color: "var(--md-on-surface-variant)" }}>
-        Loading org chart...
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ overflowX: "auto", padding: "20px 0" }}>
-      <div style={{ display: "flex", gap: 40, justifyContent: "center", flexWrap: "wrap", minWidth: "fit-content" }}>
-        {tree.map((node) => (
-          <OrgAgentNode
-            key={node.agent.id || node.agent.name}
-            agent={node.agent}
-            replicas={node.replicas}
-            children={node.children}
-            isRoot={true}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function AgentTile({ agent, isSelected, onClick }) {
   const caps = Array.isArray(agent.capabilities) ? agent.capabilities : [];
   const load = agent.current_load || 0;
@@ -629,7 +773,7 @@ export default function Pingboard() {
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [replicas, setReplicas] = useState(null);
   const [replicasLoading, setReplicasLoading] = useState(false);
-  const [viewMode, setViewMode] = useState("grid"); // "grid" | "orgchart"
+  const [viewMode, setViewMode] = useState("orgchart"); // default to org chart
   const [allReplicas, setAllReplicas] = useState({});
   const [allReplicasLoading, setAllReplicasLoading] = useState(false);
 
@@ -686,7 +830,6 @@ export default function Pingboard() {
     return () => clearInterval(interval);
   }, [fetchAgents]);
 
-  // Fetch all replicas when in org chart mode
   useEffect(() => {
     if (viewMode === "orgchart") {
       fetchAllReplicas();
@@ -770,8 +913,8 @@ export default function Pingboard() {
           {/* View mode toggle */}
           <div style={{ display: "flex", gap: 4, background: "var(--md-surface-container)", borderRadius: 12, padding: 3 }}>
             {[
-              { key: "grid", label: "⊞ Grid" },
               { key: "orgchart", label: "🏢 Org Chart" },
+              { key: "grid", label: "⊞ Grid" },
             ].map((mode) => (
               <button
                 key={mode.key}
@@ -853,7 +996,7 @@ export default function Pingboard() {
 
         {/* View content */}
         {viewMode === "orgchart" ? (
-          <OrgChartView agents={filtered} allReplicas={allReplicas} loading={allReplicasLoading} />
+          <OrgChartTree agents={filtered} allReplicas={allReplicas} loading={allReplicasLoading} />
         ) : (
           /* Grid view (existing) */
           <div style={{ display: "flex", gap: 24 }}>
