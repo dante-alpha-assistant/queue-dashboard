@@ -42,6 +42,8 @@ if (typeof document !== "undefined" && !document.getElementById(styleId)) {
   `;
   document.head.appendChild(style);
 }
+import OrgChart from "../components/OrgChart";
+import { useState, useEffect, useCallback } from "react";
 
 const STATUS_COLORS = {
   online: "#2E7D32",
@@ -1199,6 +1201,7 @@ export default function Pingboard() {
   const [allReplicas, setAllReplicas] = useState({});
   const [allReplicasLoading, setAllReplicasLoading] = useState(false);
   const [liveStatus, setLiveStatus] = useState({});
+  const [viewMode, setViewMode] = useState("grid");
 
   const fetchAgents = useCallback(async () => {
     try {
@@ -1427,6 +1430,23 @@ export default function Pingboard() {
               width: 240,
             }}
           />
+          <div style={{ display: "flex", borderRadius: 10, overflow: "hidden", border: "1px solid var(--md-surface-variant)" }}>
+            {[{ key: "grid", label: "⊞ Grid" }, { key: "orgchart", label: "⸬ Org Chart" }].map(v => (
+              <button
+                key={v.key}
+                onClick={() => setViewMode(v.key)}
+                style={{
+                  padding: "7px 14px", fontSize: 12, fontWeight: 600, border: "none",
+                  cursor: "pointer", fontFamily: "'Roboto', system-ui, sans-serif",
+                  background: viewMode === v.key ? "var(--md-primary)" : "var(--md-surface)",
+                  color: viewMode === v.key ? "var(--md-on-primary)" : "var(--md-on-surface-variant)",
+                  transition: "all 150ms",
+                }}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* View content */}
@@ -1441,6 +1461,80 @@ export default function Pingboard() {
               {filtered.length === 0 ? (
                 <div style={{ textAlign: "center", color: "var(--md-on-surface-variant)", padding: 60, fontSize: 14 }}>
                   No agents found
+        {/* Main content: grid + detail panel */}
+        {viewMode === "orgchart" ? (
+          <OrgChart />
+        ) : (
+        <div style={{ display: "flex", gap: 24 }}>
+          {/* Agent grid */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {filtered.length === 0 ? (
+              <div
+                style={{
+                  textAlign: "center",
+                  color: "var(--md-on-surface-variant)",
+                  padding: 60,
+                  fontSize: 14,
+                }}
+              >
+                No agents found
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: selectedAgent
+                    ? "repeat(auto-fill, minmax(180px, 1fr))"
+                    : "repeat(auto-fill, minmax(220px, 1fr))",
+                  gap: 16,
+                  transition: "all 200ms",
+                }}
+              >
+                {filtered.map((agent) => (
+                  <AgentTile
+                    key={agent.name}
+                    agent={agent}
+                    isSelected={selectedAgent?.name === agent.name}
+                    onClick={() => handleSelectAgent(agent)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Detail / Replicas panel */}
+          {selectedAgent && (
+            <div
+              style={{
+                width: 420,
+                flexShrink: 0,
+                background: "var(--md-surface-container)",
+                borderRadius: 16,
+                border: "1px solid var(--md-surface-variant)",
+                padding: 20,
+                alignSelf: "flex-start",
+                position: "sticky",
+                top: 66,
+                maxHeight: "calc(100vh - 90px)",
+                overflowY: "auto",
+              }}
+            >
+              {/* Agent header */}
+              <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
+                <AgentAvatar agent={selectedAgent} size={48} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: 16, color: "var(--md-on-background)" }}>
+                    {selectedAgent.name}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: STATUS_COLORS[selectedAgent.status],
+                      fontWeight: 600,
+                    }}
+                  >
+                    {STATUS_LABELS[selectedAgent.status] || selectedAgent.status}
+                  </div>
                 </div>
               ) : (
                 <div
@@ -1670,6 +1764,9 @@ export default function Pingboard() {
               </div>
             )}
           </div>
+            </div>
+          )}
+        </div>
         )}
       </div>
     </div>
