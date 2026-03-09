@@ -42,7 +42,7 @@ function extractImages(dataTransfer) {
   const files = [];
   if (dataTransfer?.files) {
     for (const file of dataTransfer.files) {
-      if (ACCEPTED_TYPES.includes(file.type) && file.size <= MAX_IMAGE_SIZE) {
+      if (file.type.startsWith("image/")) {
         files.push(file);
       }
     }
@@ -354,12 +354,19 @@ export default function NewTaskChat({ isMobile }) {
       const data = await resp.json();
       if (controller.signal.aborted) return;
       if (Array.isArray(data)) {
-        setMessages(data.map(m => ({
-          role: m.role,
-          content: m.content,
-          time: m.created_at,
-          id: m.id,
-        })));
+        setMessages(data.map(m => {
+          // Reconstruct multipart content if images stored in metadata
+          let content = m.content;
+          if (m.role === "user" && m.metadata?.images?.length) {
+            const parts = [];
+            if (m.content) parts.push({ type: "text", text: m.content });
+            for (const url of m.metadata.images) {
+              parts.push({ type: "image_url", image_url: { url } });
+            }
+            content = parts;
+          }
+          return { role: m.role, content, time: m.created_at, id: m.id };
+        }));
       }
     } catch (e) {
       if (e.name === "AbortError") return;
@@ -394,14 +401,24 @@ export default function NewTaskChat({ isMobile }) {
 
   const addImages = useCallback(async (files) => {
     const newImages = [];
+    const errors = [];
     for (const file of files) {
+      if (!ACCEPTED_TYPES.includes(file.type)) {
+        errors.push(`${file.name}: unsupported format (use PNG, JPG, GIF, or WebP)`);
+        continue;
+      }
+      if (file.size > MAX_IMAGE_SIZE) {
+        errors.push(`${file.name}: too large (max ${MAX_IMAGE_SIZE / 1024 / 1024}MB)`);
+        continue;
+      }
       try {
         const dataUrl = await fileToBase64(file);
         newImages.push({ dataUrl, name: file.name });
       } catch (e) {
-        console.error("Failed to read image:", e);
+        errors.push(`${file.name}: failed to read`);
       }
     }
+    if (errors.length) setError(errors.join("; "));
     if (newImages.length) setPendingImages(prev => [...prev, ...newImages]);
   }, []);
 
@@ -482,11 +499,25 @@ export default function NewTaskChat({ isMobile }) {
 
     setError(null);
     const content = text;
-    const userMsg = { role: "user", content, time: new Date().toISOString() };
+    const imageUrls = pendingImages.map(img => img.dataUrl);
+
+    // Build user message content: include images as multipart array if present
+    let userContent;
+    if (imageUrls.length) {
+      const parts = [];
+      if (content) parts.push({ type: "text", text: content });
+      for (const url of imageUrls) {
+        parts.push({ type: "image_url", image_url: { url } });
+      }
+      userContent = parts;
+    } else {
+      userContent = content;
+    }
+
+    const userMsg = { role: "user", content: userContent, time: new Date().toISOString() };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setInput("");
-    const imageUrls = pendingImages.map(img => img.dataUrl);
     setPendingImages([]);
     setStreaming(true);
 
@@ -577,7 +608,7 @@ export default function NewTaskChat({ isMobile }) {
   const handleDragLeave = (e) => { e.preventDefault(); e.stopPropagation(); dragCounter.current--; if (dragCounter.current === 0) setDragging(false); };
   const handleDragOver = (e) => { e.preventDefault(); e.stopPropagation(); };
   const handleDrop = (e) => { e.preventDefault(); e.stopPropagation(); dragCounter.current = 0; setDragging(false); const files = extractImages(e.dataTransfer); if (files.length) addImages(files); };
-  const handleFileSelect = (e) => { const files = Array.from(e.target.files || []).filter(f => ACCEPTED_TYPES.includes(f.type) && f.size <= MAX_IMAGE_SIZE); if (files.length) addImages(files); e.target.value = ""; };
+  const handleFileSelect = (e) => { const files = Array.from(e.target.files || []).filter(f => f.type.startsWith("image/")); if (files.length) addImages(files); e.target.value = ""; };
 
   // FAB button
   if (!open) {

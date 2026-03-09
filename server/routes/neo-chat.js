@@ -80,13 +80,18 @@ neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
       return res.status(400).json({ error: "content required" });
     }
 
-    // Save user message
+    // Save user message (with images in metadata if present)
+    const userMsgData = {
+      conversation_id: conversationId,
+      role: "user",
+      content: content || "",
+      metadata: images?.length ? { images } : {},
+    };
     const { error: userMsgErr } = await supabase
       .from("chat_messages")
-      .insert({ conversation_id: conversationId, role: "user", content: content || "" });
+      .insert(userMsgData);
     if (userMsgErr) {
       console.error("Failed to save user message:", userMsgErr.message, userMsgErr.details);
-      // If we can't save the message, still try to respond but log the error
     }
 
     // Update conversation title from first message if untitled
