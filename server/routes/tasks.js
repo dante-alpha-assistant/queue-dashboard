@@ -314,6 +314,7 @@ router.post("/deploy/:id", async (req, res) => {
   const GH_TOKEN = process.env.GH_TOKEN;
   const VERCEL_TOKEN = process.env.VERCEL_TOKEN;
   const VERCEL_TEAM_ID = process.env.VERCEL_TEAM_ID;
+  const RAILWAY_TOKEN = process.env.RAILWAY_TOKEN;
   const ARGOCD_URL = process.env.ARGOCD_URL || "http://argocd-server.argocd.svc.cluster.local";
   const ARGOCD_USERNAME = process.env.ARGOCD_USERNAME;
   const ARGOCD_PASSWORD = process.env.ARGOCD_PASSWORD;
@@ -516,6 +517,135 @@ router.post("/deploy/:id", async (req, res) => {
           project_url: `https://vercel.com/${VERCEL_TEAM_ID || "~"}/${projectName}`,
           project_name: projectName,
         };
+      }
+
+    } else if (deployTarget === "railway") {
+      // Railway deployment via GraphQL API
+      console.log(`[DEPLOY] Target is 'railway' — triggering Railway deployment`);
+
+      if (!RAILWAY_TOKEN) {
+        await supabase.from('agent_tasks').update({ status: 'deploy_failed', error: 'RAILWAY_TOKEN not configured', updated_at: new Date().toISOString() }).eq('id', req.params.id);
+        return res.status(500).json({ ok: false, error: "RAILWAY_TOKEN not configured — cannot deploy to Railway." });
+      }
+
+      const repoUrl = task.repository_url || (prRefs[0] ? `https://github.com/${prRefs[0].repo}` : null);
+      const repoFullName = repoUrl?.match(/github\.com\/(.+?)(?:\.git)?$/)?.[1];
+
+      if (!repoFullName) {
+        await supabase.from('agent_tasks').update({ status: 'deploy_failed', error: 'No repository URL found', updated_at: new Date().toISOString() }).eq('id', req.params.id);
+        return res.status(400).json({ ok: false, error: "No repository URL found — cannot deploy to Railway." });
+      }
+
+      const railwayGQL = async (query, variables = {}) => {
+        const resp = await fetch("https://backboard.railway.com/graphql/v2", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${RAILWAY_TOKEN}`,
+          },
+          body: JSON.stringify({ query, variables }),
+        });
+        const json = await resp.json();
+        if (json.errors) throw new Error(json.errors[0].message);
+        return json.data;
+      };
+
+      const projectName = repoFullName.split("/")[1];
+
+      try {
+        // 1. Check if project already exists (search by name)
+        let projectId = null;
+        let environmentId = null;
+        let serviceId = null;
+
+        const projectsData = await railwayGQL(`
+          query { me { projects { edges { node { id name services { edges { node { id name } } } environments { edges { node { id name } } } } } } } }
+        `);
+
+        const existingProject = projectsData.me.projects.edges.find(
+          e => e.node.name.toLowerCase() === projectName.toLowerCase()
+        );
+
+        if (existingProject) {
+          projectId = existingProject.node.id;
+          environmentId = existingProject.node.environments.edges.find(e => e.node.name === "production")?.node.id;
+          serviceId = existingProject.node.services.edges[0]?.node.id;
+          console.log(`[DEPLOY] Found existing Railway project: ${projectName} (${projectId})`);
+        }
+
+        // 2. If no project, create one from GitHub repo
+        if (!projectId) {
+          console.log(`[DEPLOY] Creating new Railway project for ${repoFullName}`);
+          const createData = await railwayGQL(`
+            mutation($input: ProjectCreateInput!) {
+              projectCreate(input: $input) { id environments { edges { node { id name } } } }
+            }
+          `, {
+            input: {
+              name: projectName,
+              repo: { fullRepoName: repoFullName },
+            },
+          });
+          projectId = createData.projectCreate.id;
+          environmentId = createData.projectCreate.environments.edges.find(e => e.node.name === "production")?.node.id;
+          console.log(`[DEPLOY] Created Railway project: ${projectId}`);
+
+          // Wait briefly for service to be created from repo
+          await new Promise(r => setTimeout(r, 3000));
+
+          // Fetch the service created from the repo
+          const svcData = await railwayGQL(`
+            query($projectId: String!) {
+              project(id: $projectId) { services { edges { node { id name } } } }
+            }
+          `, { projectId });
+          serviceId = svcData.project.services.edges[0]?.node.id;
+        }
+
+        // 3. Trigger a redeploy if we have a service
+        let deploymentUrl = null;
+        if (serviceId && environmentId) {
+          // Get latest deployment to redeploy
+          const deploymentsData = await railwayGQL(`
+            query($input: DeploymentListInput!) {
+              deployments(input: $input) { edges { node { id status } } }
+            }
+          `, { input: { serviceId, environmentId } });
+
+          const latestDeployment = deploymentsData.deployments.edges[0]?.node;
+
+          if (latestDeployment) {
+            await railwayGQL(`
+              mutation($id: String!) {
+                deploymentRedeploy(id: $id) { id }
+              }
+            `, { id: latestDeployment.id });
+            console.log(`[DEPLOY] Redeployed Railway service ${serviceId}`);
+          }
+
+          // Get the service domain
+          const domainData = await railwayGQL(`
+            query($projectId: String!, $serviceId: String!, $environmentId: String!) {
+              domains(projectId: $projectId, serviceId: $serviceId, environmentId: $environmentId) { serviceDomains { domain } customDomains { domain } }
+            }
+          `, { projectId, serviceId, environmentId });
+
+          const domain = domainData.domains?.serviceDomains?.[0]?.domain || domainData.domains?.customDomains?.[0]?.domain;
+          if (domain) deploymentUrl = `https://${domain}`;
+        }
+
+        deployResult = {
+          strategy: "railway",
+          project_id: projectId,
+          service_id: serviceId,
+          deployment_url: deploymentUrl,
+          project_url: `https://railway.com/project/${projectId}`,
+          project_name: projectName,
+        };
+      } catch (railwayErr) {
+        console.error(`[DEPLOY] Railway error: ${railwayErr.message}`);
+        await supabase.from('agent_tasks').update({ status: 'deploy_failed', error: `Railway deploy failed: ${railwayErr.message}`, updated_at: new Date().toISOString() }).eq('id', req.params.id);
+        return res.status(500).json({ ok: false, error: `Railway deploy failed: ${railwayErr.message}` });
       }
 
     } else {
