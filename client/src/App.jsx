@@ -324,7 +324,6 @@ export default function App() {
         </div>
 
         <NewTaskChat isMobile={isMobile} />
-
         {selectedTask && !selectedTask._notFound && (
           <TaskDetailModal
             task={selectedTask}
