@@ -8,7 +8,6 @@ function formatTime(date) {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-// Simple markdown-ish rendering: bold, code, links
 function renderText(text) {
   if (!text) return null;
   return text.split("\n").map((line, i) => (
@@ -19,11 +18,65 @@ function renderText(text) {
   ));
 }
 
+const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function extractImages(dataTransfer) {
+  const files = [];
+  if (dataTransfer?.files) {
+    for (const file of dataTransfer.files) {
+      if (ACCEPTED_TYPES.includes(file.type) && file.size <= MAX_IMAGE_SIZE) {
+        files.push(file);
+      }
+    }
+  }
+  return files;
+}
+
+// Render inline images from message content array
+function renderContent(content) {
+  if (typeof content === "string") return renderText(content);
+  if (!Array.isArray(content)) return null;
+
+  return content.map((part, i) => {
+    if (part.type === "text") return <span key={i}>{renderText(part.text)}</span>;
+    if (part.type === "image_url") {
+      return (
+        <img
+          key={i}
+          src={part.image_url?.url}
+          alt="uploaded"
+          style={{
+            maxWidth: "100%",
+            maxHeight: 200,
+            borderRadius: 8,
+            marginTop: 4,
+            marginBottom: 4,
+            display: "block",
+          }}
+        />
+      );
+    }
+    return null;
+  });
+}
+
 export default function NewTaskChat({ isMobile }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [pendingImages, setPendingImages] = useState([]); // [{dataUrl, name}]
+  const [dragging, setDragging] = useState(false);
   const [sessionId] = useState(() => {
     const saved = sessionStorage.getItem("neo-chat-session");
     if (saved) return saved;
@@ -35,6 +88,8 @@ export default function NewTaskChat({ isMobile }) {
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
   const abortRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const dragCounter = useRef(0);
 
   // Load persisted messages
   useEffect(() => {
@@ -59,17 +114,72 @@ export default function NewTaskChat({ isMobile }) {
     if (open) inputRef.current?.focus();
   }, [open]);
 
+  const addImages = useCallback(async (files) => {
+    const newImages = [];
+    for (const file of files) {
+      try {
+        const dataUrl = await fileToBase64(file);
+        newImages.push({ dataUrl, name: file.name });
+      } catch (e) {
+        console.error("Failed to read image:", e);
+      }
+    }
+    if (newImages.length) {
+      setPendingImages(prev => [...prev, ...newImages]);
+    }
+  }, []);
+
+  const removeImage = useCallback((index) => {
+    setPendingImages(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  // Paste handler
+  useEffect(() => {
+    if (!open) return;
+    const handlePaste = (e) => {
+      const files = extractImages(e.clipboardData);
+      if (files.length) {
+        e.preventDefault();
+        addImages(files);
+      }
+    };
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
+  }, [open, addImages]);
+
+  // Build message content (text + images)
+  const buildContent = useCallback((text, images) => {
+    if (!images.length) return text;
+    const parts = [];
+    if (text) parts.push({ type: "text", text });
+    for (const img of images) {
+      parts.push({
+        type: "image_url",
+        image_url: { url: img.dataUrl },
+      });
+    }
+    return parts;
+  }, []);
+
+  // For sending to API: flatten content to serializable format
+  const contentForApi = (content) => {
+    if (typeof content === "string") return content;
+    // Send as OpenAI vision content parts
+    return content;
+  };
+
   const send = useCallback(async () => {
     const text = input.trim();
-    if (!text || streaming) return;
+    if ((!text && !pendingImages.length) || streaming) return;
 
-    const userMsg = { role: "user", content: text, time: new Date().toISOString() };
+    const content = buildContent(text, pendingImages);
+    const userMsg = { role: "user", content, time: new Date().toISOString() };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setInput("");
+    setPendingImages([]);
     setStreaming(true);
 
-    // Add placeholder for assistant
     const assistantMsg = { role: "assistant", content: "", time: new Date().toISOString() };
     setMessages([...newMessages, assistantMsg]);
 
@@ -81,7 +191,7 @@ export default function NewTaskChat({ isMobile }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+          messages: newMessages.map(m => ({ role: m.role, content: contentForApi(m.content) })),
           sessionId,
         }),
         signal: controller.signal,
@@ -136,7 +246,6 @@ export default function NewTaskChat({ isMobile }) {
         }
       }
 
-      // If we got no content from streaming, try to get from non-delta format
       if (!accumulated) {
         setMessages(prev => {
           const updated = [...prev];
@@ -161,7 +270,7 @@ export default function NewTaskChat({ isMobile }) {
 
     abortRef.current = null;
     setStreaming(false);
-  }, [input, streaming, messages, sessionId]);
+  }, [input, streaming, messages, sessionId, pendingImages, buildContent]);
 
   const handleKey = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -172,9 +281,51 @@ export default function NewTaskChat({ isMobile }) {
 
   const clearChat = () => {
     setMessages([]);
+    setPendingImages([]);
     sessionStorage.removeItem("neo-chat-messages");
     const newId = generateSessionId();
     sessionStorage.setItem("neo-chat-session", newId);
+  };
+
+  // Drag & drop handlers
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current++;
+    if (e.dataTransfer?.types?.includes("Files")) {
+      setDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current--;
+    if (dragCounter.current === 0) {
+      setDragging(false);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current = 0;
+    setDragging(false);
+    const files = extractImages(e.dataTransfer);
+    if (files.length) addImages(files);
+  };
+
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files || []).filter(
+      f => ACCEPTED_TYPES.includes(f.type) && f.size <= MAX_IMAGE_SIZE
+    );
+    if (files.length) addImages(files);
+    e.target.value = "";
   };
 
   // FAB button
@@ -228,8 +379,56 @@ export default function NewTaskChat({ isMobile }) {
         overflow: "hidden",
       };
 
+  const hasInput = input.trim() || pendingImages.length > 0;
+
   return (
-    <div style={containerStyle}>
+    <div
+      style={{ ...containerStyle, position: "fixed" }}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {/* Drop zone overlay */}
+      {dragging && (
+        <div style={{
+          position: "absolute",
+          inset: 0,
+          background: "rgba(103, 80, 164, 0.15)",
+          border: "3px dashed var(--md-primary, #6750A4)",
+          borderRadius: isMobile ? 0 : 24,
+          zIndex: 10,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          backdropFilter: "blur(2px)",
+        }}>
+          <div style={{
+            background: "var(--md-surface, #fff)",
+            padding: "20px 32px",
+            borderRadius: 16,
+            textAlign: "center",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+          }}>
+            <div style={{ fontSize: 36, marginBottom: 8 }}>📷</div>
+            <div style={{
+              fontSize: 14,
+              fontWeight: 600,
+              color: "var(--md-on-surface)",
+            }}>
+              Drop image here
+            </div>
+            <div style={{
+              fontSize: 11,
+              color: "var(--md-on-surface-variant)",
+              marginTop: 4,
+            }}>
+              PNG, JPG, GIF, WebP
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div style={{
         padding: "14px 20px",
@@ -293,6 +492,11 @@ export default function NewTaskChat({ isMobile }) {
               You can describe features, bugs, ops work — anything.
             </div>
             <div style={{
+              fontSize: 11, color: "var(--md-on-surface-variant)", marginTop: 8, opacity: 0.7,
+            }}>
+              📎 You can also drag & drop or paste images
+            </div>
+            <div style={{
               display: "flex", flexDirection: "column", gap: 6, marginTop: 20,
               maxWidth: 260, margin: "20px auto 0",
             }}>
@@ -351,7 +555,7 @@ export default function NewTaskChat({ isMobile }) {
                     color: "var(--md-primary)", opacity: 0.8,
                   }}>Neo</div>
                 )}
-                {renderText(msg.content)}
+                {renderContent(msg.content)}
                 {!msg.content && streaming && i === messages.length - 1 && (
                   <span style={{ opacity: 0.5 }}>●●●</span>
                 )}
@@ -368,14 +572,93 @@ export default function NewTaskChat({ isMobile }) {
         <div ref={bottomRef} />
       </div>
 
+      {/* Image previews */}
+      {pendingImages.length > 0 && (
+        <div style={{
+          padding: "8px 12px 0",
+          display: "flex",
+          gap: 8,
+          flexWrap: "wrap",
+          borderTop: "1px solid var(--md-surface-variant)",
+        }}>
+          {pendingImages.map((img, i) => (
+            <div key={i} style={{ position: "relative", display: "inline-block" }}>
+              <img
+                src={img.dataUrl}
+                alt={img.name}
+                style={{
+                  width: 56,
+                  height: 56,
+                  objectFit: "cover",
+                  borderRadius: 8,
+                  border: "1px solid var(--md-surface-variant)",
+                }}
+              />
+              <button
+                onClick={() => removeImage(i)}
+                style={{
+                  position: "absolute",
+                  top: -6,
+                  right: -6,
+                  width: 18,
+                  height: 18,
+                  borderRadius: "50%",
+                  background: "var(--md-error, #B3261E)",
+                  color: "#fff",
+                  border: "none",
+                  fontSize: 10,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  lineHeight: 1,
+                  padding: 0,
+                }}
+                title="Remove image"
+              >✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Input */}
       <div style={{
         padding: 12,
-        borderTop: "1px solid var(--md-surface-variant)",
+        borderTop: pendingImages.length ? "none" : "1px solid var(--md-surface-variant)",
         display: "flex",
         gap: 8,
+        alignItems: "flex-end",
         paddingBottom: isMobile ? "max(12px, env(safe-area-inset-bottom, 12px))" : 12,
       }}>
+        {/* Paperclip button */}
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          title="Attach image"
+          style={{
+            background: "none",
+            border: "none",
+            color: "var(--md-on-surface-variant)",
+            fontSize: 18,
+            cursor: "pointer",
+            padding: "6px",
+            borderRadius: 8,
+            minWidth: 36,
+            minHeight: 36,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >📎</button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          multiple
+          style={{ display: "none" }}
+          onChange={handleFileSelect}
+        />
+
         <textarea
           ref={inputRef}
           value={input}
@@ -401,21 +684,22 @@ export default function NewTaskChat({ isMobile }) {
         />
         <button
           onClick={send}
-          disabled={!input.trim() || streaming}
+          disabled={!hasInput || streaming}
           style={{
-            background: input.trim() && !streaming
+            background: hasInput && !streaming
               ? "linear-gradient(135deg, #6750A4, #7B68EE)"
               : "var(--md-surface-variant)",
-            color: input.trim() && !streaming ? "#fff" : "var(--md-on-surface-variant)",
+            color: hasInput && !streaming ? "#fff" : "var(--md-on-surface-variant)",
             border: "none",
             padding: "10px 16px",
             borderRadius: 20,
             fontWeight: 600,
             fontSize: 13,
-            cursor: input.trim() && !streaming ? "pointer" : "default",
+            cursor: hasInput && !streaming ? "pointer" : "default",
             fontFamily: "'Roboto', system-ui, sans-serif",
             minHeight: isMobile ? 44 : "auto",
             minWidth: 60,
+            flexShrink: 0,
           }}
         >
           {streaming ? "..." : "Send"}
