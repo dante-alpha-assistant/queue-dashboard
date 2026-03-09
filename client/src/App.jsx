@@ -161,6 +161,14 @@ export default function App() {
       case "active": return [...filterByType(assigned), ...filterByType(inProgress)];
       case "blocked": return [...filterByType(blocked)].sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at));
       case "qa": return filterByType(qa);
+      case "blocked": return filterByType(blocked);
+      case "qa": return filterByType(qa).sort((a, b) => {
+            const aAssigned = !!a.assigned_agent;
+            const bAssigned = !!b.assigned_agent;
+            if (aAssigned !== bAssigned) return aAssigned ? -1 : 1;
+            if (aAssigned) return new Date(b.started_at || 0) - new Date(a.started_at || 0);
+            return new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
+          });
       case "completed": return filterByType(completed);
       case "deploying": return filterByType(deploying);
       case "deployed": return filterByType(deployed);
@@ -491,6 +499,14 @@ export default function App() {
         <Column title="QA Testing" color="#7B5EA7" count={filterByType(qa).length} agentCount={countActiveTasks(filterByType(qa))} isTablet={isTablet}
           collapsible collapsed={!!collapsedCols.qa_testing} onToggleCollapse={() => toggleCollapse("qa_testing")}>
           {renderCards(filterByType(qa).slice(0, 30))}
+        <Column title="QA Testing" color="#7B5EA7" count={filterByType(qa).length} isTablet={isTablet}>
+          {renderCards(filterByType(qa).sort((a, b) => {
+            const aAssigned = !!a.assigned_agent;
+            const bAssigned = !!b.assigned_agent;
+            if (aAssigned !== bAssigned) return aAssigned ? -1 : 1;
+            if (aAssigned) return new Date(b.started_at || 0) - new Date(a.started_at || 0);
+            return new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
+          }).slice(0, 30))}
         </Column>
         <Column title="Completed" color="#1B5E20" count={filterByType(completed).length} isTablet={isTablet}
           collapsible collapsed={!!collapsedCols.completed} onToggleCollapse={() => toggleCollapse("completed")}>
