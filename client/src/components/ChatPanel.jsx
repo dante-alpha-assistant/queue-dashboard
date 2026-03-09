@@ -16,8 +16,10 @@ function cleanText(text) {
     .trim();
 }
 
-export default function ChatPanel({ isMobile }) {
-  const [open, setOpen] = useState(false);
+export default function ChatPanel({ isMobile, open: controlledOpen, onClose }) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = onClose ? (v) => { if (!v) onClose(); } : setInternalOpen;
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -89,21 +91,7 @@ export default function ChatPanel({ isMobile }) {
   };
 
   if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        style={{
-          position: "fixed",
-          bottom: isMobile ? 80 : 24,
-          right: isMobile ? 80 : 24,
-          width: 56, height: 56,
-          borderRadius: "50%", background: "var(--md-primary)", border: "none",
-          fontSize: 24, cursor: "pointer", zIndex: 1000, color: "var(--md-on-primary)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: "0 4px 12px rgba(103, 80, 164, 0.3)",
-        }}
-      >💬</button>
-    );
+    return null;
   }
 
   const containerStyle = isMobile ? {
