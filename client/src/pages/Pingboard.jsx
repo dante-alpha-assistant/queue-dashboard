@@ -669,6 +669,291 @@ function OrgChartTree({ agents, allReplicas, loading: replicasLoading, liveStatu
   );
 }
 
+/* ─── Pipeline View ─── */
+function PipelineView() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [days, setDays] = useState(30);
+
+  const fetchPipeline = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/agents/pipeline-stats?days=${days}`);
+      if (res.ok) setData(await res.json());
+    } catch (e) {
+      console.error("Failed to fetch pipeline stats:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [days]);
+
+  useEffect(() => {
+    fetchPipeline();
+    const interval = setInterval(fetchPipeline, 30000);
+    return () => clearInterval(interval);
+  }, [fetchPipeline]);
+
+  if (loading) return <div style={{ textAlign: "center", padding: 60, color: "var(--md-on-surface-variant)" }}>Loading pipeline...</div>;
+  if (!data) return <div style={{ textAlign: "center", padding: 60, color: "var(--md-on-surface-variant)" }}>Failed to load pipeline data</div>;
+
+  const { pipeline_state, current_by_stage, stage_durations, agent_summary, bottlenecks, agents } = data;
+
+  function formatDuration(ms) {
+    if (!ms) return "—";
+    const mins = Math.round(ms / 60000);
+    if (mins < 60) return `${mins}m`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ${mins % 60}m`;
+    return `${Math.floor(hrs / 24)}d ${hrs % 24}h`;
+  }
+
+  const stages = [
+    { key: "todo", label: "Backlog", emoji: "📋", color: "#79747E" },
+    { key: "in_progress", label: "Coding", emoji: "🔧", color: "#2E7D32" },
+    { key: "qa_testing", label: "QA Review", emoji: "🧪", color: "#E65100" },
+    { key: "completed", label: "Completed", emoji: "✅", color: "#1565C0" },
+    { key: "deployed", label: "Deployed", emoji: "🚀", color: "#6A1B9A" },
+  ];
+
+  const qaAgents = (agents || []).filter(a => (a.capabilities || []).includes("qa"));
+  const codingAgents = (agents || []).filter(a => (a.capabilities || []).includes("coding") || (a.capabilities || []).includes("ops"));
+  const totalQaSlots = qaAgents.reduce((sum, a) => sum + (a.max_capacity || 1), 0);
+  const totalCodingSlots = codingAgents.reduce((sum, a) => sum + (a.max_capacity || 1), 0);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* Period selector */}
+      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <span style={{ fontSize: 12, color: "var(--md-on-surface-variant)", fontWeight: 600 }}>Period:</span>
+        {[7, 14, 30, 90].map(d => (
+          <button key={d} onClick={() => { setDays(d); setLoading(true); }} style={{
+            padding: "4px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600, border: "none",
+            background: days === d ? "var(--md-primary)" : "var(--md-surface-container)",
+            color: days === d ? "var(--md-on-primary)" : "var(--md-on-surface-variant)",
+            cursor: "pointer", fontFamily: "'Roboto', system-ui, sans-serif",
+          }}>
+            {d}d
+          </button>
+        ))}
+      </div>
+
+      {/* Bottleneck alerts */}
+      {bottlenecks.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {bottlenecks.map((b, i) => (
+            <div key={i} style={{
+              padding: "10px 16px", borderRadius: 12,
+              background: b.severity === "high" ? "rgba(186, 26, 26, 0.08)" : "rgba(230, 81, 0, 0.08)",
+              border: `1px solid ${b.severity === "high" ? "rgba(186, 26, 26, 0.3)" : "rgba(230, 81, 0, 0.3)"}`,
+              color: b.severity === "high" ? "#BA1A1A" : "#E65100",
+              fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8,
+            }}>
+              {b.severity === "high" ? "🔴" : "🟡"} {b.message}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Pipeline flow diagram */}
+      <div style={{
+        background: "var(--md-surface-container)", borderRadius: 16, padding: 24,
+        border: "1px solid var(--md-surface-variant)",
+      }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--md-on-background)", marginBottom: 20 }}>
+          📊 Task Pipeline
+        </div>
+
+        {/* Flow stages */}
+        <div style={{ display: "flex", alignItems: "center", gap: 0, overflowX: "auto", paddingBottom: 8 }}>
+          {stages.map((stage, i) => {
+            const count = pipeline_state[stage.key] || 0;
+            const isBottleneck = bottlenecks.some(b => b.stage === stage.key);
+            const tasks = current_by_stage[stage.key] || [];
+
+            return (
+              <div key={stage.key} style={{ display: "flex", alignItems: "center" }}>
+                {/* Stage card */}
+                <div className="pingboard-tooltip-trigger" style={{
+                  position: "relative",
+                  minWidth: 130, padding: "16px 14px", borderRadius: 14, textAlign: "center",
+                  background: isBottleneck ? `${stage.color}12` : "var(--md-surface)",
+                  border: `2px solid ${isBottleneck ? "#BA1A1A" : count > 0 ? stage.color : "var(--md-surface-variant)"}`,
+                  boxShadow: isBottleneck ? `0 0 12px ${stage.color}20` : "none",
+                  transition: "all 200ms",
+                }}>
+                  <div style={{ fontSize: 24, marginBottom: 6 }}>{stage.emoji}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: stage.color, marginBottom: 4 }}>
+                    {stage.label}
+                  </div>
+                  <div style={{
+                    fontSize: 28, fontWeight: 800, color: count > 0 ? "var(--md-on-background)" : "var(--md-on-surface-variant)",
+                    lineHeight: 1,
+                  }}>
+                    {count}
+                  </div>
+                  {isBottleneck && (
+                    <div style={{
+                      position: "absolute", top: -8, right: -8, width: 20, height: 20, borderRadius: "50%",
+                      background: "#BA1A1A", color: "#fff", fontSize: 11, fontWeight: 700,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>!</div>
+                  )}
+
+                  {/* Tooltip with task list */}
+                  {tasks.length > 0 && (
+                    <div className="pingboard-tooltip" style={{ minWidth: 240 }}>
+                      <div style={{ fontWeight: 700, marginBottom: 6 }}>{stage.label} ({tasks.length})</div>
+                      {tasks.slice(0, 5).map(t => (
+                        <div key={t.id} style={{ fontSize: 11, padding: "3px 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                          <span style={{ opacity: 0.6 }}>{t.agent || "unassigned"}</span> — {t.title?.length > 40 ? t.title.slice(0, 37) + "..." : t.title}
+                        </div>
+                      ))}
+                      {tasks.length > 5 && <div style={{ fontSize: 10, opacity: 0.5, marginTop: 4 }}>+{tasks.length - 5} more</div>}
+                    </div>
+                  )}
+                </div>
+
+                {/* Arrow between stages */}
+                {i < stages.length - 1 && (
+                  <div style={{ display: "flex", alignItems: "center", padding: "0 4px" }}>
+                    <div style={{ width: 24, height: 0, borderTop: "2px solid var(--md-surface-variant)" }} />
+                    <div style={{
+                      width: 0, height: 0,
+                      borderLeft: "8px solid var(--md-surface-variant)",
+                      borderTop: "5px solid transparent",
+                      borderBottom: "5px solid transparent",
+                    }} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Blocked / Failed sidebar counts */}
+        {(pipeline_state.blocked > 0 || pipeline_state.failed > 0) && (
+          <div style={{ display: "flex", gap: 12, marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--md-surface-variant)" }}>
+            {pipeline_state.blocked > 0 && (
+              <div style={{ padding: "8px 14px", borderRadius: 10, background: "rgba(186, 26, 26, 0.06)", border: "1px solid rgba(186, 26, 26, 0.2)", fontSize: 12, fontWeight: 600, color: "#BA1A1A" }}>
+                🚧 {pipeline_state.blocked} blocked
+              </div>
+            )}
+            {pipeline_state.failed > 0 && (
+              <div style={{ padding: "8px 14px", borderRadius: 10, background: "rgba(186, 26, 26, 0.06)", border: "1px solid rgba(186, 26, 26, 0.2)", fontSize: 12, fontWeight: 600, color: "#BA1A1A" }}>
+                ❌ {pipeline_state.failed} failed
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Agent roles in pipeline */}
+      <div style={{
+        background: "var(--md-surface-container)", borderRadius: 16, padding: 24,
+        border: "1px solid var(--md-surface-variant)",
+      }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--md-on-background)", marginBottom: 16 }}>
+          🏗️ Pipeline Roles
+        </div>
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+          {/* Coding agents */}
+          <div style={{ flex: 1, minWidth: 260, padding: 16, borderRadius: 12, background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)" }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#2E7D32", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10 }}>
+              🔧 Coding Agents ({codingAgents.length}) — {totalCodingSlots} slots
+            </div>
+            {codingAgents.map(a => {
+              const stats = agent_summary[a.id] || agent_summary[a.name] || {};
+              return (
+                <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid var(--md-surface-variant)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <StatusDot status={a.status} size={8} />
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{a.name}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--md-on-surface-variant)" }}>
+                    {stats.coding_tasks ? `${stats.coding_tasks} tasks · avg ${formatDuration(stats.avg_coding_ms)}` : "No tasks yet"}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Arrow */}
+          <div style={{ display: "flex", alignItems: "center", padding: "0 8px" }}>
+            <div style={{ fontSize: 24, color: "var(--md-on-surface-variant)" }}>→</div>
+          </div>
+
+          {/* QA agents */}
+          <div style={{ flex: 1, minWidth: 260, padding: 16, borderRadius: 12, background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)" }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#E65100", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10 }}>
+              🧪 QA Agents ({qaAgents.length}) — {totalQaSlots} slots
+            </div>
+            {qaAgents.length === 0 && (
+              <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)", fontStyle: "italic", padding: "8px 0" }}>No QA agents configured</div>
+            )}
+            {qaAgents.map(a => {
+              const stats = agent_summary[a.id] || agent_summary[a.name] || {};
+              return (
+                <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid var(--md-surface-variant)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <StatusDot status={a.status} size={8} />
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{a.name}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--md-on-surface-variant)" }}>
+                    {stats.qa_tasks ? `${stats.qa_tasks} reviews · avg ${formatDuration(stats.avg_qa_ms)}` : "No reviews yet"}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Arrow */}
+          <div style={{ display: "flex", alignItems: "center", padding: "0 8px" }}>
+            <div style={{ fontSize: 24, color: "var(--md-on-surface-variant)" }}>→</div>
+          </div>
+
+          {/* Deploy */}
+          <div style={{ minWidth: 140, padding: 16, borderRadius: 12, background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)", textAlign: "center", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#6A1B9A", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 }}>
+              🚀 Deploy
+            </div>
+            <div style={{ fontSize: 11, color: "var(--md-on-surface-variant)" }}>
+              ArgoCD + Vercel
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 800, marginTop: 8 }}>{pipeline_state.deployed || 0}</div>
+            <div style={{ fontSize: 10, color: "var(--md-on-surface-variant)" }}>deployed ({days}d)</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Flow stats */}
+      <div style={{
+        background: "var(--md-surface-container)", borderRadius: 16, padding: 24,
+        border: "1px solid var(--md-surface-variant)",
+      }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--md-on-background)", marginBottom: 16 }}>
+          ⏱️ Flow Statistics ({days} day window)
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
+          {[
+            { label: "Avg Coding Time", value: formatDuration(stage_durations.coding.avg_ms), sub: `${stage_durations.coding.count} tasks · median ${formatDuration(stage_durations.coding.median_ms)}`, color: "#2E7D32" },
+            { label: "Avg QA Time", value: formatDuration(stage_durations.qa.avg_ms), sub: `${stage_durations.qa.count} reviews · median ${formatDuration(stage_durations.qa.median_ms)}`, color: "#E65100" },
+            { label: "Avg End-to-End", value: formatDuration(stage_durations.end_to_end.avg_ms), sub: `${stage_durations.end_to_end.count} tasks · median ${formatDuration(stage_durations.end_to_end.median_ms)}`, color: "#1565C0" },
+          ].map((stat, i) => (
+            <div key={i} style={{ padding: 16, borderRadius: 12, background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)", textAlign: "center" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: stat.color, marginBottom: 8 }}>
+                {stat.label}
+              </div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: "var(--md-on-background)", marginBottom: 4 }}>
+                {stat.value}
+              </div>
+              <div style={{ fontSize: 10, color: "var(--md-on-surface-variant)" }}>{stat.sub}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ReplicaCard({ pod, activeTasks }) {
   const podTasks = activeTasks || [];
   const statusColor = pod.ready ? "#2E7D32" : pod.status === "Running" ? "#E65100" : "#BA1A1A";
@@ -1058,6 +1343,7 @@ export default function Pingboard() {
           <div style={{ display: "flex", gap: 4, background: "var(--md-surface-container)", borderRadius: 12, padding: 3 }}>
             {[
               { key: "orgchart", label: "🏢 Org Chart" },
+              { key: "pipeline", label: "🔀 Pipeline" },
               { key: "grid", label: "⊞ Grid" },
             ].map((mode) => (
               <button
@@ -1141,6 +1427,8 @@ export default function Pingboard() {
         {/* View content */}
         {viewMode === "orgchart" ? (
           <OrgChartTree agents={filtered} allReplicas={allReplicas} loading={allReplicasLoading} liveStatus={liveStatus} />
+        ) : viewMode === "pipeline" ? (
+          <PipelineView />
         ) : (
           /* Grid view (existing) */
           <div style={{ display: "flex", gap: 24 }}>
