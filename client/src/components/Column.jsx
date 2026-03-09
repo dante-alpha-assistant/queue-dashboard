@@ -1,4 +1,4 @@
-export default function Column({ title, color, count, children, isTablet, collapsible, collapsed, onToggleCollapse, headerAction }) {
+export default function Column({ title, color, count, agentCount, children, isTablet, collapsible, collapsed, onToggleCollapse, headerAction }) {
   if (collapsible && collapsed) {
     return (
       <div
@@ -38,6 +38,17 @@ export default function Column({ title, color, count, children, isTablet, collap
           fontWeight: 700,
           flexShrink: 0,
         }}>{count}</span>
+        {agentCount > 0 && (
+          <span style={{
+            background: "#0097A720",
+            color: "#0097A7",
+            padding: "2px 8px",
+            borderRadius: 10,
+            fontSize: 11,
+            fontWeight: 700,
+            flexShrink: 0,
+          }}>👤{agentCount}</span>
+        )}
       </div>
     );
   }
@@ -66,6 +77,16 @@ export default function Column({ title, color, count, children, isTablet, collap
             background: `${color}20`, color,
             padding: "2px 10px", borderRadius: 10, fontSize: 12, fontWeight: 700,
           }}>{count}</span>
+          {agentCount > 0 && (
+            <span style={{
+              background: "#0097A720",
+              color: "#0097A7",
+              padding: "2px 8px",
+              borderRadius: 10,
+              fontSize: 11,
+              fontWeight: 700,
+            }} title={`${agentCount} agent${agentCount !== 1 ? 's' : ''} working`}>👤{agentCount}</span>
+          )}
           {headerAction}
           {collapsible && (
             <span style={{
