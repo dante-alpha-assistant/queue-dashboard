@@ -75,6 +75,36 @@ const ACTIVE_STATUSES = new Set(["in_progress", "running", "qa_testing", "comple
 
 const HAS_MARKDOWN = /[#*`\[|]/;
 
+/* ── Error → Suggestion pattern matching ─────────────────── */
+
+const ERROR_SUGGESTIONS = [
+  { pattern: /idle timeout/i, suggestion: "The agent timed out waiting. Click Actions → Retry to re-dispatch, or check if the agent has capacity." },
+  { pattern: /session idle/i, suggestion: "The agent session went idle. Click Actions → Retry to re-dispatch, or check if the agent has capacity." },
+  { pattern: /qa rejected.*no pr/i, suggestion: "The coding agent did not create a pull request. Click Actions → Retry to re-assign to a different agent." },
+  { pattern: /qa rejected.*no pull request/i, suggestion: "The coding agent did not create a pull request. Click Actions → Retry to re-assign to a different agent." },
+  { pattern: /qa rejected/i, suggestion: "QA found issues with this task. Review the QA result, then click Actions → Retry to re-assign." },
+  { pattern: /at capacity/i, suggestion: "All agent replicas are busy. Wait for a task to complete, or scale up replicas in gitops." },
+  { pattern: /no available agent/i, suggestion: "No agents are available to handle this task. Check agent status on the Pingboard, or wait for an agent to free up." },
+  { pattern: /deploy failed.*vercel/i, suggestion: "Install the Vercel GitHub integration at vercel.com/integrations/github, then retry the deploy." },
+  { pattern: /deploy failed/i, suggestion: "The deployment failed. Check the deploy logs for details, then click Actions → Retry." },
+  { pattern: /merge conflict/i, suggestion: "The PR has merge conflicts. Click Actions → Rebase PR to attempt an automatic rebase, or resolve conflicts manually." },
+  { pattern: /rate limit/i, suggestion: "An API rate limit was hit. Wait a few minutes, then click Actions → Retry." },
+  { pattern: /auth.*fail|unauthorized|403|401/i, suggestion: "Authentication failed. Check that the agent's tokens are valid and not expired." },
+  { pattern: /timeout|timed out/i, suggestion: "The operation timed out. Click Actions → Retry to try again, or check if the target service is healthy." },
+  { pattern: /out of memory|oom/i, suggestion: "The agent ran out of memory. Consider scaling up resources in gitops, then retry." },
+  { pattern: /network|connection refused|ECONNREFUSED/i, suggestion: "A network error occurred. Check connectivity to the target service, then retry." },
+  { pattern: /not found|404/i, suggestion: "A required resource was not found. Verify the repo/endpoint exists and the agent has access." },
+  { pattern: /dispatch.*fail/i, suggestion: "Task dispatch failed. Check that target agents are online, then click Actions → Retry." },
+];
+
+function getErrorSuggestion(error) {
+  if (!error || typeof error !== 'string') return null;
+  for (const { pattern, suggestion } of ERROR_SUGGESTIONS) {
+    if (pattern.test(error)) return suggestion;
+  }
+  return null;
+}
+
 const TIMELINE_STEPS = [
   { key: 'created', label: 'Created', statuses: ['todo', 'blocked', 'in_progress', 'running', 'completed', 'failed', 'qa', 'qa_testing', 'deploying', 'deployed', 'deploy_failed'] },
   { key: 'assigned', label: 'Assigned', statuses: [ 'in_progress', 'running', 'completed', 'failed', 'qa', 'qa_testing', 'deploying', 'deployed', 'deploy_failed'] },
@@ -1084,17 +1114,35 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
             </div>
           )}
           {hasError && (
-            <div style={{
-              marginBottom: 16, padding: '12px 16px', borderRadius: 10,
-              background: '#BA1A1A0A', border: '1px solid #BA1A1A25',
-              display: 'flex', alignItems: 'flex-start', gap: 10,
-            }}>
-              <span style={{ fontSize: 18, flexShrink: 0, lineHeight: 1.2 }}>❌</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#BA1A1A', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Error</div>
-                <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--md-on-surface, #1C1B1F)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{task.error}</div>
+            <>
+              <div style={{
+                marginBottom: 0, padding: '12px 16px', borderRadius: getErrorSuggestion(task.error) ? '10px 10px 0 0' : 10,
+                background: '#BA1A1A0A', border: '1px solid #BA1A1A25',
+                borderBottom: getErrorSuggestion(task.error) ? 'none' : undefined,
+                display: 'flex', alignItems: 'flex-start', gap: 10,
+              }}>
+                <span style={{ fontSize: 18, flexShrink: 0, lineHeight: 1.2 }}>❌</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#BA1A1A', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Error</div>
+                  <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--md-on-surface, #1C1B1F)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{task.error}</div>
+                </div>
               </div>
-            </div>
+              {getErrorSuggestion(task.error) && (
+                <div style={{
+                  marginBottom: 16, padding: '10px 16px', borderRadius: '0 0 10px 10px',
+                  background: '#E8A31708', border: '1px solid #E8A31730',
+                  borderTop: '1px dashed #E8A31740',
+                  display: 'flex', alignItems: 'flex-start', gap: 10,
+                }}>
+                  <span style={{ fontSize: 16, flexShrink: 0, lineHeight: 1.3 }}>💡</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#E8A317', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Suggestion</div>
+                    <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--md-on-surface-variant, #49454F)' }}>{getErrorSuggestion(task.error)}</div>
+                  </div>
+                </div>
+              )}
+              {!getErrorSuggestion(task.error) && <div style={{ marginBottom: 16 }} />}
+            </>
           )}
           {hasDescription && (
             <div style={{ marginBottom: 16 }}>
