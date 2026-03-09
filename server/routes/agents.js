@@ -35,6 +35,79 @@ agentsRouter.get("/discover", async (req, res) => {
   }
 });
 
+// Bulk pod replicas for all agents (K8s) — used by org chart view
+agentsRouter.get("/all-replicas", async (req, res) => {
+  try {
+    const { execSync } = await import("child_process");
+    const kubectl = process.env.KUBECTL_PATH || "/tools/kubectl";
+    const namespace = process.env.K8S_NAMESPACE || "agents";
+
+    // Get all agents
+    const { data: agents } = await supabase
+      .from("agent_cards")
+      .select("id, name")
+      .order("name");
+
+    // Get all pods in the agents namespace
+    let allPods = [];
+    try {
+      const raw = execSync(
+        `${kubectl} get pods -n ${namespace} -o json`,
+        { timeout: 15000, encoding: "utf8" }
+      );
+      const parsed = JSON.parse(raw);
+      allPods = parsed.items || [];
+    } catch (e) {
+      allPods = [];
+    }
+
+    // Get all in-progress tasks
+    const { data: tasks } = await supabase
+      .from("agent_tasks")
+      .select("id, title, status, type, priority, assigned_agent")
+      .in("status", ["in_progress", "assigned", "qa_testing"])
+      .order("created_at", { ascending: false });
+
+    // Group pods by agent (match via app label)
+    const result = {};
+    for (const agent of (agents || [])) {
+      const agentPods = allPods.filter(pod => {
+        const appLabel = pod.metadata?.labels?.app;
+        return appLabel === agent.id || appLabel === agent.name;
+      });
+
+      result[agent.id] = {
+        agent: agent.id,
+        pods: agentPods.map((pod) => {
+          const containerStatuses = pod.status?.containerStatuses || [];
+          const mainContainer = containerStatuses[0] || {};
+          const startedAt = mainContainer.state?.running?.startedAt;
+          const ready = mainContainer.ready || false;
+          const restarts = mainContainer.restartCount || 0;
+          const container = (pod.spec?.containers || [])[0] || {};
+          const resources = container.resources || {};
+          return {
+            name: pod.metadata?.name,
+            node: pod.spec?.nodeName,
+            status: pod.status?.phase,
+            ready,
+            restarts,
+            startedAt,
+            uptime: startedAt ? Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000) : null,
+            resources: { requests: resources.requests || {}, limits: resources.limits || {} },
+            image: container.image,
+          };
+        }),
+        activeTasks: (tasks || []).filter(t => t.assigned_agent === agent.id),
+      };
+    }
+
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Pod replicas for an agent (K8s)
 agentsRouter.get("/:name/replicas", async (req, res) => {
   try {
