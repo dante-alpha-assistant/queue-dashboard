@@ -28,7 +28,8 @@ DECLARE
     'status', 'title', 'description', 'type', 'priority',
     'assigned_agent', 'stage', 'acceptance_criteria',
     'dispatched_by', 'result', 'error', 'qa_result',
-    'project_id', 'repository_id', 'blocked_reason'
+    'project_id', 'repository_id', 'blocked_reason',
+    'deployment_url'
   ];
 BEGIN
   -- Determine actor: use assigned_agent if status changed to in_progress/running,
