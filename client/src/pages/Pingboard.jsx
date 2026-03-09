@@ -1156,6 +1156,11 @@ function AgentTile({ agent, isSelected, onClick, liveTasks = [] }) {
         <div style={{ fontSize: 11, color: statusColor, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
           {STATUS_LABELS[agent.status] || agent.status}
         </div>
+        {agent.role && (
+          <div style={{ fontSize: 11, color: "var(--md-on-surface-variant)", marginTop: 2 }}>
+            {agent.role}
+          </div>
+        )}
       </div>
 
       {/* Capacity bar in grid tile */}
@@ -1486,6 +1491,52 @@ export default function Pingboard() {
                     </div>
                     <div style={{ fontSize: 12, color: STATUS_COLORS[selectedAgent.status], fontWeight: 600 }}>
                       {STATUS_LABELS[selectedAgent.status] || selectedAgent.status}
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        padding: "3px 10px",
+                        borderRadius: 8,
+                        background:
+                          selectedAgent.tier === "leader"
+                            ? "rgba(99,102,241,0.1)"
+                            : selectedAgent.tier === "manager"
+                            ? "rgba(46,125,50,0.1)"
+                            : selectedAgent.tier === "worker"
+                            ? "rgba(230,81,0,0.1)"
+                            : "rgba(121,116,126,0.1)",
+                        color:
+                          selectedAgent.tier === "leader"
+                            ? "#6366f1"
+                            : selectedAgent.tier === "manager"
+                            ? "#2E7D32"
+                            : selectedAgent.tier === "worker"
+                            ? "#E65100"
+                            : "#79747E",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {selectedAgent.tier}
+                    </span>
+                  </div>
+                )}
+                {selectedAgent.role && (
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--md-on-surface-variant)", opacity: 0.7, marginBottom: 4 }}>
+                      Role
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "var(--md-on-background)" }}>
+                      {selectedAgent.role}
+                    </div>
+                  </div>
+                )}
+                {selectedAgent.max_capacity != null && (
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--md-on-surface-variant)", opacity: 0.7, marginBottom: 4 }}>
+                      Capacity
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "var(--md-on-background)" }}>
+                      {selectedAgent.current_load || 0} / {selectedAgent.max_capacity}
                     </div>
                   </div>
                   <button
