@@ -3,8 +3,9 @@ import { Router } from "express";
 export const neoChatRouter = Router();
 
 // Neo's OpenClaw gateway (in-cluster)
-const NEO_GATEWAY = process.env.NEO_GATEWAY_URL || "http://neo-worker.agents.svc.cluster.local:18789";
-const NEO_TOKEN = process.env.NEO_GATEWAY_TOKEN || "neo-worker-gw-tok-2026";
+// Route to dedicated neo-chat-worker (headless, no Discord session conflicts)
+const NEO_GATEWAY = process.env.NEO_GATEWAY_URL || "http://neo-chat-worker.agents.svc.cluster.local:18789";
+const NEO_TOKEN = process.env.NEO_GATEWAY_TOKEN || "neo-chat-worker-gw-tok-2026";
 
 const SYSTEM_PROMPT = `You are Neo, an AI engineering assistant embedded in the tasks.dante.id dashboard.
 The user is describing work they need done. Your job is to:
