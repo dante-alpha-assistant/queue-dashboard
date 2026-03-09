@@ -442,6 +442,44 @@ function ActionBar({ task, onStatusChange, isMobile }) {
   );
 }
 
+/* ── Merge Status Badge ───────────────────────────────────── */
+const MERGE_STATUS_CONFIG = {
+  queued:   { emoji: "⏳", label: "In queue",  color: "#79747E", bg: "#79747E20" },
+  merging:  { emoji: "🔄", label: "Merging",   color: "#1565C0", bg: "#1565C020" },
+  merged:   { emoji: "✅", label: "Merged",    color: "#2E7D32", bg: "#2E7D3220" },
+  conflict: { emoji: "⚠️", label: "Conflict",  color: "#E65100", bg: "#E6510020" },
+};
+
+function MergeStatusBadge({ metadata }) {
+  const status = metadata?.merge_status;
+  if (!status) return null;
+  const config = MERGE_STATUS_CONFIG[status];
+  if (!config) return null;
+
+  // Build tooltip text
+  const details = metadata.merge_status_details || {};
+  let tooltip = config.label;
+  if (status === "queued" && details.queue_position) {
+    tooltip = `Queue position: ${details.queue_position}/${details.queue_length || "?"}`;
+  } else if (status === "conflict" && details.conflict_info) {
+    tooltip = details.conflict_info;
+  } else if (status === "merging") {
+    tooltip = `Merging PR${details.pr_number ? " #" + details.pr_number : ""}...`;
+  } else if (status === "merged") {
+    tooltip = `PR${details.pr_number ? " #" + details.pr_number : ""} merged`;
+  }
+
+  return (
+    <span title={tooltip}>
+      <Badge
+        label={`${config.emoji} ${config.label}${status === "queued" && details.queue_position ? ` #${details.queue_position}` : ""}`}
+        color={config.color}
+        bg={config.bg}
+      />
+    </span>
+  );
+}
+
 /* ── Task Card ────────────────────────────────────────────── */
 export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, progress, monitor, transitioning }) {
   const agent = task.assigned_agent?.toLowerCase();
@@ -516,6 +554,7 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
               ? <Badge label={`🔍 QA: ${task.qa_agent}`} color="#2E7D32" bg="#2E7D3220" />
               : <Badge label="⏳ Waiting for QA" color="#7B5EA7" bg="#7B5EA720" />
           )}
+          {task.status === "completed" && <MergeStatusBadge metadata={task.metadata} />}
         </div>
         <DurationTicker updatedAt={task.updated_at} startedAt={task.started_at} completedAt={task.completed_at} active={isActive} status={task.status} />
       </div>
