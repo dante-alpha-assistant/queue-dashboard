@@ -85,7 +85,7 @@ export default function Column({ title, color, count, agentCount, children, isTa
               borderRadius: 10,
               fontSize: 11,
               fontWeight: 700,
-            }} title={`${agentCount} agent${agentCount !== 1 ? 's' : ''} working`}>👤{agentCount}</span>
+            }} title={`${agentCount} active task${agentCount !== 1 ? 's' : ''}`}>👤{agentCount}</span>
           )}
           {headerAction}
           {collapsible && (

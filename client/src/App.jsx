@@ -146,7 +146,7 @@ export default function App() {
   };
   const filterByType = filterTasks;
 
-  const countUniqueAgents = (tasks) => new Set(tasks.filter(t => t.assigned_agent).map(t => t.assigned_agent)).size;
+  const countActiveTasks = (tasks) => tasks.filter(t => t.assigned_agent).length;
 
   const getActiveColumnTasks = () => {
     switch (activeTab) {
@@ -461,7 +461,7 @@ export default function App() {
           collapsible collapsed={!!collapsedCols.todo} onToggleCollapse={() => toggleCollapse("todo")}>
           {renderCards(filterByType(todo))}
         </Column>
-        <Column title="In Progress" color="#E8A317" count={filterByType(assigned).length + filterByType(inProgress).length} agentCount={countUniqueAgents([...filterByType(assigned), ...filterByType(inProgress)])} isTablet={isTablet}
+        <Column title="In Progress" color="#E8A317" count={filterByType(assigned).length + filterByType(inProgress).length} agentCount={countActiveTasks([...filterByType(assigned), ...filterByType(inProgress)])} isTablet={isTablet}
           collapsible collapsed={!!collapsedCols.in_progress} onToggleCollapse={() => toggleCollapse("in_progress")}>
           {renderCards([...filterByType(assigned), ...filterByType(inProgress)])}
         </Column>
@@ -469,7 +469,7 @@ export default function App() {
           collapsible collapsed={!!collapsedCols.blocked} onToggleCollapse={() => toggleCollapse("blocked")}>
           {renderCards(filterByType(blocked))}
         </Column>
-        <Column title="QA Testing" color="#7B5EA7" count={filterByType(qa).length} agentCount={countUniqueAgents(filterByType(qa))} isTablet={isTablet}
+        <Column title="QA Testing" color="#7B5EA7" count={filterByType(qa).length} agentCount={countActiveTasks(filterByType(qa))} isTablet={isTablet}
           collapsible collapsed={!!collapsedCols.qa_testing} onToggleCollapse={() => toggleCollapse("qa_testing")}>
           {renderCards(filterByType(qa).slice(0, 30))}
         </Column>
