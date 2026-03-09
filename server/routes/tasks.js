@@ -73,6 +73,11 @@ router.get("/tasks", async (req, res) => {
       query = query.neq("status", "deprecated");
     }
 
+    // Text search by title (case-insensitive partial match)
+    if (req.query.search) {
+      query = query.ilike("title", `%${req.query.search}%`);
+      query = query.limit(10);
+    }
 
     const { since, until } = req.query;
     const ALWAYS_INCLUDE_STATUSES = ["todo", "in_progress", "qa_testing", "blocked"];
