@@ -38,8 +38,14 @@ const STATUS_CONFIG = {
   failed:      { bg: "#BA1A1A14", color: "#BA1A1A", label: "Failed",      accent: "#BA1A1A" },
   blocked:     { bg: "#E6510014", color: "#E65100", label: "Blocked",     accent: "#E65100" },
   deployed:    { bg: "#00838F14", color: "#00838F", label: "Deployed",    accent: "#00838F" },
+  deploying:   { bg: "#E8A31714", color: "#E8A317", label: "Deploying",   accent: "#D97706" },
+  deploy_failed: { bg: "#BA1A1A14", color: "#BA1A1A", label: "Deploy Failed", accent: "#BA1A1A" },
+  saving:      { bg: "#E8A31714", color: "#E8A317", label: "Saving",      accent: "#D97706" },
   deprecated:  { bg: "#9E9E9E14", color: "#9E9E9E", label: "Deprecated",  accent: "#9E9E9E" },
 };
+
+/** Statuses that indicate a long-running async operation is in flight */
+const TRANSITIONAL_STATUSES = new Set(['deploying', 'saving']);
 
 const PRIORITY_CONFIG = {
   urgent: { bg: "#D32F2F14", color: "#D32F2F", label: "Urgent", icon: "🔴" },
@@ -589,7 +595,8 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
   const [open, setOpen] = useState(false);
   const [showAssignPicker, setShowAssignPicker] = useState(false);
   const [assigning, setAssigning] = useState(false);
-  const actionLoading = actionProcessing;
+  const isTransitional = TRANSITIONAL_STATUSES.has(task.status);
+  const actionLoading = actionProcessing || isTransitional;
   const setActionLoading = setActionProcessing;
   const ref = useRef(null);
 
@@ -1310,8 +1317,8 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
           }} />
         )}
 
-        {/* ── Full-card loading overlay ───────────────────── */}
-        {actionProcessing && (
+        {/* ── Full-card loading overlay (persists across close/reopen via task status) ── */}
+        {(actionProcessing || TRANSITIONAL_STATUSES.has(task.status)) && (
           <div style={{
             position: 'absolute', inset: 0, zIndex: 250,
             background: 'rgba(255,251,254,0.7)',
