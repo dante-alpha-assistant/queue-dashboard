@@ -64,6 +64,9 @@ function renderContent(content) {
 
 export default function NewTaskChat({ isMobile }) {
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(() => {
+    try { return localStorage.getItem("neo-chat-expanded") === "true"; } catch { return false; }
+  });
   const [conversations, setConversations] = useState([]);
   const [activeConvoId, setActiveConvoId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -74,6 +77,7 @@ export default function NewTaskChat({ isMobile }) {
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [error, setError] = useState(null);
+  const [animating, setAnimating] = useState(false);
 
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
@@ -81,6 +85,17 @@ export default function NewTaskChat({ isMobile }) {
   const fileInputRef = useRef(null);
   const dragCounter = useRef(0);
   const loadAbortRef = useRef(null);
+
+  const toggleExpanded = useCallback(() => {
+    setAnimating(true);
+    setExpanded(prev => {
+      const next = !prev;
+      try { localStorage.setItem("neo-chat-expanded", String(next)); } catch {}
+      return next;
+    });
+    // Hide sidebar in expanded mode to save space
+    setTimeout(() => setAnimating(false), 350);
+  }, []);
 
   // Fetch conversations
   const loadConversations = useCallback(async () => {
@@ -382,7 +397,24 @@ export default function NewTaskChat({ isMobile }) {
 
   const containerStyle = isMobile
     ? { position: "fixed", inset: 0, background: "var(--md-background)", zIndex: 1001, display: "flex", flexDirection: "column" }
-    : { position: "fixed", bottom: 24, right: 24, width: 640, height: 560, background: "var(--md-background)", borderRadius: 24, border: "1px solid var(--md-surface-variant)", zIndex: 1001, display: "flex", flexDirection: "row", boxShadow: "0 12px 40px rgba(0,0,0,0.15)", overflow: "hidden" };
+    : expanded
+    ? {
+        position: "fixed", top: 0, right: 0, bottom: 0, width: 420,
+        background: "var(--md-background)", zIndex: 1001,
+        display: "flex", flexDirection: "column",
+        borderLeft: "1px solid var(--md-surface-variant)",
+        boxShadow: "-4px 0 32px rgba(0,0,0,0.12)",
+        transition: "width 300ms cubic-bezier(0.4, 0, 0.2, 1), transform 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+        transform: animating ? "translateX(10px)" : "translateX(0)",
+      }
+    : {
+        position: "fixed", bottom: 24, right: 24, width: 640, height: 560,
+        background: "var(--md-background)", borderRadius: 24,
+        border: "1px solid var(--md-surface-variant)", zIndex: 1001,
+        display: "flex", flexDirection: "row",
+        boxShadow: "0 12px 40px rgba(0,0,0,0.15)", overflow: "hidden",
+        transition: "all 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+      };
 
   const hasInput = input.trim() || pendingImages.length > 0;
 
@@ -401,8 +433,8 @@ export default function NewTaskChat({ isMobile }) {
         </div>
       )}
 
-      {/* Sidebar */}
-      {(sidebarOpen || !isMobile) && (
+      {/* Sidebar — hidden in expanded mode unless toggled */}
+      {(sidebarOpen || (!isMobile && !expanded)) && (
         <div style={{
           width: isMobile ? "100%" : sidebarWidth,
           borderRight: isMobile ? "none" : "1px solid var(--md-surface-variant)",
@@ -462,8 +494,11 @@ export default function NewTaskChat({ isMobile }) {
           background: "linear-gradient(135deg, rgba(103,80,164,0.08) 0%, rgba(123,104,238,0.04) 100%)",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {isMobile && (
-              <button onClick={() => setSidebarOpen(true)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "var(--md-on-surface-variant)", padding: 4 }}>☰</button>
+            {(isMobile || expanded) && (
+              <button onClick={() => setSidebarOpen(prev => !prev)} title="Conversation history" style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "var(--md-on-surface-variant)", padding: 4, borderRadius: 8, transition: "background 150ms" }}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--md-surface-container)"}
+                onMouseLeave={e => e.currentTarget.style.background = "none"}
+              >☰</button>
             )}
             <div style={{
               width: 28, height: 28, borderRadius: "50%",
@@ -475,11 +510,31 @@ export default function NewTaskChat({ isMobile }) {
               <div style={{ fontSize: 10, color: "var(--md-on-surface-variant)", marginTop: 1 }}>Describe what you need → Neo creates the task</div>
             </div>
           </div>
-          <button onClick={() => setOpen(false)} style={{
-            background: "none", border: "none", color: "var(--md-on-surface-variant)",
-            fontSize: 18, cursor: "pointer", padding: "6px 8px", borderRadius: 8,
-            minWidth: 36, minHeight: 36, display: "flex", alignItems: "center", justifyContent: "center",
-          }}>✕</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+            {!isMobile && (
+              <button
+                onClick={toggleExpanded}
+                title={expanded ? "Collapse to popup" : "Expand to side panel"}
+                style={{
+                  background: "none", border: "none", color: "var(--md-on-surface-variant)",
+                  fontSize: 15, cursor: "pointer", minWidth: 36, minHeight: 36,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  borderRadius: 8, transition: "background 150ms",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--md-surface-container)"}
+                onMouseLeave={e => e.currentTarget.style.background = "none"}
+              >{expanded ? "↙" : "↗"}</button>
+            )}
+            <button onClick={() => { setExpanded(false); setOpen(false); }} style={{
+              background: "none", border: "none", color: "var(--md-on-surface-variant)",
+              fontSize: 18, cursor: "pointer", padding: "6px 8px", borderRadius: 8,
+              minWidth: 36, minHeight: 36, display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "background 150ms",
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = "var(--md-surface-container)"}
+            onMouseLeave={e => e.currentTarget.style.background = "none"}
+            >✕</button>
+          </div>
         </div>
 
         {/* Messages */}
