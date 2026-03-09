@@ -1,5 +1,6 @@
 import SpeedLoader from "../components/SpeedLoader";
-import { useState, useEffect, useCallback, useRef } from "react";
+import AgentDetailPanel from "../components/AgentDetailPanel";
+import { useState, useEffect, useCallback } from "react";
 
 /* ─── CSS Keyframes (injected once) ─── */
 const styleId = "pingboard-animations";
@@ -458,6 +459,7 @@ function VerticalConnector({ height = 32, color = "var(--md-surface-variant)", d
 
 /* ─── Org Chart Tree View ─── */
 function OrgChartTree({ agents, allReplicas, loading: replicasLoading, liveStatus = {} }) {
+function OrgChartTree({ agents, allReplicas, loading: replicasLoading, onAgentClick }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
@@ -510,6 +512,21 @@ function OrgChartTree({ agents, allReplicas, loading: replicasLoading, liveStatu
       case "manager": return <ManagerCard agent={agent} replicas={allReplicas[agentId]} liveTasks={tasks} />;
       default: return <WorkerCard agent={agent} liveTasks={tasks} />;
     }
+    const card = (() => {
+      switch (type) {
+        case "human": return <HumanCard agent={agent} replicas={allReplicas[agent.id || agent.name]} />;
+        case "manager": return <ManagerCard agent={agent} replicas={allReplicas[agent.id || agent.name]} />;
+        default: return <WorkerCard agent={agent} />;
+      }
+    })();
+    return (
+      <div
+        onClick={() => onAgentClick && onAgentClick(agent)}
+        style={{ cursor: "pointer" }}
+      >
+        {card}
+      </div>
+    );
   }
 
   // Sort roots: human first, then managers, then workers
@@ -1123,6 +1140,7 @@ function ReplicaCard({ pod, activeTasks, animState, hasActiveTasks }) {
 }
 
 function AgentTile({ agent, isSelected, onClick, liveTasks = [] }) {
+function AgentTile({ agent, isSelected, onClick }) {
   const caps = Array.isArray(agent.capabilities) ? agent.capabilities : [];
   const load = liveTasks.length || agent.current_load || 0;
   const maxCap = agent.max_capacity || 0;
@@ -1234,8 +1252,6 @@ export default function Pingboard() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [selectedAgent, setSelectedAgent] = useState(null);
-  const [replicas, setReplicas] = useState(null);
-  const [replicasLoading, setReplicasLoading] = useState(false);
   const [viewMode, setViewMode] = useState("orgchart"); // default to org chart
   const [allReplicas, setAllReplicas] = useState({});
   const [allReplicasLoading, setAllReplicasLoading] = useState(false);
@@ -1566,6 +1582,18 @@ export default function Pingboard() {
           <div style={{ display: "flex", gap: 24 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               {filtered.length === 0 ? (
+        <div style={{ display: "flex", gap: 24 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {viewMode === "orgchart" ? (
+              <OrgChartTree
+                agents={filtered}
+                allReplicas={allReplicas}
+                loading={allReplicasLoading}
+                onAgentClick={handleSelectAgent}
+              />
+            ) : (
+              /* Grid view */
+              filtered.length === 0 ? (
                 <div style={{ textAlign: "center", color: "var(--md-on-surface-variant)", padding: 60, fontSize: 14 }}>
                   No agents found
         {/* Main content: grid + detail panel */}
@@ -1974,6 +2002,18 @@ export default function Pingboard() {
           )}
         </div>
         )}
+              )
+            )}
+          </div>
+
+          {/* Agent Detail Panel */}
+          {selectedAgent && (
+            <AgentDetailPanel
+              agent={selectedAgent}
+              onClose={() => setSelectedAgent(null)}
+            />
+          )}
+        </div>
       </div>
       <SkillsModal open={skillsOpen} onClose={() => setSkillsOpen(false)} />
     </div>
