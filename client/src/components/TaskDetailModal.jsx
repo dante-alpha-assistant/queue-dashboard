@@ -923,7 +923,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   };
 
   const handleDeprecate = async () => {
-    if (!deprecateConfirm) { setDeprecateConfirm(true); return; }
+    
     setDeprecating(true);
     setDeprecateError(null);
     try {
