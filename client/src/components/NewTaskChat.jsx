@@ -322,15 +322,16 @@ export default function NewTaskChat({ isMobile }) {
     try {
       const resp = await fetch("/api/neo-chat/conversations");
       if (!resp.ok) {
-        console.error("Failed to load conversations:", resp.status);
-        setError("Failed to load conversations. The chat service may be unavailable.");
+        const errBody = await resp.json().catch(() => null);
+        console.error("Failed to load conversations:", resp.status, errBody);
+        setError(errBody?.error || `Failed to load conversations (${resp.status} ${resp.statusText})`);
         return;
       }
       const data = await resp.json();
       if (Array.isArray(data)) setConversations(data);
     } catch (e) {
       console.error("Failed to load conversations:", e);
-      setError("Failed to connect to chat service.");
+      setError(e.message?.includes("fetch") ? "Connection failed — check your network" : `Failed to connect to chat service: ${e.message}`);
     }
   }, []);
 
@@ -346,8 +347,9 @@ export default function NewTaskChat({ isMobile }) {
       });
       if (controller.signal.aborted) return;
       if (!resp.ok) {
-        console.error("Failed to load messages:", resp.status);
-        setError("Failed to load messages.");
+        const errBody = await resp.json().catch(() => null);
+        console.error("Failed to load messages:", resp.status, errBody);
+        setError(errBody?.error || `Failed to load messages (${resp.status} ${resp.statusText})`);
         setLoadingMessages(false);
         return;
       }
@@ -364,7 +366,7 @@ export default function NewTaskChat({ isMobile }) {
     } catch (e) {
       if (e.name === "AbortError") return;
       console.error("Failed to load messages:", e);
-      setError("Failed to load messages.");
+      setError(e.message?.includes("fetch") ? "Connection failed — check your network" : `Failed to load messages: ${e.message}`);
     }
     if (!controller.signal.aborted) setLoadingMessages(false);
   }, []);
@@ -475,7 +477,8 @@ export default function NewTaskChat({ isMobile }) {
           return;
         }
       } catch (e) {
-        setError(`Failed to create conversation: ${e.message}`);
+        console.error("Failed to create conversation:", e);
+        setError(e.message?.includes("fetch") ? "Connection failed — check your network" : `Failed to create conversation: ${e.message}`);
         return;
       }
     }
@@ -505,10 +508,12 @@ export default function NewTaskChat({ isMobile }) {
       });
 
       if (!resp.ok) {
-        const err = await resp.json().catch(() => ({ error: "Unknown error" }));
+        const err = await resp.json().catch(() => null);
+        const errMsg = err?.error || resp.statusText || `Request failed with status ${resp.status}`;
+        console.error(`Chat API error [${resp.status} ${resp.statusText}]:`, err || "(no response body)");
         setMessages(prev => {
           const updated = [...prev];
-          updated[updated.length - 1] = { ...updated[updated.length - 1], content: `⚠️ Error: ${err.error || resp.statusText}` };
+          updated[updated.length - 1] = { ...updated[updated.length - 1], content: `⚠️ ${errMsg}` };
           return updated;
         });
         setStreaming(false);
@@ -557,9 +562,17 @@ export default function NewTaskChat({ isMobile }) {
       loadConversations();
     } catch (e) {
       if (e.name !== "AbortError") {
+        const isTimeout = e.name === "TimeoutError" || e.message?.toLowerCase().includes("timeout");
+        const isNetwork = e instanceof TypeError && e.message?.includes("fetch");
+        const displayMsg = isTimeout
+          ? "Request timed out — try again"
+          : isNetwork
+          ? "Connection failed — check your network"
+          : `Connection error: ${e.message}`;
+        console.error("Chat send error:", { name: e.name, message: e.message, stack: e.stack });
         setMessages(prev => {
           const updated = [...prev];
-          updated[updated.length - 1] = { ...updated[updated.length - 1], content: `⚠️ Connection error: ${e.message}` };
+          updated[updated.length - 1] = { ...updated[updated.length - 1], content: `⚠️ ${displayMsg}` };
           return updated;
         });
       }
