@@ -865,9 +865,12 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const hasDescription = !!task.description;
   const hasMetadata = !!task.metadata && typeof task.metadata === 'object' && Object.keys(task.metadata).length > 0;
 
+  const hasDeployment = ['deploying', 'deployed', 'deploy_failed'].includes(task.status);
+
   const tabs = [{ key: 'details', label: 'Details' }];
   tabs.push({ key: 'comments', label: '💬 Comments' });
   tabs.push({ key: 'activity', label: 'Activity' });
+  if (hasDeployment) tabs.push({ key: 'deployment', label: '🚀 Deployment' });
   tabs.push({ key: 'metadata', label: 'Metadata' });
   if (hasQA) tabs.push({ key: 'qa', label: 'QA' });
   if (hasMetadata) tabs.push({ key: 'meta', label: 'Meta' });
@@ -1119,6 +1122,113 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
             {task.qa_result.passed ? "QA Passed" : "QA Failed"}
           </SectionLabel>
           <ResultDisplay result={task.qa_result} variant={task.qa_result.passed ? "success" : "error"} />
+        </div>
+      )}
+
+      {activeTab === 'deployment' && hasDeployment && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Deployment Status */}
+          <div style={{
+            padding: '14px 16px', borderRadius: 10,
+            background: task.status === 'deployed' ? '#00838F0A' : task.status === 'deploy_failed' ? '#BA1A1A0A' : '#E8A3170A',
+            border: `1px solid ${task.status === 'deployed' ? '#00838F25' : task.status === 'deploy_failed' ? '#BA1A1A25' : '#E8A31725'}`,
+            display: 'flex', alignItems: 'center', gap: 12,
+          }}>
+            <span style={{ fontSize: 24 }}>
+              {task.status === 'deployed' ? '✅' : task.status === 'deploy_failed' ? '❌' : '⏳'}
+            </span>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: task.status === 'deployed' ? '#00838F' : task.status === 'deploy_failed' ? '#BA1A1A' : '#E8A317' }}>
+                {task.status === 'deployed' ? 'Deployed' : task.status === 'deploy_failed' ? 'Deploy Failed' : 'Deploying…'}
+              </div>
+              {task.updated_at && (
+                <div style={{ fontSize: 11, color: 'var(--md-outline, #79747E)', marginTop: 2 }}>
+                  {formatDate(task.updated_at)}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Deployment URL */}
+          <div className="tdm-sidebar-card">
+            <SectionLabel icon="🔗">Deployment URL</SectionLabel>
+            {task.deployment_url ? (
+              <a href={task.deployment_url} target="_blank" rel="noopener noreferrer" style={{
+                color: '#6750A4', textDecoration: 'none', fontWeight: 500, fontSize: 13,
+                display: 'flex', alignItems: 'center', gap: 6, wordBreak: 'break-all',
+              }}>
+                <span>🌐</span> {task.deployment_url}
+              </a>
+            ) : (
+              <span style={{ color: 'var(--md-outline, #79747E)', fontSize: 13, fontStyle: 'italic' }}>
+                No deployment URL recorded
+              </span>
+            )}
+          </div>
+
+          {/* Deploy Target */}
+          <div className="tdm-sidebar-card">
+            <SectionLabel icon={DEPLOY_TARGET_CONFIG[task.deploy_target || 'kubernetes']?.icon || '☸️'}>Deploy Target</SectionLabel>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Badge
+                label={DEPLOY_TARGET_CONFIG[task.deploy_target || 'kubernetes']?.label || task.deploy_target || 'Kubernetes'}
+                color={DEPLOY_TARGET_CONFIG[task.deploy_target || 'kubernetes']?.color || '#326CE5'}
+              />
+            </div>
+
+            {/* Vercel-specific links */}
+            {(task.deploy_target === 'vercel') && (
+              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {task.result?.project_url && (
+                  <a href={task.result.project_url} target="_blank" rel="noopener noreferrer" style={{ color: '#6750A4', textDecoration: 'none', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>📊</span> Vercel Project Dashboard
+                  </a>
+                )}
+                {task.result?.project_name && (
+                  <a href={`https://vercel.com/~/projects/${task.result.project_name}/deployments`} target="_blank" rel="noopener noreferrer" style={{ color: '#6750A4', textDecoration: 'none', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>📋</span> Deployment History
+                  </a>
+                )}
+              </div>
+            )}
+
+            {/* Kubernetes-specific info */}
+            {(task.deploy_target === 'kubernetes' || !task.deploy_target) && (
+              <div style={{ marginTop: 10, fontSize: 12, color: 'var(--md-on-surface-variant, #49454F)' }}>
+                {task.result?.argocd_synced ? (
+                  <span style={{ color: '#386A20', fontWeight: 500 }}>✅ ArgoCD synced</span>
+                ) : task.result?.sync_triggered ? (
+                  <span style={{ color: '#E8A317', fontWeight: 500 }}>⏳ ArgoCD sync triggered</span>
+                ) : (
+                  <span style={{ color: 'var(--md-outline, #79747E)', fontStyle: 'italic' }}>ArgoCD status unknown</span>
+                )}
+              </div>
+            )}
+
+            {/* No deploy target */}
+            {task.deploy_target === 'none' && (
+              <div style={{ marginTop: 6, fontSize: 12, color: 'var(--md-outline, #79747E)', fontStyle: 'italic' }}>
+                No deployment target configured
+              </div>
+            )}
+          </div>
+
+          {/* Merged PRs */}
+          {task.pull_request_url?.length > 0 && (
+            <div className="tdm-sidebar-card">
+              <SectionLabel icon="🔀">Pull Requests</SectionLabel>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {(Array.isArray(task.pull_request_url) ? task.pull_request_url : [task.pull_request_url]).map((url, i) => (
+                  <a key={i} href={url} target="_blank" rel="noopener noreferrer" style={{
+                    color: '#6750A4', textDecoration: 'none', fontWeight: 500, fontSize: 13,
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}>
+                    <span>🔀</span> {url.replace(/https:\/\/github\.com\//, '')}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
