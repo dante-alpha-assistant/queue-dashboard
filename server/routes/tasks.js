@@ -677,7 +677,14 @@ router.post("/tasks/:id/rebase", async (req, res) => {
     // 4. Determine which agent to dispatch to
     const rebaseAgent = task.assigned_agent || task.last_failed_agent || null;
 
-    // 5. Update task: set back to in_progress with rebase metadata
+    // 5. Build rebase instructions for the agent
+    const rebaseBranch = prData.head?.ref;
+    const rebaseBase = prData.base?.ref || "main";
+    const rebaseInstructions = `REBASE REQUESTED: Rebase PR #${pr.number} on ${pr.repo}. ` +
+      `Branch "${rebaseBranch}" needs to be rebased against "${rebaseBase}" and force-pushed. ` +
+      `Steps: git fetch origin, git checkout ${rebaseBranch}, git rebase origin/${rebaseBase}, resolve any conflicts, git push --force-with-lease origin ${rebaseBranch}.`;
+
+    // 5b. Update task: set back to in_progress with rebase instructions in human_input
     const { data: updated, error: updateErr } = await supabase
       .from("agent_tasks")
       .update({
@@ -687,12 +694,7 @@ router.post("/tasks/:id/rebase", async (req, res) => {
         completed_at: null,
         error: null,
         result: null,
-        metadata: {
-          ...(task.metadata || {}),
-          rebase_requested: true,
-          rebase_requested_at: new Date().toISOString(),
-          rebase_pr: { repo: pr.repo, number: pr.number, branch: prData.head?.ref, base: prData.base?.ref || "main" },
-        },
+        human_input: rebaseInstructions,
       })
       .eq("id", req.params.id)
       .select()
@@ -700,6 +702,17 @@ router.post("/tasks/:id/rebase", async (req, res) => {
 
     if (updateErr) {
       return res.status(500).json({ ok: false, error: `Failed to update task: ${updateErr.message}` });
+    }
+
+    // 5c. Dispatch to task-dispatcher so an agent picks it up
+    try {
+      await fetch(`${DISPATCHER_URL}/dispatch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task_id: req.params.id }),
+      });
+    } catch (dispatchErr) {
+      console.warn(`[REBASE] Dispatch failed for task ${req.params.id}: ${dispatchErr.message} (task updated anyway)`);
     }
 
     // 6. Log activity
