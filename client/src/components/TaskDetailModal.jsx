@@ -923,16 +923,15 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   };
 
   const handleDeprecate = async () => {
-    
     setDeprecating(true);
     setDeprecateError(null);
     try {
       await onStatusChange(task.id, { status: 'deprecated' });
-      handleClose();
     } catch (err) {
+      setDeprecateError(err.message || "Failed to deprecate task");
+    } finally {
       setDeprecating(false);
       setDeprecateConfirm(false);
-      setDeprecateError(err.message || "Failed to deprecate task");
     }
   };
 
