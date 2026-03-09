@@ -961,7 +961,6 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
         throw new Error(data.error || `Deploy failed (HTTP ${resp.status})`);
       }
       // Don't close or reset deploying — the Processing overlay stays
-      // until Realtime updates task.status to deployed/deploy_failed
     } catch (e) {
       setDeploying(false);
       setDeployError(e.message || "Deploy failed");
