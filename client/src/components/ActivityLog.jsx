@@ -240,6 +240,70 @@ function ActivityEntry({ entry, isLast }) {
   );
 }
 
+/* ── Filter Definitions ───────────────────────────────────── */
+
+const ACTIVITY_FILTERS = [
+  { key: 'all', label: 'All', match: () => true },
+  { key: 'errors', label: 'Errors', match: e => e.field === 'error', tint: true },
+  { key: 'status', label: 'Status', match: e => e.field === 'status' },
+  { key: 'merges', label: 'Merges', match: e => ['merge_complete', 'merge_conflict', 'merge_error'].includes(e.field) },
+  { key: 'assignments', label: 'Assignments', match: e => e.field === 'assigned_agent' },
+];
+
+function FilterChips({ entries, activeFilter, onFilterChange }) {
+  const counts = {};
+  for (const f of ACTIVITY_FILTERS) {
+    counts[f.key] = f.key === 'all' ? entries.length : entries.filter(f.match).length;
+  }
+
+  const hasErrors = counts.errors > 0;
+
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+      {ACTIVITY_FILTERS.map(f => {
+        const isActive = activeFilter === f.key;
+        const isErrorChip = f.key === 'errors';
+        const errorTint = isErrorChip && hasErrors;
+
+        return (
+          <button
+            key={f.key}
+            onClick={() => onFilterChange(f.key)}
+            data-testid={`activity-filter-${f.key}`}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '4px 10px', borderRadius: 16, fontSize: 11, fontWeight: 500,
+              cursor: 'pointer', transition: 'all 0.15s ease',
+              border: `1px solid ${
+                isActive
+                  ? errorTint ? '#BA1A1A' : 'var(--md-primary, #6750A4)'
+                  : errorTint ? '#BA1A1A40' : 'var(--md-surface-variant, #E7E0EC)'
+              }`,
+              background: isActive
+                ? errorTint ? '#BA1A1A14' : '#6750A414'
+                : errorTint ? '#BA1A1A08' : 'transparent',
+              color: isActive
+                ? errorTint ? '#BA1A1A' : 'var(--md-primary, #6750A4)'
+                : errorTint ? '#BA1A1A' : 'var(--md-on-surface-variant, #49454F)',
+            }}
+          >
+            {f.label}
+            <span style={{
+              fontSize: 9, fontWeight: 600, padding: '1px 5px', borderRadius: 10,
+              background: isActive
+                ? errorTint ? '#BA1A1A20' : '#6750A420'
+                : 'var(--md-surface-container-low, #F7F2FA)',
+              color: errorTint ? '#BA1A1A' : undefined,
+            }}>
+              {counts[f.key]}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ── Main Component ───────────────────────────────────────── */
 
 export default function ActivityLog({ taskId }) {
@@ -248,6 +312,7 @@ export default function ActivityLog({ taskId }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
   const [total, setTotal] = useState(0);
+  const [activeFilter, setActiveFilter] = useState('all');
   const PAGE_SIZE = 10;
 
   useEffect(() => {
@@ -316,13 +381,21 @@ export default function ActivityLog({ taskId }) {
     );
   }
 
+  const filterDef = ACTIVITY_FILTERS.find(f => f.key === activeFilter) || ACTIVITY_FILTERS[0];
+  const filteredEntries = activeFilter === 'all' ? entries : entries.filter(filterDef.match);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-      {entries.map((entry, i) => (
+      <FilterChips entries={entries} activeFilter={activeFilter} onFilterChange={setActiveFilter} />
+      {filteredEntries.length === 0 ? (
+        <div style={{ padding: 20, textAlign: 'center', color: 'var(--md-outline, #79747E)', fontSize: 12, fontStyle: 'italic' }}>
+          No matching activity entries.
+        </div>
+      ) : filteredEntries.map((entry, i) => (
         <ActivityEntry
           key={entry.id}
           entry={entry}
-          isLast={i === entries.length - 1}
+          isLast={i === filteredEntries.length - 1}
         />
       ))}
       {entries.length < total && (
