@@ -191,6 +191,61 @@ router.patch("/tasks/:id", async (req, res) => {
   }
 });
 
+// Force status change (bypasses regression guard, logs activity)
+router.post("/tasks/:id/force-status", async (req, res) => {
+  try {
+    const { status, changed_by } = req.body;
+    const VALID_STATUSES = ["todo", "in_progress", "qa_testing", "completed", "blocked", "deployed", "failed"];
+    if (!status || !VALID_STATUSES.includes(status)) {
+      return res.status(400).json({ error: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` });
+    }
+
+    // Get current status for activity log
+    const { data: current, error: fetchErr } = await supabase
+      .from("agent_tasks")
+      .select("status")
+      .eq("id", req.params.id)
+      .single();
+    if (fetchErr) throw fetchErr;
+
+    const updates = {
+      status,
+      updated_at: new Date().toISOString(),
+    };
+    if (status === "completed" || status === "failed" || status === "deployed") {
+      updates.completed_at = new Date().toISOString();
+    }
+    if (status === "todo") {
+      updates.started_at = null;
+      updates.completed_at = null;
+      updates.error = null;
+      updates.blocked_reason = null;
+    }
+
+    const { data, error } = await supabase
+      .from("agent_tasks")
+      .update(updates)
+      .eq("id", req.params.id)
+      .select()
+      .single();
+    if (error) throw error;
+
+    // Log the manual override in activity log
+    await supabase.from("task_activity_log").insert({
+      task_id: req.params.id,
+      field: "force_status",
+      old_value: current.status,
+      new_value: `${status} (manual override by ${changed_by || "dashboard"})`,
+      changed_by: changed_by || "dashboard",
+      changed_at: new Date().toISOString(),
+    }).catch(() => {});
+
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // SSE proxy — stream events from task-dispatcher
 router.get("/events", async (req, res) => {
   res.writeHead(200, {
