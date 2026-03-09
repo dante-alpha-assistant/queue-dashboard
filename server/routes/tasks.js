@@ -143,6 +143,23 @@ router.post("/tasks", async (req, res) => {
 router.patch("/tasks/:id", async (req, res) => {
   try {
     const updates = { ...req.body, updated_at: new Date().toISOString() };
+
+    // === STATUS REGRESSION GUARD ===
+    // Block completed/deployed → todo/in_progress transitions via API
+    // These can only happen through the reopen_task RPC (dashboard UI)
+    if (updates.status === "todo" || updates.status === "in_progress") {
+      const { data: current } = await supabase
+        .from("agent_tasks")
+        .select("status")
+        .eq("id", req.params.id)
+        .single();
+      if (current && (current.status === "completed" || current.status === "deployed")) {
+        return res.status(403).json({
+          error: `Status regression blocked: ${current.status} → ${updates.status}. Use the Reopen button in the dashboard to reopen completed/deployed tasks.`,
+        });
+      }
+    }
+
     if (updates.status === "done" || updates.status === "failed") {
       updates.completed_at = new Date().toISOString();
     }
@@ -812,6 +829,24 @@ router.get("/tasks/:id/mergeability", async (req, res) => {
     res.json({ has_pr: true, prs: results });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// Reopen task — human-only action to move completed/deployed tasks back to todo
+router.post("/tasks/:id/reopen", async (req, res) => {
+  try {
+    const reason = req.body.reason || "Reopened from dashboard";
+    const { data, error } = await supabase.rpc("reopen_task", {
+      p_task_id: req.params.id,
+      p_reason: reason,
+    });
+    if (error) throw error;
+    if (data && !data.ok) {
+      return res.status(400).json(data);
+    }
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
   }
 });
 
