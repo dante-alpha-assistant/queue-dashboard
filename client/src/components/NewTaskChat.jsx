@@ -547,8 +547,13 @@ export default function NewTaskChat({ isMobile }) {
     return (
       <button onClick={() => setOpen(true)} title="Chat with Neo to create a task"
         style={{
-          position: "fixed", bottom: isMobile ? 80 : 24, right: isMobile ? 16 : 88,
-          height: 48, paddingLeft: 16, paddingRight: 18, borderRadius: 24,
+          position: "fixed",
+          bottom: isMobile ? 80 : 24,
+          right: isMobile ? 16 : 24,
+          height: 48,
+          paddingLeft: 16,
+          paddingRight: 18,
+          borderRadius: 24,
           background: "linear-gradient(135deg, #6750A4 0%, #7B68EE 100%)",
           border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", zIndex: 1000,
           color: "#fff", display: "flex", alignItems: "center", gap: 8,
