@@ -18,8 +18,9 @@ function cleanText(text) {
 
 export default function ChatPanel({ isMobile, open: controlledOpen, onClose }) {
   const [internalOpen, setInternalOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
-  const setOpen = onClose ? (v) => { if (!v) onClose(); } : setInternalOpen;
+  const setOpen = onClose ? (v) => { if (!v) { setExpanded(false); onClose(); } } : setInternalOpen;
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -97,6 +98,12 @@ export default function ChatPanel({ isMobile, open: controlledOpen, onClose }) {
   const containerStyle = isMobile ? {
     position: "fixed", inset: 0, background: "var(--md-background)", zIndex: 1000,
     display: "flex", flexDirection: "column",
+  } : expanded ? {
+    position: "fixed", top: 0, right: 0, bottom: 0, width: 450,
+    background: "var(--md-background)", zIndex: 1000,
+    display: "flex", flexDirection: "column",
+    borderLeft: "1px solid var(--md-surface-variant)",
+    boxShadow: "-4px 0 24px rgba(0,0,0,0.10)",
   } : {
     position: "fixed", bottom: 24, right: 24, width: 400, height: 500,
     background: "var(--md-background)", borderRadius: 24,
@@ -114,11 +121,27 @@ export default function ChatPanel({ isMobile, open: controlledOpen, onClose }) {
         display: "flex", justifyContent: "space-between", alignItems: "center",
       }}>
         <span style={{ fontWeight: 600, fontSize: 14 }}>💬 #dante-agents</span>
-        <button onClick={() => setOpen(false)} style={{
-          background: "none", border: "none", color: "var(--md-on-surface-variant)",
-          fontSize: 18, cursor: "pointer", minWidth: 44, minHeight: 44,
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>✕</button>
+        <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+          {!isMobile && (
+            <button
+              onClick={() => setExpanded(prev => !prev)}
+              title={expanded ? "Collapse to popup" : "Expand to panel"}
+              style={{
+                background: "none", border: "none", color: "var(--md-on-surface-variant)",
+                fontSize: 16, cursor: "pointer", minWidth: 36, minHeight: 36,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                borderRadius: 8,
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = "var(--md-surface-container)"}
+              onMouseLeave={e => e.currentTarget.style.background = "none"}
+            >{expanded ? "↙" : "↗"}</button>
+          )}
+          <button onClick={() => setOpen(false)} style={{
+            background: "none", border: "none", color: "var(--md-on-surface-variant)",
+            fontSize: 18, cursor: "pointer", minWidth: 44, minHeight: 44,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>✕</button>
+        </div>
       </div>
 
       {/* Messages */}
