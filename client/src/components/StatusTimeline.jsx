@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { CheckCircle2, Clock, Rocket, Search, XCircle } from 'lucide-react';
 
 /* ── Status display config ──────────────────────────────── */
 
@@ -39,11 +40,11 @@ const STATUS_ICONS = {
   assigned: '◉',
   in_progress: '▶',
   running: '▶',
-  qa_testing: '🔍',
+  qa_testing: Search,
   completed: '✓',
-  deployed: '🚀',
-  deploying: '⏳',
-  deploy_failed: '💥',
+  deployed: Rocket,
+  deploying: Clock,
+  deploy_failed: XCircle,
   failed: '✕',
   blocked: '⏸',
   deprecated: '⊘',
@@ -227,7 +228,7 @@ function TimelineStep({ step, isFirst, isLast }) {
             color: step.isTerminal ? '#00838F' : color,
             fontVariantNumeric: 'tabular-nums',
           }}>
-            {step.isTerminal ? '✅' : formatDurationDetailed(step.duration)}
+            {step.isTerminal ? <CheckCircle2 size={12} /> : formatDurationDetailed(step.duration)}
           </span>
         </div>
 

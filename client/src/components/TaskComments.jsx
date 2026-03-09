@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { AlertTriangle, Bot, Brain, Clock, Glasses, Hammer, MessageSquare, Settings, User, Waves, Wrench, Zap } from 'lucide-react';
 
 const AUTHOR_ICONS = {
-  dante: '👤', neo: '🕶️', mu: '🔧', beta: '⚡', alpha: '🧠', flow: '🌊', ifra: '🛠️',
-  'neo-worker': '🕶️', 'beta-worker': '⚡', 'ifra-worker': '🛠️', system: '⚙️',
+  dante: User, neo: Glasses, mu: Wrench, beta: Zap, alpha: Brain, flow: Waves, ifra: Hammer,
+  'neo-worker': Glasses, 'beta-worker': Zap, 'ifra-worker': Hammer, system: Settings,
 };
 const AUTHOR_TYPE_COLORS = {
   human: '#6750A4',
@@ -100,7 +101,7 @@ export default function TaskComments({ taskId }) {
           </div>
         )}
         {comments.map(c => {
-          const icon = AUTHOR_ICONS[c.author] || (c.author_type === 'agent' ? '🤖' : '👤');
+          const IconComp = AUTHOR_ICONS[c.author] || (c.author_type === 'agent' ? Bot : User);
           const typeColor = AUTHOR_TYPE_COLORS[c.author_type] || '#79747E';
           return (
             <div key={c.id} style={{
@@ -173,10 +174,10 @@ export default function TaskComments({ taskId }) {
             transition: 'all 0.15s', minHeight: 38, whiteSpace: 'nowrap',
           }}
         >
-          {posting ? '⏳' : '💬'} Send
+          {posting ? <Clock size={14} /> : <MessageSquare size={14} />} Send
         </button>
       </form>
-      {error && <div style={{ fontSize: 12, color: '#BA1A1A' }}>⚠️ {error}</div>}
+      {error && <div style={{ fontSize: 12, color: '#BA1A1A' }}><AlertTriangle size={14} /> {error}</div>}
     </div>
   );
 }

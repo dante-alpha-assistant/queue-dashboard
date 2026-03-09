@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
+import { MessageSquare } from 'lucide-react';
 
 function timeAgo(iso) {
   if (!iso) return "";
@@ -123,7 +124,7 @@ export default function ChatPanel({ isMobile, open: controlledOpen, onClose }) {
         padding: "14px 20px", borderBottom: "1px solid var(--md-surface-variant)",
         display: "flex", justifyContent: "space-between", alignItems: "center",
       }}>
-        <span style={{ fontWeight: 600, fontSize: 14 }}>💬 #dante-agents</span>
+        <span style={{ fontWeight: 600, fontSize: 14 }}><MessageSquare size={14} /> #dante-agents</span>
         <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
           {!isMobile && (
             <button

@@ -10,6 +10,7 @@ import TaskRelationships from './TaskRelationships';
 import { ProgressDetail } from './ProgressFeed';
 import CostsTab from './CostsTab';
 import HumanInterventionForm from './HumanInterventionForm';
+import { Activity, AlertTriangle, BarChart3, Bot, Brain, CheckCircle2, Circle, ClipboardList, Clock, FileText, Glasses, Hammer, Lightbulb, Link, Package, Pause, Pencil, RefreshCw, Rocket, Target, Timer, Waves, Wrench, XCircle, Zap } from 'lucide-react';
 
 /* ── Constants ────────────────────────────────────────────── */
 
@@ -24,7 +25,7 @@ const GHERKIN_KEYWORDS = [
 ];
 const GHERKIN_TEST = /^(Given|When|Then|And|But|Scenario|Background|Feature|Scenario Outline|Examples)\b/;
 
-const AGENT_ICONS = { neo: "🕶️", mu: "🔧", beta: "⚡", alpha: "🧠", flow: "🌊", ifra: "🛠️" };
+const AGENT_ICONS = { neo: Glasses, mu: Wrench, beta: Zap, alpha: Brain, flow: Waves, ifra: Hammer };
 const AGENT_ROLES = { neo: "Builder", alpha: "Leader", beta: "QA", mu: "Builder", flow: "Orchestrator", ifra: "Ops" };
 
 const STATUS_CONFIG = {
@@ -49,7 +50,7 @@ const STATUS_CONFIG = {
 const TRANSITIONAL_STATUSES = new Set(['deploying', 'saving']);
 
 const PRIORITY_CONFIG = {
-  urgent: { bg: "#D32F2F14", color: "#D32F2F", label: "Urgent", icon: "🔴" },
+  urgent: { bg: "#D32F2F14", color: "#D32F2F", label: "Urgent", icon: Circle },
   high:   { bg: "#E6510014", color: "#E65100", label: "High", icon: "🟠" },
   normal: null,
   low:    { bg: "#75757514", color: "#757575", label: "Low", icon: "⚪" },
@@ -417,7 +418,7 @@ function ResultDisplay({ result, variant = "success" }) {
     <>
       {summaryMd && <div className="tdm-md" style={{ marginBottom: 8, fontSize: 14, lineHeight: 1.7 }}><ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{parsed.summary}</ReactMarkdown></div>}
       <div style={{ position: 'relative' }}>
-        <button className="tdm-copy-btn" onClick={handleCopy}>{copied ? '✓ Copied' : '📋 Copy'}</button>
+        <button className="tdm-copy-btn" onClick={handleCopy}>{copied ? <><CheckCircle2 size={12} /> Copied</> : <><ClipboardList size={12} /> Copy</>}</button>
         <pre style={{ fontSize: 12, fontFamily: "'Roboto Mono', 'JetBrains Mono', monospace", whiteSpace: 'pre-wrap', overflowX: 'auto', maxWidth: '100%', wordBreak: 'break-word', padding: '16px 16px 16px', paddingTop: 32, background: 'var(--md-surface-container-low, #F7F2FA)', borderRadius: 10, border: '1px solid var(--md-surface-variant, #E7E0EC)', margin: 0, lineHeight: 1.6 }}>
           <JsonSyntax data={parsed} indent={0} />
         </pre>
@@ -615,7 +616,7 @@ function SmartRetryInfo({ metadata }) {
   const sr = metadata.smart_retry;
   return (
     <div style={{ padding: 10, background: '#E6510008', borderRadius: 10, border: '1px solid #E6510018', fontSize: 12 }}>
-      <div style={{ fontWeight: 600, color: '#E65100', marginBottom: 4, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>🔄 Smart Retry</div>
+      <div style={{ fontWeight: 600, color: '#E65100', marginBottom: 4, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}><RefreshCw size={14} /> Smart Retry</div>
       {sr.reasoning && <div style={{ color: 'var(--md-on-surface-variant, #49454F)', lineHeight: 1.5 }}>{sr.reasoning}</div>}
       {sr.recommended_agent && <div style={{ marginTop: 4, color: 'var(--md-outline, #79747E)', fontSize: 11 }}>→ Routed to <strong>{sr.recommended_agent}</strong></div>}
     </div>
@@ -661,35 +662,35 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
   if (task.paused) {
     actions.push({ label: '▶️ Resume', key: 'resume', color: '#2E7D32' });
   } else {
-    actions.push({ label: '⏸️ Stop task', key: 'stop', color: '#E65100' });
+    actions.push({ label: 'Stop task', iconKey: 'pause', key: 'stop', color: '#E65100' });
   }
 
   if (s === 'todo' && !task.paused) {
-    actions.push({ label: '👤 Assign', key: 'assign' });
+    actions.push({ label: 'Assign', iconKey: 'user', key: 'assign' });
   }
   if (s === 'failed' || s === 'deploy_failed') {
-    actions.push({ label: '🔄 Retry', key: 'retry', color: '#E65100' });
+    actions.push({ label: 'Retry', iconKey: 'refresh', key: 'retry', color: '#E65100' });
   }
   if (s === 'blocked') {
-    actions.push({ label: '🔓 Unblock', key: 'unblock', color: '#1B5E20' });
+    actions.push({ label: 'Unblock', iconKey: 'unlock', key: 'unblock', color: '#1B5E20' });
   }
   if (s === 'qa_testing' || s === 'completed') {
-    actions.push({ label: '↩️ Reopen', key: 'reopen' });
+    actions.push({ label: 'Reopen', iconKey: 'undo', key: 'reopen' });
   }
   if (s === 'completed' || s === 'deploy_failed') {
     const deployTarget = task.deploy_target || 'kubernetes';
-    const deployLabel = deploying ? '⏳ Deploying…' : deploySuccess ? '✅ Deployed' : deployConfirm ? `⚠️ Confirm Deploy → ${deployTarget}` : `🚀 Deploy → ${deployTarget}`;
+    const deployLabel = deploying ? 'Deploying…' : deploySuccess ? 'Deployed' : deployConfirm ? `Confirm Deploy → ${deployTarget}` : `Deploy → ${deployTarget}`;
     actions.push({ label: deployLabel, key: 'deploy', color: deployConfirm ? '#E65100' : '#00838F', disabled: deploying || deploySuccess });
   }
   // Rebase PR — available when task has PRs and is in completed, qa_testing, deploy_failed, or failed status
   if (['completed', 'qa_testing', 'deploy_failed', 'failed'].includes(s) && task.pull_request_url?.length > 0) {
-    const rebaseLabel = rebasing ? '⏳ Rebasing…' : rebaseSuccess ? '✅ Rebase Sent' : '🔄 Rebase PR';
+    const rebaseLabel = rebasing ? 'Rebasing…' : rebaseSuccess ? 'Rebase Sent' : 'Rebase PR';
     actions.push({ label: rebaseLabel, key: 'rebase', color: '#E65100', disabled: rebasing || rebaseSuccess });
   }
   // Force Complete — for non-terminal tasks
   const TERMINAL = new Set(['completed', 'deployed', 'deprecated']);
   if (!TERMINAL.has(s)) {
-    actions.push({ label: forceCompleteConfirm ? '⚠️ Confirm Force Complete' : '✅ Force Complete', key: 'force_complete', color: forceCompleteConfirm ? '#E65100' : '#1B5E20' });
+    actions.push({ label: forceCompleteConfirm ? 'Confirm Force Complete' : 'Force Complete', key: 'force_complete', color: forceCompleteConfirm ? '#E65100' : '#1B5E20' });
   }
   // Change Status — always available (except deprecated)
   if (s !== 'deprecated') {
@@ -697,7 +698,7 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
   }
 
   if (s !== 'deprecated') {
-    actions.push({ label: deprecating ? '⏳…' : '🗑️ Deprecate', key: 'deprecate', color: '#9E9E9E', disabled: deprecating });
+    actions.push({ label: deprecating ? '…' : 'Deprecate', key: 'deprecate', color: '#9E9E9E', disabled: deprecating });
   }
 
   const handleForceStatus = async (newStatus) => {
@@ -803,7 +804,7 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
           cursor: (assigning || actionLoading) ? 'not-allowed' : 'pointer', color: '#fff',
           minHeight: isMobile ? 42 : 36, display: 'flex', alignItems: 'center', gap: 6,
         }}>
-        {actionLoading ? (<><span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'tdm-spin 0.6s linear infinite' }} /> Processing…</>) : assigning ? "⏳ Assigning…" : "⚡ Actions ▾"}
+        {actionLoading ? (<><span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'tdm-spin 0.6s linear infinite' }} /> Processing…</>) : assigning ? "Assigning…" : "Actions ▾"}
       </button>
       {open && (
         <div style={menuStyle}>
@@ -844,7 +845,7 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
                 onClick={() => handleForceStatus(opt.value)}
                 style={{ display: 'block', width: '100%', padding: '10px 16px', background: '#FFF3E0', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, textAlign: 'left', color: '#E65100' }}
               >
-                ⚠️ Confirm → {opt.label}
+                <AlertTriangle size={14} /> Confirm → {opt.label}
               </button>
             ) : (
               <button key={opt.value}
@@ -1087,7 +1088,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   if (!task) return null;
 
   const agent = task.assigned_agent?.toLowerCase();
-  const icon = AGENT_ICONS[agent] || "🤖";
+  const IconComp = AGENT_ICONS[agent] || Bot;
   const role = AGENT_ROLES[agent] || "Agent";
   const sc = STATUS_CONFIG[task.status] || STATUS_CONFIG.todo;
   const typeColor = TYPE_COLORS[task.type] || "#79747E";
@@ -1112,7 +1113,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const tabs = [{ key: 'details', label: 'Details' }];
   tabs.push({ key: 'comments', label: 'Comments' });
   tabs.push({ key: 'activity', label: 'Activity' });
-  tabs.push({ key: 'deployment', label: '🚀 Deployment' });
+  tabs.push({ key: 'deployment', label: 'Deployment', Icon: Rocket });
   if (hasCosts) tabs.push({ key: 'costs', label: '💰 Costs' });
   if (hasDeployment) tabs.push({ key: 'deployment', label: 'Deployment' });
   if (hasCosts) tabs.push({ key: 'costs', label: 'Costs' });
@@ -1220,7 +1221,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
                 color: '#6750A4', textDecoration: 'none', fontSize: 11, display: 'flex',
                 alignItems: 'center', gap: 4, marginTop: 4, wordBreak: 'break-all',
               }}>
-                <span style={{ fontSize: 10 }}>🔗</span>
+                <span style={{ fontSize: 10 }}><Link size={14} /></span>
                 {task.deployment_url.replace(/^https?:\/\//, '').slice(0, 30)}{task.deployment_url.replace(/^https?:\/\//, '').length > 30 ? '…' : ''}
               </a>
             ) : null}
@@ -1257,14 +1258,14 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
       {/* Pipeline stepper */}
       {task.stage && (
         <div className="tdm-sidebar-card">
-          <SectionLabel icon="🔄">Pipeline</SectionLabel>
+          <SectionLabel icon={<RefreshCw size={14} />}>Pipeline</SectionLabel>
           <PipelineStepper stage={task.stage} />
         </div>
       )}
 
       {/* Timeline */}
       <div className="tdm-sidebar-card">
-        <SectionLabel icon="⏱️" collapsible collapsed={collapsedSections.timeline} onToggle={() => toggleSection('timeline')}>Timeline</SectionLabel>
+        <SectionLabel icon={<Timer size={14} />} collapsible collapsed={collapsedSections.timeline} onToggle={() => toggleSection('timeline')}>Timeline</SectionLabel>
         {!collapsedSections.timeline && (
           task.status_history && task.status_history.length > 0
             ? <StatusTimeline task={task} />
@@ -1313,7 +1314,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
                 borderBottom: getErrorSuggestion(task.error) ? 'none' : undefined,
                 display: 'flex', alignItems: 'flex-start', gap: 10,
               }}>
-                <span style={{ fontSize: 18, flexShrink: 0, lineHeight: 1.2 }}>❌</span>
+                <span style={{ fontSize: 18, flexShrink: 0, lineHeight: 1.2 }}><XCircle size={14} /></span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: '#BA1A1A', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Error</div>
                   <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--md-on-surface, #1C1B1F)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{task.error}</div>
@@ -1326,7 +1327,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
                   borderTop: '1px dashed #E8A31740',
                   display: 'flex', alignItems: 'flex-start', gap: 10,
                 }}>
-                  <span style={{ fontSize: 16, flexShrink: 0, lineHeight: 1.3 }}>💡</span>
+                  <span style={{ fontSize: 16, flexShrink: 0, lineHeight: 1.3 }}><Lightbulb size={14} /></span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: '#E8A317', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Suggestion</div>
                     <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--md-on-surface-variant, #49454F)' }}>{getErrorSuggestion(task.error)}</div>
@@ -1338,7 +1339,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
           )}
           {hasDescription && (
             <div style={{ marginBottom: 16 }}>
-              <SectionLabel icon="📝" collapsible collapsed={collapsedSections.desc} onToggle={() => toggleSection('desc')}>Description</SectionLabel>
+              <SectionLabel icon={<FileText size={14} />} collapsible collapsed={collapsedSections.desc} onToggle={() => toggleSection('desc')}>Description</SectionLabel>
               {!collapsedSections.desc && (
                 <div style={{ padding: 14, background: 'var(--md-surface-container-low, #F7F2FA)', borderRadius: 10, border: '1px solid var(--md-surface-variant, #E7E0EC)', overflow: 'hidden', overflowWrap: 'break-word', wordBreak: 'break-word', maxWidth: '100%' }}>
                   <MarkdownContent text={task.description} />
@@ -1348,7 +1349,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
           )}
           {hasCriteria && (
             <div style={{ marginBottom: 16 }}>
-              <SectionLabel icon="✅" color="#E65100" collapsible collapsed={collapsedSections.criteria} onToggle={() => toggleSection('criteria')}>Acceptance Criteria</SectionLabel>
+              <SectionLabel icon={<CheckCircle2 size={14} />} color="#E65100" collapsible collapsed={collapsedSections.criteria} onToggle={() => toggleSection('criteria')}>Acceptance Criteria</SectionLabel>
               {!collapsedSections.criteria && (
                 <div style={{ padding: 14, background: '#E6510006', borderRadius: 10, border: '1px solid #E6510018', overflow: 'hidden', overflowWrap: 'break-word', wordBreak: 'break-word', maxWidth: '100%' }}>
                   <MarkdownContent text={task.acceptance_criteria} />
@@ -1363,7 +1364,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
           )}
           <TaskRelationships taskId={task.id} onNavigateToTask={(id) => { window.location.href = `/task/${id}`; }} />
           <div style={{ marginTop: 16 }}>
-            <SectionLabel icon="🔗">Links</SectionLabel>
+            <SectionLabel icon={<Link size={14} />}>Links</SectionLabel>
             <div style={{ padding: 14, background: 'var(--md-surface-container-low, #F7F2FA)', borderRadius: 10, border: '1px solid var(--md-surface-variant, #E7E0EC)', display: 'flex', flexDirection: 'column', gap: 8 }}>
               {task.pull_request_url?.length > 0 ? (
                 (Array.isArray(task.pull_request_url) ? task.pull_request_url : [task.pull_request_url]).map((url, i) => (
@@ -1374,7 +1375,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
               ) : null}
               {task.repository_url && (
                 <a href={task.repository_url} target="_blank" rel="noopener noreferrer" style={{ color: "#386A20", textDecoration: "none", fontWeight: 500, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span>📦</span> {task.repository_url.replace(/https:\/\/github\.com\//, '')}
+                  <span><Package size={14} /></span> {task.repository_url.replace(/https:\/\/github\.com\//, '')}
                 </a>
               )}
               {!task.pull_request_url?.length && !task.repository_url && (
@@ -1406,7 +1407,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
               display: 'flex', alignItems: 'center', gap: 12,
             }}>
               <span style={{ fontSize: 24 }}>
-                {task.status === 'deployed' ? '✅' : task.status === 'deploy_failed' ? '❌' : '⏳'}
+                {task.status === 'deployed' ? <CheckCircle2 size={14} /> : task.status === 'deploy_failed' ? <XCircle size={14} /> : <Clock size={14} />}
               </span>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: task.status === 'deployed' ? '#00838F' : task.status === 'deploy_failed' ? '#BA1A1A' : '#E8A317' }}>
@@ -1423,7 +1424,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
 
           {/* Deployment URL — editable */}
           <div className="tdm-sidebar-card">
-            <SectionLabel icon="🔗">Deployment URL</SectionLabel>
+            <SectionLabel icon={<Link size={14} />}>Deployment URL</SectionLabel>
             {editingDeployUrl ? (
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <input
@@ -1484,7 +1485,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
                     color: '#6750A4', textDecoration: 'none', fontWeight: 500, fontSize: 13,
                     display: 'flex', alignItems: 'center', gap: 6, wordBreak: 'break-all', flex: 1, minWidth: 0,
                   }}>
-                    <span>🔗</span> {task.deployment_url}
+                    <span><Link size={14} /></span> {task.deployment_url}
                   </a>
                 ) : (
                   <span style={{ color: 'var(--md-outline, #79747E)', fontSize: 13, fontStyle: 'italic' }}>
@@ -1503,7 +1504,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
                   }}
                   onMouseEnter={e => { e.currentTarget.style.color = 'var(--md-on-surface, #1C1B1F)'; }}
                   onMouseLeave={e => { e.currentTarget.style.color = 'var(--md-outline, #79747E)'; }}
-                >✏️</button>
+                ><Pencil size={14} /></button>
               </div>
             )}
           </div>
@@ -1523,12 +1524,12 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
               <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {task.result?.project_url && (
                   <a href={task.result.project_url} target="_blank" rel="noopener noreferrer" style={{ color: '#6750A4', textDecoration: 'none', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span>📊</span> Vercel Project Dashboard
+                    <span><BarChart3 size={14} /></span> Vercel Project Dashboard
                   </a>
                 )}
                 {task.result?.project_name && (
                   <a href={`https://vercel.com/~/projects/${task.result.project_name}/deployments`} target="_blank" rel="noopener noreferrer" style={{ color: '#6750A4', textDecoration: 'none', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span>📋</span> Deployment History
+                    <span><ClipboardList size={14} /></span> Deployment History
                   </a>
                 )}
               </div>
@@ -1539,7 +1540,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
               <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {task.result?.project_url && (
                   <a href={task.result.project_url} target="_blank" rel="noopener noreferrer" style={{ color: '#6750A4', textDecoration: 'none', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span>📊</span> Railway Project Dashboard
+                    <span><BarChart3 size={14} /></span> Railway Project Dashboard
                   </a>
                 )}
                 {task.result?.project_name && (
@@ -1554,9 +1555,9 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
             {(task.deploy_target === 'kubernetes' || !task.deploy_target) && (
               <div style={{ marginTop: 10, fontSize: 12, color: 'var(--md-on-surface-variant, #49454F)' }}>
                 {task.result?.argocd_synced ? (
-                  <span style={{ color: '#386A20', fontWeight: 500 }}>✅ ArgoCD synced</span>
+                  <span style={{ color: '#386A20', fontWeight: 500 }}><CheckCircle2 size={14} /> ArgoCD synced</span>
                 ) : task.result?.sync_triggered ? (
-                  <span style={{ color: '#E8A317', fontWeight: 500 }}>⏳ ArgoCD sync triggered</span>
+                  <span style={{ color: '#E8A317', fontWeight: 500 }}><Clock size={14} /> ArgoCD sync triggered</span>
                 ) : (
                   <span style={{ color: 'var(--md-outline, #79747E)', fontStyle: 'italic' }}>ArgoCD status unknown</span>
                 )}
@@ -1634,7 +1635,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
 
       {activeTab === 'meta' && hasFilteredMetadata && (
         <div>
-          <SectionLabel icon="🔧">Task Metadata</SectionLabel>
+          <SectionLabel icon={<Wrench size={14} />}>Task Metadata</SectionLabel>
           <div style={{ position: 'relative' }}>
             <pre style={{ fontSize: 12, fontFamily: "'Roboto Mono', 'JetBrains Mono', monospace", whiteSpace: 'pre-wrap', overflowX: 'auto', maxWidth: '100%', wordBreak: 'break-word', padding: 14, background: 'var(--md-surface-container-low, #F7F2FA)', borderRadius: 10, border: '1px solid var(--md-surface-variant, #E7E0EC)', margin: 0, lineHeight: 1.6 }}>
               <JsonSyntax data={filteredMetadata} indent={0} />
@@ -1730,7 +1731,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8 }}>
             <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
               <StatusBadge status={task.status} />
-              {task.paused && <Badge label="⏸️ Paused" color="#E65100" bg="#E6510020" />}
+              {task.paused && <Badge label="Paused" icon={Pause} color="#E65100" bg="#E6510020" />}
               <Badge label={task.type} color={typeColor} />
               {isActive && !isMobile && !useWideLayout && <DurationTicker task={task} />}
             </div>
@@ -1812,10 +1813,10 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
           borderTop: '1px solid var(--md-surface-variant, #E7E0EC)',
           display: 'flex', gap: 6, alignItems: 'center',
         }}>
-          {saveError && <span style={{ color: '#D32F2F', fontSize: 12, wordBreak: 'break-word' }}>⚠️ {saveError}</span>}
-          {mergeConflict && <span style={{ color: '#E65100', fontSize: 12, fontWeight: 600 }}>⚠️ PR has merge conflicts</span>}
-          {deployError && <span style={{ color: '#D32F2F', fontSize: 12, wordBreak: 'break-word' }}>⚠️ {deployError}</span>}
-          {rebaseError && <span style={{ color: '#D32F2F', fontSize: 12, wordBreak: 'break-word' }}>⚠️ {rebaseError}</span>}
+          {saveError && <span style={{ color: '#D32F2F', fontSize: 12, wordBreak: 'break-word' }}><AlertTriangle size={14} /> {saveError}</span>}
+          {mergeConflict && <span style={{ color: '#E65100', fontSize: 12, fontWeight: 600 }}><AlertTriangle size={14} /> PR has merge conflicts</span>}
+          {deployError && <span style={{ color: '#D32F2F', fontSize: 12, wordBreak: 'break-word' }}><AlertTriangle size={14} /> {deployError}</span>}
+          {rebaseError && <span style={{ color: '#D32F2F', fontSize: 12, wordBreak: 'break-word' }}><AlertTriangle size={14} /> {rebaseError}</span>}
           {deprecateError && <span style={{color:"#D32F2F",fontSize:13}}>{deprecateError}</span>}
           <div style={{ flex: 1 }} />
           {!isMobile && task.created_at && (

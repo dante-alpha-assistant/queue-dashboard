@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { ArrowUp, CheckCircle2, Circle, Clock, Link, Paperclip, Search } from 'lucide-react';
 
 /* ── Status color mapping ─────────────────────────────────── */
 const STATUS_INDICATOR = {
-  completed: { icon: '✅', color: '#1B5E20', bg: '#1B5E2014' },
-  deployed:  { icon: '✅', color: '#00838F', bg: '#00838F14' },
-  in_progress: { icon: '⏳', color: '#E8A317', bg: '#E8A31714' },
-  running:   { icon: '⏳', color: '#E8A317', bg: '#E8A31714' },
-  qa_testing: { icon: '⏳', color: '#5E35B1', bg: '#5E35B114' },
-  blocked:   { icon: '🔴', color: '#BA1A1A', bg: '#BA1A1A14' },
-  failed:    { icon: '🔴', color: '#BA1A1A', bg: '#BA1A1A14' },
+  completed: { icon: CheckCircle2, color: '#1B5E20', bg: '#1B5E2014' },
+  deployed:  { icon: CheckCircle2, color: '#00838F', bg: '#00838F14' },
+  in_progress: { icon: Clock, color: '#E8A317', bg: '#E8A31714' },
+  running:   { icon: Clock, color: '#E8A317', bg: '#E8A31714' },
+  qa_testing: { icon: Clock, color: '#5E35B1', bg: '#5E35B114' },
+  blocked:   { icon: Circle, color: '#BA1A1A', bg: '#BA1A1A14' },
+  failed:    { icon: Circle, color: '#BA1A1A', bg: '#BA1A1A14' },
   todo:      { icon: '⚪', color: '#79747E', bg: '#79747E14' },
   assigned:  { icon: '⚪', color: '#6750A4', bg: '#6750A414' },
 };
@@ -154,7 +155,7 @@ function AddRelationshipForm({ taskId, onAdd, onCancel }) {
               onFocus={e => { e.target.style.borderColor = 'var(--md-primary, #6750A4)'; }}
               onBlur={e => { e.target.style.borderColor = 'var(--md-surface-variant, #E7E0EC)'; }}
             />
-            {loading && <span style={{ position: 'absolute', right: 10, top: 8, fontSize: 12, color: 'var(--md-outline)' }}>⏳</span>}
+            {loading && <span style={{ position: 'absolute', right: 10, top: 8, fontSize: 12, color: 'var(--md-outline)' }}><Clock size={14} /></span>}
           </div>
 
           {/* Results list — rendered inline to avoid overflow clipping in modals */}
@@ -230,7 +231,7 @@ function AddRelationshipForm({ taskId, onAdd, onCancel }) {
             fontSize: 12, fontWeight: 600, cursor: selectedTask ? 'pointer' : 'not-allowed',
             fontFamily: 'inherit', opacity: submitting ? 0.6 : 1,
           }}
-        >{submitting ? '⏳ Adding…' : 'Add'}</button>
+        >{submitting ? <><Clock size={12} /> Adding…</> : 'Add'}</button>
       </div>
     </div>
   );
@@ -309,7 +310,7 @@ export default function TaskRelationships({ taskId, onNavigateToTask }) {
           textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6,
           display: 'flex', alignItems: 'center', gap: 5,
         }}>
-          <span style={{ fontSize: 11 }}>🔗</span> Dependencies
+          <span style={{ fontSize: 11 }}><Link size={14} /></span> Dependencies
         </div>
         <button
           onClick={() => setShowAdd(true)}
@@ -328,9 +329,9 @@ export default function TaskRelationships({ taskId, onNavigateToTask }) {
   }
 
   const GROUP_CONFIG = [
-    { key: 'depends_on', label: 'Depends on', icon: '⬆️' },
+    { key: 'depends_on', label: 'Depends on', icon: ArrowUp },
     { key: 'blocks', label: 'Blocks', icon: '⬇️' },
-    { key: 'subtask_of', label: 'Subtask of', icon: '📎' },
+    { key: 'subtask_of', label: 'Subtask of', icon: Paperclip },
     { key: 'related_to', label: 'Related to', icon: '↔️' },
   ];
 
@@ -345,7 +346,7 @@ export default function TaskRelationships({ taskId, onNavigateToTask }) {
         textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10,
         display: 'flex', alignItems: 'center', gap: 5,
       }}>
-        <span style={{ fontSize: 11 }}>🔗</span> Dependencies
+        <span style={{ fontSize: 11 }}><Link size={14} /></span> Dependencies
       </div>
 
       {GROUP_CONFIG.map(({ key, label, icon }) => {

@@ -1,20 +1,21 @@
 import { useState, useEffect } from 'react';
 import AgentPicker from './AgentPicker';
 import { ProgressBadge } from './ProgressFeed';
+import { AlertTriangle, Ban, Bot, Brain, Building2, Circle, Clock, Folder, Glasses, Hammer, Key, Link, Lock, MessageSquare, Pause, RefreshCw, Rocket, Search, Settings, Waves, Wrench, Zap } from 'lucide-react';
 
 const BLOCKER_TYPE_STYLES = {
-  missing_credential: { color: "#E65100", bg: "#E6510018", label: "Missing Credential", icon: "🔑" },
-  missing_config: { color: "#E65100", bg: "#E6510018", label: "Missing Config", icon: "⚙️" },
-  permission_denied: { color: "#C62828", bg: "#C6282818", label: "Permission Denied", icon: "🔒" },
-  permission: { color: "#C62828", bg: "#C6282818", label: "Permission", icon: "🔒" },
+  missing_credential: { color: "#E65100", bg: "#E6510018", label: "Missing Credential", icon: Key },
+  missing_config: { color: "#E65100", bg: "#E6510018", label: "Missing Config", icon: Settings },
+  permission_denied: { color: "#C62828", bg: "#C6282818", label: "Permission Denied", icon: Lock },
+  permission: { color: "#C62828", bg: "#C6282818", label: "Permission", icon: Lock },
   ambiguous_requirement: { color: "#1565C0", bg: "#1565C018", label: "Ambiguous", icon: "❓" },
   ambiguous: { color: "#1565C0", bg: "#1565C018", label: "Ambiguous", icon: "❓" },
-  external_dependency: { color: "#6A1B9A", bg: "#6A1B9A18", label: "External Dep", icon: "🔗" },
-  infrastructure: { color: "#AD1457", bg: "#AD145718", label: "Infrastructure", icon: "🏗️" },
+  external_dependency: { color: "#6A1B9A", bg: "#6A1B9A18", label: "External Dep", icon: Link },
+  infrastructure: { color: "#AD1457", bg: "#AD145718", label: "Infrastructure", icon: Building2 },
   human_decision: { color: "#00695C", bg: "#00695C18", label: "Human Decision", icon: "🧑" },
 };
 
-const AGENT_ICONS = { neo: "🕶️", mu: "🔧", beta: "⚡", alpha: "🧠", flow: "🌊", ifra: "🛠️" };
+const AGENT_ICONS = { neo: Glasses, mu: Wrench, beta: Zap, alpha: Brain, flow: Waves, ifra: Hammer };
 const AGENT_ROLES = { neo: "Builder", alpha: "Leader", beta: "QA", mu: "Builder", flow: "Orchestrator", ifra: "Ops" };
 const STATUS_COLORS = {
   todo: "#79747E", assigned: "#6750A4", in_progress: "#E8A317", running: "#E8A317",
@@ -29,7 +30,7 @@ const STATUS_BG = {
   deploying: "#F57C0014", deploy_failed: "#C6282814",
 };
 const PRIORITY_MAP = {
-  urgent: { color: "#D32F2F", bg: "#D32F2F14", label: "Urgent", icon: "🔴" },
+  urgent: { color: "#D32F2F", bg: "#D32F2F14", label: "Urgent", icon: Circle },
   high: { color: "#E65100", bg: "#E6510014", label: "High", icon: "🟠" },
   normal: null,
   low: { color: "#757575", bg: "#75757514", label: "Low", icon: "⚪" },
@@ -196,7 +197,7 @@ function Badge({ label, color, bg, style: extraStyle }) {
 function BlockerBadge({ task }) {
   const blockerType = task.metadata?.blocker?.type;
   if (!blockerType) return null;
-  const style = BLOCKER_TYPE_STYLES[blockerType] || { color: "#79747E", bg: "#79747E18", label: blockerType.replace(/_/g, " "), icon: "⚠️" };
+  const style = BLOCKER_TYPE_STYLES[blockerType] || { color: "#79747E", bg: "#79747E18", label: blockerType.replace(/_/g, " "), icon: AlertTriangle };
   return (
     <Badge label={`${style.icon} ${style.label}`} color={style.color} bg={style.bg} />
   );
@@ -228,7 +229,7 @@ function BlockedDurationTicker({ task }) {
       padding: "3px 8px", borderRadius: 100,
       background: isLong ? "#C6282812" : "#D8431512",
     }}>
-      🚫 Blocked {formatDuration(elapsed)}
+      <Ban size={14} /> Blocked {formatDuration(elapsed)}
     </span>
   );
 }
@@ -268,19 +269,19 @@ function BlockedQuickActions({ task, onStatusChange }) {
         <button
           onClick={() => setShowInput(v => !v)}
           style={{ ...btnStyle, background: "#E6510018", color: "#E65100" }}
-        >🔑 Provide Keys</button>
+        ><Key size={14} /> Provide Keys</button>
       )}
       {(blockerType === "ambiguous_requirement" || blockerType === "ambiguous" || blockerType === "human_decision") && (
         <button
           onClick={() => setShowInput(v => !v)}
           style={{ ...btnStyle, background: "#1565C018", color: "#1565C0" }}
-        >💬 Clarify</button>
+        ><MessageSquare size={14} /> Clarify</button>
       )}
       <button
         onClick={() => handleUnblock(null)}
         disabled={submitting}
         style={{ ...btnStyle, background: "#2E7D3218", color: "#2E7D32", opacity: submitting ? 0.6 : 1 }}
-      >🔄 Retry</button>
+      ><RefreshCw size={14} /> Retry</button>
 
       {showInput && (
         <div style={{
@@ -413,7 +414,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
           {deploying ? (
             <span style={{ display: "inline-block", width: 14, height: 14, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
           ) : (
-            <span style={{ fontSize: 14, lineHeight: 1 }}>🚀</span>
+            <span style={{ fontSize: 14, lineHeight: 1 }}><Rocket size={14} /></span>
           )}
           {deploying ? "Deploying…" : "Deploy"}
         </button>
@@ -481,7 +482,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
           }}
         >
           {assigning ? (
-            <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⏳</span>
+            <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}><Clock size={14} /></span>
           ) : (
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
               <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="23" y1="11" x2="17" y2="11" />
@@ -510,14 +511,14 @@ function ActionBar({ task, onStatusChange, isMobile }) {
             fontSize: 12, color: "#D84315", fontWeight: 500, marginBottom: 8,
             display: "flex", alignItems: "flex-start", gap: 6,
           }}>
-            <span>🚫</span>
+            <Ban size={14} />
             <span>{task.blocked_reason}</span>
           </div>
         )}
         <BlockedQuickActions task={task} onStatusChange={onStatusChange} />
         {assignError && (
           <span style={{ fontSize: 12, color: "#BA1A1A", fontWeight: 500, marginTop: 6, display: "block" }}>
-            ⚠️ {assignError}
+            <AlertTriangle size={14} /> {assignError}
           </span>
         )}
       </div>
@@ -535,7 +536,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
     }}>
       {(assignError || deployError) && (
         <span style={{ fontSize: 12, color: "#BA1A1A", fontWeight: 500, marginRight: "auto" }}>
-          ⚠️ {assignError || deployError}
+          <AlertTriangle size={14} /> {assignError || deployError}
         </span>
       )}
       {actions}
@@ -546,7 +547,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
 /* ── Task Card ────────────────────────────────────────────── */
 export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, progress, monitor, transitioning }) {
   const agent = task.assigned_agent?.toLowerCase();
-  const icon = AGENT_ICONS[agent] || "🤖";
+  const IconComp = AGENT_ICONS[agent] || Bot;
   const role = AGENT_ROLES[agent] || "Agent";
   const statusColor = STATUS_COLORS[task.status] || "#79747E";
   const isActive = ACTIVE_STATUSES.has(task.status);
@@ -625,12 +626,12 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
           )}
           {task.status === "blocked" && <BlockerBadge task={task} />}
           {task.paused && (
-            <Badge label="⏸️ Paused" color="#E65100" bg="#E6510020" />
+            <Badge label="Paused" icon={Pause} color="#E65100" bg="#E6510020" />
           )}
           {task.status === "qa_testing" && (
             task.qa_agent && task.assigned_agent
-              ? <Badge label={`🔍 QA: ${task.qa_agent}`} color="#2E7D32" bg="#2E7D3220" />
-              : <Badge label="⏳ Waiting for QA" color="#7B5EA7" bg="#7B5EA720" />
+              ? <Badge label={`QA: ${task.qa_agent}`} icon={Search} color="#2E7D32" bg="#2E7D3220" />
+              : <Badge label="Waiting for QA" icon={Clock} color="#7B5EA7" bg="#7B5EA720" />
           )}
         </div>
         {task.status === "blocked"
@@ -713,7 +714,7 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
             fontSize: 11, color: "var(--md-outline, #79747E)",
             marginTop: 8, fontWeight: 500,
           }}>
-            📁 {task.project.name}
+            <Folder size={14} /> {task.project.name}
           </div>
         )}
       </div>

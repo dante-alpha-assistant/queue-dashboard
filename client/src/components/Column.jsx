@@ -1,3 +1,4 @@
+import { User } from 'lucide-react';
 export default function Column({ title, color, count, agentCount, children, isTablet, collapsible, collapsed, onToggleCollapse, headerAction }) {
   if (collapsible && collapsed) {
     return (
@@ -47,7 +48,7 @@ export default function Column({ title, color, count, agentCount, children, isTa
             fontSize: 11,
             fontWeight: 700,
             flexShrink: 0,
-          }}>👤{agentCount}</span>
+          }}><User size={14} />{agentCount}</span>
         )}
       </div>
     );
@@ -85,7 +86,7 @@ export default function Column({ title, color, count, agentCount, children, isTa
               borderRadius: 10,
               fontSize: 11,
               fontWeight: 700,
-            }} title={`${agentCount} active task${agentCount !== 1 ? 's' : ''}`}>👤{agentCount}</span>
+            }} title={`${agentCount} active task${agentCount !== 1 ? 's' : ''}`}><User size={14} />{agentCount}</span>
           )}
           {headerAction}
           {collapsible && (

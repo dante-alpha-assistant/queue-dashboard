@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
+import { AlertTriangle, Bot, Brain, Glasses, Hammer, User, Waves, Wrench, Zap } from 'lucide-react';
 
 const AGENT_ICONS = {
-  neo: "🕶️", mu: "🔧", beta: "⚡", alpha: "🧠", flow: "🌊", ifra: "🛠️",
-  "neo-worker": "🕶️", "ifra-worker": "🛠️", "beta-worker": "⚡",
+  neo: Glasses, mu: Wrench, beta: Zap, alpha: Brain, flow: Waves, ifra: Hammer,
+  "neo-worker": Glasses, "ifra-worker": Hammer, "beta-worker": Zap,
 };
 
 const STATUS_DOT = {
@@ -57,7 +58,7 @@ export default function AgentPicker({ onSelect, onCancel, style }) {
         color: "var(--md-on-surface, #1C1B1F)",
         borderBottom: "1px solid var(--md-surface-variant, #E7E0EC)",
       }}>
-        👤 Assign to agent
+        <User size={14} /> Assign to agent
       </div>
 
       {loading && (
@@ -67,7 +68,7 @@ export default function AgentPicker({ onSelect, onCancel, style }) {
       )}
 
       {error && (
-        <div style={{ padding: 16, fontSize: 12, color: "#BA1A1A" }}>⚠️ {error}</div>
+        <div style={{ padding: 16, fontSize: 12, color: "#BA1A1A" }}><AlertTriangle size={14} /> {error}</div>
       )}
 
       {!loading && !error && agents.length === 0 && (
@@ -79,7 +80,7 @@ export default function AgentPicker({ onSelect, onCancel, style }) {
       {!loading && !error && (
         <div style={{ padding: "4px 0" }}>
           {agents.map((agent) => {
-            const icon = agent.avatar || AGENT_ICONS[agent.name] || "🤖";
+            const icon = agent.avatar || AGENT_ICONS[agent.name] || Bot;
             const statusColor = STATUS_DOT[agent.status] || '#9E9E9E';
             const isAvailable = agent.status === 'online';
             const types = (agent.task_types || agent.capabilities || []).slice(0, 4);

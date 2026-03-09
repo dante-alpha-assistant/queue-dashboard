@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Activity, Ban, AlertTriangle, CheckCircle2, Clock, FileText, FlaskConical, Folder, Link, MessageSquare, Package, Pencil, PlusCircle, RefreshCw, Search, Tag, User, Wrench, XCircle, Zap } from 'lucide-react';
 
 /* ── Constants ────────────────────────────────────────────── */
 
@@ -25,25 +26,25 @@ const FIELD_LABELS = {
 };
 
 const FIELD_ICONS = {
-  created: '🆕',
-  status: '🔄',
-  title: '✏️',
-  description: '📝',
-  type: '🏷️',
-  priority: '⚡',
-  assigned_agent: '👤',
-  stage: '🔧',
-  acceptance_criteria: '✅',
+  created: PlusCircle,
+  status: RefreshCw,
+  title: Pencil,
+  description: FileText,
+  type: Tag,
+  priority: Zap,
+  assigned_agent: User,
+  stage: Wrench,
+  acceptance_criteria: CheckCircle2,
   dispatched_by: '👑',
-  result: '📦',
-  error: '❌',
-  qa_result: '🧪',
-  qa_agent: '🔍',
-  project_id: '📁',
+  result: Package,
+  error: XCircle,
+  qa_result: FlaskConical,
+  qa_agent: Search,
+  project_id: Folder,
   repository_id: '📂',
-  blocked_reason: '🚫',
-  pull_request_url: '🔗',
-  comment: '💬',
+  blocked_reason: Ban,
+  pull_request_url: Link,
+  comment: MessageSquare,
 };
 
 const STATUS_COLORS = {
@@ -232,7 +233,7 @@ function ActivityEntry({ entry, isLast }) {
             fontSize: 11, color: '#BA1A1A',
             maxWidth: 400, wordBreak: 'break-word',
           }}>
-            ⚠️ {entry.reason}
+            <AlertTriangle size={14} /> {entry.reason}
           </div>
         )}
       </div>
@@ -409,7 +410,7 @@ export default function ActivityLog({ taskId }) {
             fontSize: 12, fontWeight: 500, color: 'var(--md-primary, #6750A4)',
           }}
         >
-          {loadingMore ? '⏳ Loading…' : `Show more (${entries.length}/${total})`}
+          {loadingMore ? <><Clock size={12} className="spin" /> Loading…</> : `Show more (${entries.length}/${total})`}
         </button>
       )}
     </div>

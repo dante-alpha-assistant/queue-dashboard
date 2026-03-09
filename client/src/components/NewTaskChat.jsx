@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
+import { AlertTriangle, Lightbulb, MessageSquare, Paperclip } from 'lucide-react';
 
 function formatTime(date) {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -508,7 +509,7 @@ export default function NewTaskChat({ isMobile }) {
         const err = await resp.json().catch(() => ({ error: "Unknown error" }));
         setMessages(prev => {
           const updated = [...prev];
-          updated[updated.length - 1] = { ...updated[updated.length - 1], content: `⚠️ Error: ${err.error || resp.statusText}` };
+          updated[updated.length - 1] = { ...updated[updated.length - 1], content: `Error: ${err.error || resp.statusText}` };
           return updated;
         });
         setStreaming(false);
@@ -559,7 +560,7 @@ export default function NewTaskChat({ isMobile }) {
       if (e.name !== "AbortError") {
         setMessages(prev => {
           const updated = [...prev];
-          updated[updated.length - 1] = { ...updated[updated.length - 1], content: `⚠️ Connection error: ${e.message}` };
+          updated[updated.length - 1] = { ...updated[updated.length - 1], content: `Connection error: ${e.message}` };
           return updated;
         });
       }
@@ -712,21 +713,21 @@ export default function NewTaskChat({ isMobile }) {
             <div style={{ fontSize: 13, lineHeight: 1.6, maxWidth: 280, margin: "0 auto", color: "var(--md-on-surface-variant)" }}>
               Tell me what you need and I'll create a task for it. You can describe features, bugs, ops work — anything.
             </div>
-            <div style={{ fontSize: 11, color: "var(--md-on-surface-variant)", marginTop: 8, opacity: 0.6 }}>📎 Drag & drop or paste images</div>
+            <div style={{ fontSize: 11, color: "var(--md-on-surface-variant)", marginTop: 8, opacity: 0.6 }}><Paperclip size={14} /> Drag & drop or paste images</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 20, maxWidth: 260, margin: "20px auto 0" }}>
               {["Add dark mode toggle to settings", "Deploy the latest build to staging", "Research best auth libraries for Next.js"].map((suggestion, i) => (
                 <button key={i} onClick={() => setInput(suggestion)}
                   style={{ padding: "8px 14px", borderRadius: 16, fontSize: 12, border: "1px solid var(--md-surface-variant)", background: "var(--md-surface)", color: "var(--md-on-surface)", cursor: "pointer", textAlign: "left", fontFamily: "'Roboto', system-ui, sans-serif", transition: "background 150ms" }}
                   onMouseEnter={e => e.target.style.background = "var(--md-surface-container)"}
                   onMouseLeave={e => e.target.style.background = "var(--md-surface)"}
-                >💡 {suggestion}</button>
+                ><Lightbulb size={14} /> {suggestion}</button>
               ))}
             </div>
           </div>
         )}
         {!loadingMessages && messages.length === 0 && activeConvoId && (
           <div style={{ textAlign: "center", marginTop: 60, color: "var(--md-on-surface-variant)" }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>💬</div>
+            <div style={{ fontSize: 32, marginBottom: 12 }}><MessageSquare size={14} /></div>
             <div style={{ fontSize: 13 }}>No messages yet. Start the conversation!</div>
           </div>
         )}
@@ -802,7 +803,7 @@ export default function NewTaskChat({ isMobile }) {
           background: "rgba(179, 38, 30, 0.12)", color: "var(--md-error, #B3261E)",
           fontSize: 12, display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span>⚠️ {error}</span>
+          <span><AlertTriangle size={14} /> {error}</span>
           <button onClick={() => setError(null)} style={{
             background: "none", border: "none", color: "var(--md-error, #B3261E)",
             cursor: "pointer", fontSize: 14, padding: "0 4px",
@@ -840,7 +841,7 @@ export default function NewTaskChat({ isMobile }) {
           }}
           onMouseEnter={e => e.currentTarget.style.background = "var(--md-surface-container)"}
           onMouseLeave={e => e.currentTarget.style.background = "none"}
-        >📎</button>
+        ><Paperclip size={14} /></button>
         <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple style={{ display: "none" }} onChange={handleFileSelect} />
         <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKey}
           placeholder="Describe what you need..." rows={1}

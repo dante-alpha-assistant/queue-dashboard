@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
+import { Bot, Puzzle } from 'lucide-react';
 
 const TABS = [
-  { key: "matrix", label: "🧩 Skills Matrix" },
-  { key: "agents", label: "🤖 Per Agent" },
+  { key: "matrix", label: "Skills Matrix", Icon: Puzzle },
+  { key: "agents", label: "Per Agent", Icon: Bot },
 ];
 
 function AgentAvatar({ agent, size = 32 }) {
@@ -221,7 +222,7 @@ function PerAgentView({ skills, agents }) {
                       borderBottom: "1px solid var(--md-surface-variant)",
                       display: "flex", alignItems: "flex-start", gap: 10,
                     }}>
-                      <span style={{ fontSize: 18, lineHeight: 1 }}>🧩</span>
+                      <span style={{ fontSize: 18, lineHeight: 1 }}><Puzzle size={14} /></span>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600, fontSize: 13, color: "var(--md-on-background)" }}>
                           {skillName}
@@ -319,7 +320,7 @@ export default function SkillsModal({ open, onClose }) {
         }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "var(--md-on-background)" }}>
-              🧩 Agent Skills
+              <Puzzle size={14} /> Agent Skills
             </h2>
             <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)", marginTop: 4 }}>
               {skills.length} skill{skills.length !== 1 ? "s" : ""} across {agents.filter(a => (a.skills || []).length > 0).length} agents

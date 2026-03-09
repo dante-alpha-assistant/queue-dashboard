@@ -14,7 +14,8 @@
     "@supabase/supabase-js": "^2.98.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
-    "ioredis": "^5.10.0"
+    "ioredis": "^5.10.0",
+    "lucide-react": "^0.577.0"
   },
   "devDependencies": {
     "vitest": "^4.0.18"

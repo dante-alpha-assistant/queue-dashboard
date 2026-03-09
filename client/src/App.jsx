@@ -13,29 +13,30 @@ import TaskDetailModal from "./components/TaskDetailModal";
 import Pingboard from "./pages/Pingboard";
 import HealthDashboard from "./pages/HealthDashboard";
 import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
+import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Rocket, Search, XCircle, Zap } from 'lucide-react';
 
 const MOBILE_TABS = [
-  { key: "todo", label: "Todo", icon: "📋" },
-  { key: "in_progress", label: "Active", icon: "⚡" },
-  { key: "blocked", label: "Blocked", icon: "🚫" },
-  { key: "qa", label: "QA", icon: "🧪" },
-  { key: "completed", label: "Done", icon: "✅" },
-  { key: "deployed", label: "Deployed", icon: "🚀" },
-  { key: "deploying", label: "Deploying", icon: "⏳" },
-  { key: "deploy_failed", label: "Deploy Failed", icon: "💥" },
-  { key: "failed", label: "Failed", icon: "❌" },
+  { key: "todo", label: "Todo", icon: ClipboardList },
+  { key: "in_progress", label: "Active", icon: Zap },
+  { key: "blocked", label: "Blocked", icon: Ban },
+  { key: "qa", label: "QA", icon: FlaskConical },
+  { key: "completed", label: "Done", icon: CheckCircle2 },
+  { key: "deployed", label: "Deployed", icon: Rocket },
+  { key: "deploying", label: "Deploying", icon: Clock },
+  { key: "deploy_failed", label: "Deploy Failed", icon: XCircle },
+  { key: "failed", label: "Failed", icon: XCircle },
 ];
 
 // Merged tabs for bottom nav (assigned + in_progress = Active)
 const BOTTOM_TABS = [
-  { key: "todo", label: "Todo", icon: "📋", color: "#79747E" },
-  { key: "active", label: "Active", icon: "⚡", color: "#E8A317" },
-  { key: "blocked", label: "Blocked", icon: "🚫", color: "#D84315" },
-  { key: "qa", label: "QA", icon: "🧪", color: "#7B5EA7" },
-  { key: "completed", label: "Done", icon: "✅", color: "#1B5E20" },
-  { key: "deploying", label: "Deploying", icon: "⏳", color: "#E65100" },
-  { key: "deployed", label: "Deployed", icon: "🚀", color: "#00897B" },
-  { key: "failed", label: "Failed", icon: "❌", color: "#BA1A1A" },
+  { key: "todo", label: "Todo", icon: ClipboardList, color: "#79747E" },
+  { key: "active", label: "Active", icon: Zap, color: "#E8A317" },
+  { key: "blocked", label: "Blocked", icon: Ban, color: "#D84315" },
+  { key: "qa", label: "QA", icon: FlaskConical, color: "#7B5EA7" },
+  { key: "completed", label: "Done", icon: CheckCircle2, color: "#1B5E20" },
+  { key: "deploying", label: "Deploying", icon: Clock, color: "#E65100" },
+  { key: "deployed", label: "Deployed", icon: Rocket, color: "#00897B" },
+  { key: "failed", label: "Failed", icon: XCircle, color: "#BA1A1A" },
 
 ];
 
@@ -110,9 +111,9 @@ export default function App() {
   }
 
   const VIEW_TABS = [
-    { key: "board", label: "📋 Board" },
-    { key: "pingboard", label: "🤖 Pingboard" },
-    { key: "health", label: "💓 Health" },
+    { key: "board", label: "Board", Icon: ClipboardList },
+    { key: "pingboard", label: "Pingboard", Icon: Bot },
+    { key: "health", label: "Health", Icon: HeartPulse },
   ];
 
   if (view === "pingboard" || view === "health") {
@@ -221,12 +222,12 @@ export default function App() {
                 padding: "4px 10px", borderRadius: 6,
                 background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)",
                 color: "var(--md-on-surface-variant)", cursor: "pointer", fontSize: 11, fontWeight: 600,
-              }}>🤖</button>
+              }}><Bot size={14} /></button>
               <button onClick={() => setView("health")} style={{
                 padding: "4px 10px", borderRadius: 6,
                 background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)",
                 color: "var(--md-on-surface-variant)", cursor: "pointer", fontSize: 11, fontWeight: 600,
-              }}>💓</button>
+              }}><HeartPulse size={16} /></button>
             </div>
           </div>
         </div>
@@ -351,7 +352,7 @@ export default function App() {
               background: "var(--md-surface)", borderRadius: 16, padding: "32px 40px",
               textAlign: "center", maxWidth: 400,
             }} onClick={e => e.stopPropagation()}>
-              <div style={{ fontSize: 48, marginBottom: 12 }}>🔍</div>
+              <div style={{ fontSize: 48, marginBottom: 12 }}><Search size={14} /></div>
               <h2 style={{ margin: "0 0 8px", color: "var(--md-on-surface)" }}>Task Not Found</h2>
               <p style={{ color: "var(--md-on-surface-variant)", fontSize: 14, margin: "0 0 20px" }}>
                 No task with ID <code style={{ fontSize: 12 }}>{selectedTask.id}</code> was found.
@@ -395,13 +396,13 @@ export default function App() {
               background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)",
               color: "var(--md-on-surface-variant)", cursor: "pointer", fontSize: 12, fontWeight: 600,
               fontFamily: "'Roboto', system-ui, sans-serif",
-            }}>🤖 Pingboard</button>
+            }}><Bot size={14} /> Pingboard</button>
             <button onClick={() => setView("health")} style={{
               padding: "6px 14px", borderRadius: 8,
               background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)",
               color: "var(--md-on-surface-variant)", cursor: "pointer", fontSize: 12, fontWeight: 600,
               fontFamily: "'Roboto', system-ui, sans-serif",
-            }}>💓 Health</button>
+            }}><HeartPulse size={14} /> Health</button>
             <span style={{ fontSize: 10, color: 'var(--md-on-surface-variant)', opacity: 0.6, fontFamily: 'monospace', marginLeft: 8, background: 'var(--md-surface-variant)', padding: '2px 6px', borderRadius: 4 }}>{__COMMIT_HASH__}</span>
           </div>
           <StatsBar stats={stats} isTablet={isTablet} />
@@ -499,6 +500,7 @@ export default function App() {
         <Column title="QA Testing" color="#7B5EA7" count={filterByType(qa).length} agentCount={countActiveTasks(filterByType(qa))} isTablet={isTablet}
           collapsible collapsed={!!collapsedCols.qa_testing} onToggleCollapse={() => toggleCollapse("qa_testing")}>
           {renderCards(filterByType(qa).slice(0, 30))}
+        </Column>
         <Column title="QA Testing" color="#7B5EA7" count={filterByType(qa).length} isTablet={isTablet}>
           {renderCards(filterByType(qa).sort((a, b) => {
             const aAssigned = !!a.assigned_agent;
@@ -512,7 +514,7 @@ export default function App() {
           collapsible collapsed={!!collapsedCols.completed} onToggleCollapse={() => toggleCollapse("completed")}>
           {renderCards(filterByType(completed).slice(0, 20))}
         </Column>
-        <Column title="⏳ Deploying" color="#E65100" count={filterByType(deploying).length} isTablet={isTablet}
+        <Column title="Deploying" titleIcon={Clock} color="#E65100" count={filterByType(deploying).length} isTablet={isTablet}
           collapsible collapsed={!!collapsedCols.deploying} onToggleCollapse={() => toggleCollapse("deploying")}>
           {renderCards(filterByType(deploying))}
         </Column>
@@ -520,7 +522,7 @@ export default function App() {
           collapsible collapsed={!!collapsedCols.deployed} onToggleCollapse={() => toggleCollapse("deployed")}>
           {renderCards(filterByType(deployed).slice(0, 20))}
         </Column>
-        <Column title="💥 Deploy Failed" color="#C62828" count={filterByType(deployFailed).length} isTablet={isTablet}
+        <Column title="Deploy Failed" color="#C62828" count={filterByType(deployFailed).length} isTablet={isTablet}
           collapsible collapsed={!!collapsedCols.deploy_failed} onToggleCollapse={() => toggleCollapse("deploy_failed")}>
           {renderCards(filterByType(deployFailed))}
         </Column>
@@ -552,7 +554,7 @@ export default function App() {
             background: "var(--md-surface)", borderRadius: 16, padding: "32px 40px",
             textAlign: "center", maxWidth: 400,
           }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>🔍</div>
+            <div style={{ fontSize: 48, marginBottom: 12 }}><Search size={14} /></div>
             <h2 style={{ margin: "0 0 8px", color: "var(--md-on-surface)" }}>Task Not Found</h2>
             <p style={{ color: "var(--md-on-surface-variant)", fontSize: 14, margin: "0 0 20px" }}>
               No task with ID <code style={{ fontSize: 12 }}>{selectedTask.id}</code> was found.

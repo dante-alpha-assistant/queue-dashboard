@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { Link, RefreshCw } from 'lucide-react';
 
 const STATUS_COLORS = {
   online: "#2E7D32",
@@ -202,7 +203,7 @@ function TaskRow({ task }) {
           style={{ fontSize: 14, textDecoration: "none", flexShrink: 0 }}
           title="View PR"
         >
-          🔗
+          <Link size={14} />
         </a>
       )}
     </div>
@@ -249,7 +250,7 @@ function PodCard({ pod }) {
         color: "var(--md-on-surface-variant)",
       }}>
         <span>⏱ {formatUptime(pod.uptime)}</span>
-        {pod.restarts > 0 && <span>🔄 {pod.restarts} restart{pod.restarts !== 1 ? "s" : ""}</span>}
+        {pod.restarts > 0 && <span><RefreshCw size={14} /> {pod.restarts} restart{pod.restarts !== 1 ? "s" : ""}</span>}
         {pod.node && <span title={pod.node}>📍 {pod.node.length > 12 ? pod.node.slice(0, 12) + "…" : pod.node}</span>}
       </div>
     </div>
