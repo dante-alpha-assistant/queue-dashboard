@@ -78,18 +78,53 @@ function NeoAvatar({ size = 24 }) {
 }
 
 /* Header icon button */
+// SVG icon components for chat header toolbar
+const ChatIcons = {
+  newChat: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+    </svg>
+  ),
+  history: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+    </svg>
+  ),
+  clear: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+    </svg>
+  ),
+  expand: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
+    </svg>
+  ),
+  collapse: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/>
+    </svg>
+  ),
+  close: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  ),
+};
+
 function HeaderIconBtn({ icon, title, onClick, active, badge }) {
   return (
     <button
       onClick={onClick}
       title={title}
+      aria-label={title}
       style={{
         background: active ? "rgba(103, 80, 164, 0.12)" : "none",
         border: "none",
         color: active ? "var(--md-primary, #6750A4)" : "var(--md-on-surface-variant)",
         fontSize: 15,
         cursor: "pointer",
-        width: 32, height: 32,
+        width: 36, height: 36,
         display: "flex", alignItems: "center", justifyContent: "center",
         borderRadius: 8,
         transition: "background 150ms, color 150ms",
@@ -625,10 +660,10 @@ export default function NewTaskChat({ isMobile }) {
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <HeaderIconBtn icon="✏️" title="New chat" onClick={newConversation} />
+          <HeaderIconBtn icon={ChatIcons.newChat} title="New chat" onClick={newConversation} />
           <div style={{ position: "relative" }}>
             <HeaderIconBtn
-              icon="🕐"
+              icon={ChatIcons.history}
               title="History"
               onClick={() => setHistoryOpen(prev => !prev)}
               active={historyOpen}
@@ -645,16 +680,16 @@ export default function NewTaskChat({ isMobile }) {
               />
             )}
           </div>
-          <HeaderIconBtn icon="🧹" title="Clear conversation" onClick={clearConversation} />
+          <HeaderIconBtn icon={ChatIcons.clear} title="Clear conversation" onClick={clearConversation} />
           <div style={{ width: 1, height: 18, background: "var(--md-surface-variant)", margin: "0 4px" }} />
           {!isMobile && (
             <HeaderIconBtn
-              icon={expanded ? "↙" : "↗"}
+              icon={expanded ? ChatIcons.collapse : ChatIcons.expand}
               title={expanded ? "Collapse to popup" : "Expand to side panel"}
               onClick={toggleExpanded}
             />
           )}
-          <HeaderIconBtn icon="✕" title="Close" onClick={() => { setExpanded(false); setOpen(false); }} />
+          <HeaderIconBtn icon={ChatIcons.close} title="Close" onClick={() => { setExpanded(false); setOpen(false); }} />
         </div>
       </div>
 
