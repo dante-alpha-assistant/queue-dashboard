@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
 
 function timeAgo(iso) {
   if (!iso) return "";
@@ -169,10 +172,41 @@ export default function ChatPanel({ isMobile, open: controlledOpen, onClose }) {
               </div>
               <div style={{
                 fontSize: 13, lineHeight: 1.5, paddingLeft: 24,
-                whiteSpace: "pre-wrap", wordBreak: "break-word",
+                wordBreak: "break-word",
                 color: "var(--md-on-background)",
-              }}>
-                {cleaned}
+                ...(isUser ? { whiteSpace: "pre-wrap" } : {}),
+              }}
+              className={isUser ? "" : "chat-markdown"}
+              >
+                {isUser ? cleaned : (
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeHighlight]}
+                    components={{
+                      a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
+                      p: ({ node, ...props }) => <p {...props} style={{ margin: "0 0 8px 0" }} />,
+                      ul: ({ node, ...props }) => <ul {...props} style={{ margin: "4px 0", paddingLeft: 20 }} />,
+                      ol: ({ node, ...props }) => <ol {...props} style={{ margin: "4px 0", paddingLeft: 20 }} />,
+                      li: ({ node, ...props }) => <li {...props} style={{ marginBottom: 2 }} />,
+                      code: ({ node, inline, className, children, ...props }) => {
+                        if (inline) {
+                          return <code style={{
+                            background: "var(--md-surface-container-highest, rgba(0,0,0,0.08))",
+                            padding: "2px 5px", borderRadius: 4, fontSize: 12,
+                          }} {...props}>{children}</code>;
+                        }
+                        return <code className={className} {...props}>{children}</code>;
+                      },
+                      pre: ({ node, ...props }) => <pre {...props} style={{
+                        background: "var(--md-surface-container-highest, rgba(0,0,0,0.08))",
+                        padding: 10, borderRadius: 8, overflow: "auto",
+                        fontSize: 12, margin: "6px 0",
+                      }} />,
+                    }}
+                  >
+                    {cleaned}
+                  </ReactMarkdown>
+                )}
               </div>
             </div>
           );

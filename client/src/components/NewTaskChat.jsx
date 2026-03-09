@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
 
 function formatTime(date) {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -198,6 +201,49 @@ function HistoryDropdown({ conversations, activeConvoId, onSelect, onDelete, onC
       )}
     </div>
   );
+const markdownComponents = {
+  a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
+  p: ({ node, ...props }) => <p {...props} style={{ margin: "0 0 8px 0" }} />,
+  ul: ({ node, ...props }) => <ul {...props} style={{ margin: "4px 0", paddingLeft: 20 }} />,
+  ol: ({ node, ...props }) => <ol {...props} style={{ margin: "4px 0", paddingLeft: 20 }} />,
+  li: ({ node, ...props }) => <li {...props} style={{ marginBottom: 2 }} />,
+  code: ({ node, inline, className, children, ...props }) => {
+    if (inline) {
+      return <code style={{
+        background: "rgba(0,0,0,0.08)", padding: "2px 5px", borderRadius: 4, fontSize: 12,
+      }} {...props}>{children}</code>;
+    }
+    return <code className={className} {...props}>{children}</code>;
+  },
+  pre: ({ node, ...props }) => <pre {...props} style={{
+    background: "rgba(0,0,0,0.08)", padding: 10, borderRadius: 8,
+    overflow: "auto", fontSize: 12, margin: "6px 0",
+  }} />,
+};
+
+function renderMarkdownText(text) {
+  if (!text) return null;
+  return (
+    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]} components={markdownComponents}>
+      {text}
+    </ReactMarkdown>
+  );
+}
+
+function renderMarkdownContent(content) {
+  if (typeof content === "string") return renderMarkdownText(content);
+  if (!Array.isArray(content)) return null;
+  return content.map((part, i) => {
+    if (part.type === "text") return <span key={i}>{renderMarkdownText(part.text)}</span>;
+    if (part.type === "image_url") {
+      return (
+        <img key={i} src={part.image_url?.url} alt="uploaded"
+          style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8, marginTop: 4, marginBottom: 4, display: "block" }}
+        />
+      );
+    }
+    return null;
+  });
 }
 
 export default function NewTaskChat({ isMobile }) {
@@ -659,6 +705,24 @@ export default function NewTaskChat({ isMobile }) {
               }}>
                 {renderContent(msg.content)}
                 {!msg.content && streaming && i === messages.length - 1 && <span style={{ opacity: 0.5 }}>●●●</span>}
+                color: isUser
+                  ? "var(--md-on-primary)"
+                  : "var(--md-on-surface)",
+                fontSize: 13,
+                lineHeight: 1.6,
+                ...(isUser ? { whiteSpace: "pre-wrap" } : {}),
+                wordBreak: "break-word",
+              }}>
+                {!isUser && (
+                  <div style={{
+                    fontSize: 10, fontWeight: 600, marginBottom: 4,
+                    color: "var(--md-primary)", opacity: 0.8,
+                  }}>Neo</div>
+                )}
+                {isUser ? renderContent(msg.content) : renderMarkdownContent(msg.content)}
+                {!msg.content && streaming && i === messages.length - 1 && (
+                  <span style={{ opacity: 0.5 }}>●●●</span>
+                )}
                 <div style={{
                   fontSize: 9, marginTop: 3, textAlign: isUser ? "right" : "left",
                   color: isUser ? "rgba(255,255,255,0.5)" : "var(--md-on-surface-variant)",
