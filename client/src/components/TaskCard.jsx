@@ -363,7 +363,7 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
       cursor: transitioning ? "not-allowed" : "pointer",
       overflow: "hidden",
       fontFamily: "'Roboto', system-ui, -apple-system, sans-serif",
-      opacity: transitioning ? 0.7 : task.paused ? 0.6 : (task.status === "qa_testing" && !task.qa_agent ? 0.65 : 1),
+      opacity: transitioning ? 0.7 : task.paused ? 0.6 : (task.status === "qa_testing" && !task.assigned_agent ? 0.65 : 1),
       position: "relative",
       pointerEvents: transitioning ? "none" : "auto",
     }}
@@ -405,7 +405,7 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
             <Badge label="⏸️ Paused" color="#E65100" bg="#E6510020" />
           )}
           {task.status === "qa_testing" && (
-            task.qa_agent
+            task.qa_agent && task.assigned_agent
               ? <Badge label={`🔍 QA: ${task.qa_agent}`} color="#2E7D32" bg="#2E7D3220" />
               : <Badge label="⏳ Waiting for QA" color="#7B5EA7" bg="#7B5EA720" />
           )}
