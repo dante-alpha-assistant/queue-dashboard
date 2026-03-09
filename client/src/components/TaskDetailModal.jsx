@@ -582,11 +582,12 @@ function SmartRetryInfo({ metadata }) {
 
 /* ── Actions Dropdown ─────────────────────────────────────── */
 
-function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deploying, deploySuccess, deployConfirm, handleRebase, rebasing, rebaseSuccess, rebaseError, handleDeprecate, deprecating, deprecateConfirm, isMobile, dropUp = true }) {
+function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deploying, deploySuccess, deployConfirm, handleRebase, rebasing, rebaseSuccess, rebaseError, handleDeprecate, deprecating, deprecateConfirm, isMobile, dropUp = true, actionProcessing, setActionProcessing }) {
   const [open, setOpen] = useState(false);
   const [showAssignPicker, setShowAssignPicker] = useState(false);
   const [assigning, setAssigning] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
+  const actionLoading = actionProcessing;
+  const setActionLoading = setActionProcessing;
   const ref = useRef(null);
 
   useEffect(() => {
@@ -731,6 +732,7 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
 
 export default function TaskDetailModal({ task, onClose, onStatusChange, isMobile, isTablet, progress, monitor }) {
   const [closing, setClosing] = useState(false);
+  const [actionProcessing, setActionProcessing] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
   const [collapsedSections, setCollapsedSections] = useState({});
   const [idCopied, setIdCopied] = useState(false);
@@ -891,6 +893,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const panelStyle = isMobile ? {
     flex: 1, display: "flex", flexDirection: "column", overflow: "hidden",
     fontFamily: "'Roboto', system-ui, -apple-system, sans-serif",
+    position: "relative",
   } : {
     background: "var(--md-surface, #FFFBFE)", borderRadius: 16, padding: 0,
     width: useWideLayout ? 900 : 700, maxWidth: "94vw",
@@ -900,6 +903,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
     transition: 'transform 0.2s',
     fontFamily: "'Roboto', system-ui, -apple-system, sans-serif",
     display: "flex", flexDirection: "column",
+    position: "relative",
   };
 
   /* ── Sidebar content ──────────────────────────────────── */
@@ -1187,6 +1191,25 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
           }} />
         )}
 
+        {/* ── Full-card loading overlay ───────────────────── */}
+        {actionProcessing && (
+          <div style={{
+            position: 'absolute', inset: 0, zIndex: 250,
+            background: 'rgba(255,251,254,0.7)',
+            backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(2px)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            borderRadius: isMobile ? 0 : 16,
+            gap: 12,
+          }}>
+            <div style={{
+              width: 36, height: 36, border: '3px solid var(--md-surface-variant, #E7E0EC)',
+              borderTopColor: 'var(--md-primary, #6750A4)', borderRadius: '50%',
+              animation: 'tdm-spin 0.7s linear infinite',
+            }} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--md-on-surface-variant, #49454F)', letterSpacing: '0.02em' }}>Processing…</span>
+          </div>
+        )}
+
         {/* ── Header ──────────────────────────────────────── */}
         <div style={{
           padding: isMobile ? "12px 16px 0" : "20px 24px 0",
@@ -1218,6 +1241,8 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
                 deprecateConfirm={deprecateConfirm}
                 isMobile={isMobile}
                 dropUp={false}
+                actionProcessing={actionProcessing}
+                setActionProcessing={setActionProcessing}
               />
               {!isMobile && <span className="tdm-kbd">esc</span>}
               <button onClick={handleClose} style={{
