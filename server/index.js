@@ -1,4 +1,6 @@
 import express from "express";
+import { runMigrations } from "./migrate.js";
+import supabase from "./supabase.js";
 import cors from "cors";
 import { router } from "./routes/tasks.js";
 import { chatRouter } from "./routes/chat.js";
@@ -18,4 +20,10 @@ import { serveStatic } from "./static.js";
 serveStatic(app);
 
 const PORT = process.env.PORT || 9092;
+
+// Run pending database migrations on startup
+runMigrations(supabase).then(r => {
+  if (r.applied?.length) console.log('[BOOT] Migrations applied:', r.applied.join(', '));
+  if (r.error) console.error('[BOOT] Migration error:', r.error);
+}).catch(e => console.error('[BOOT] Migration runner failed:', e.message));
 app.listen(PORT, () => console.log(`Queue dashboard API on :${PORT}`));
