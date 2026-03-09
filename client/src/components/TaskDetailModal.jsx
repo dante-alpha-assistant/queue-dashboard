@@ -155,7 +155,7 @@ function ensureModalStyles() {
     .tdm-panel { animation: tdm-panel-in 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
     .tdm-mobile-panel { animation: tdm-slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
 
-    .tdm-md { overflow: hidden; }
+    .tdm-md { overflow: hidden; overflow-wrap: break-word; word-break: break-word; max-width: 100%; }
     .tdm-md table { border-collapse: collapse; width: 100%; max-width: 100%; margin: 8px 0; font-size: 13px; display: block; overflow-x: auto; }
     .tdm-md table th, .tdm-md table td { border: 1px solid var(--md-surface-variant, #E7E0EC); padding: 6px 10px; text-align: left; }
     .tdm-md table th { background: var(--md-surface-container-low, #F7F2FA); font-weight: 600; }
@@ -417,7 +417,7 @@ function ResultDisplay({ result, variant = "success" }) {
       {summaryMd && <div className="tdm-md" style={{ marginBottom: 8, fontSize: 14, lineHeight: 1.7 }}><ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{parsed.summary}</ReactMarkdown></div>}
       <div style={{ position: 'relative' }}>
         <button className="tdm-copy-btn" onClick={handleCopy}>{copied ? '✓ Copied' : '📋 Copy'}</button>
-        <pre style={{ fontSize: 12, fontFamily: "'Roboto Mono', 'JetBrains Mono', monospace", whiteSpace: 'pre-wrap', overflowX: 'auto', padding: '16px 16px 16px', paddingTop: 32, background: 'var(--md-surface-container-low, #F7F2FA)', borderRadius: 10, border: '1px solid var(--md-surface-variant, #E7E0EC)', margin: 0, lineHeight: 1.6 }}>
+        <pre style={{ fontSize: 12, fontFamily: "'Roboto Mono', 'JetBrains Mono', monospace", whiteSpace: 'pre-wrap', overflowX: 'auto', maxWidth: '100%', wordBreak: 'break-word', padding: '16px 16px 16px', paddingTop: 32, background: 'var(--md-surface-container-low, #F7F2FA)', borderRadius: 10, border: '1px solid var(--md-surface-variant, #E7E0EC)', margin: 0, lineHeight: 1.6 }}>
           <JsonSyntax data={parsed} indent={0} />
         </pre>
       </div>
@@ -1263,7 +1263,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
             <div style={{ marginBottom: 16 }}>
               <SectionLabel icon="📝" collapsible collapsed={collapsedSections.desc} onToggle={() => toggleSection('desc')}>Description</SectionLabel>
               {!collapsedSections.desc && (
-                <div style={{ padding: 14, background: 'var(--md-surface-container-low, #F7F2FA)', borderRadius: 10, border: '1px solid var(--md-surface-variant, #E7E0EC)', overflow: 'hidden' }}>
+                <div style={{ padding: 14, background: 'var(--md-surface-container-low, #F7F2FA)', borderRadius: 10, border: '1px solid var(--md-surface-variant, #E7E0EC)', overflow: 'hidden', overflowWrap: 'break-word', wordBreak: 'break-word', maxWidth: '100%' }}>
                   <MarkdownContent text={task.description} />
                 </div>
               )}
@@ -1273,7 +1273,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
             <div style={{ marginBottom: 16 }}>
               <SectionLabel icon="✅" color="#E65100" collapsible collapsed={collapsedSections.criteria} onToggle={() => toggleSection('criteria')}>Acceptance Criteria</SectionLabel>
               {!collapsedSections.criteria && (
-                <div style={{ padding: 14, background: '#E6510006', borderRadius: 10, border: '1px solid #E6510018', overflow: 'hidden' }}>
+                <div style={{ padding: 14, background: '#E6510006', borderRadius: 10, border: '1px solid #E6510018', overflow: 'hidden', overflowWrap: 'break-word', wordBreak: 'break-word', maxWidth: '100%' }}>
                   <MarkdownContent text={task.acceptance_criteria} />
                 </div>
               )}
@@ -1559,7 +1559,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
         <div>
           <SectionLabel icon="🔧">Task Metadata</SectionLabel>
           <div style={{ position: 'relative' }}>
-            <pre style={{ fontSize: 12, fontFamily: "'Roboto Mono', 'JetBrains Mono', monospace", whiteSpace: 'pre-wrap', overflowX: 'auto', padding: 14, background: 'var(--md-surface-container-low, #F7F2FA)', borderRadius: 10, border: '1px solid var(--md-surface-variant, #E7E0EC)', margin: 0, lineHeight: 1.6 }}>
+            <pre style={{ fontSize: 12, fontFamily: "'Roboto Mono', 'JetBrains Mono', monospace", whiteSpace: 'pre-wrap', overflowX: 'auto', maxWidth: '100%', wordBreak: 'break-word', padding: 14, background: 'var(--md-surface-container-low, #F7F2FA)', borderRadius: 10, border: '1px solid var(--md-surface-variant, #E7E0EC)', margin: 0, lineHeight: 1.6 }}>
               <JsonSyntax data={filteredMetadata} indent={0} />
             </pre>
           </div>
@@ -1666,12 +1666,12 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
 
         {/* ── Body ────────────────────────────────────────── */}
         <div className="tdm-scrollbar" style={{
-          flex: 1, overflowY: 'auto', minHeight: 0,
+          flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0,
           padding: isMobile ? "14px 16px 80px" : "18px 24px 24px",
         }}>
           {useWideLayout ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 260px', gap: 20, alignItems: 'start' }}>
-              <div>{tabContent}</div>
+              <div style={{ minWidth: 0 }}>{tabContent}</div>
               <div style={{ position: 'sticky', top: 0 }}>{sidebarContent}</div>
             </div>
           ) : (
