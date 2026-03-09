@@ -11,7 +11,7 @@ import { skillsRouter } from "./routes/skills.js";
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "20mb" }));
 app.use("/api", router);
 app.use("/api/chat", chatRouter);
 app.use("/api/neo-chat", neoChatRouter);
