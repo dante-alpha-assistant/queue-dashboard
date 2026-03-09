@@ -88,8 +88,8 @@ export default function App() {
     navigate("/", { replace: true });
   }, [navigate]);
 
-  // Collapsible columns for Deployed and Failed
-  const COLLAPSIBLE_COLUMNS = ["completed", "deploying", "deployed", "deploy_failed", "failed"];
+  // All columns are collapsible
+  const COLLAPSIBLE_COLUMNS = ["todo", "in_progress", "blocked", "qa_testing", "completed", "deploying", "deployed", "deploy_failed", "failed"];
   const [collapsedCols, setCollapsedCols] = useState(() => {
     try {
       const saved = localStorage.getItem("collapsed-columns");
@@ -465,16 +465,20 @@ export default function App() {
       <div style={{
         flex: 1, display: "flex", gap: 12, padding: "16px 24px", overflowX: "auto", minHeight: 0,
       }}>
-        <Column title="Todo" color="#79747E" count={filterByType(todo).length} isTablet={isTablet} headerAction={<DispatchButton />}>
+        <Column title="Todo" color="#79747E" count={filterByType(todo).length} isTablet={isTablet} headerAction={<DispatchButton />}
+          collapsible collapsed={!!collapsedCols.todo} onToggleCollapse={() => toggleCollapse("todo")}>
           {renderCards(filterByType(todo))}
         </Column>
-        <Column title="In Progress" color="#E8A317" count={filterByType(assigned).length + filterByType(inProgress).length} isTablet={isTablet}>
+        <Column title="In Progress" color="#E8A317" count={filterByType(assigned).length + filterByType(inProgress).length} isTablet={isTablet}
+          collapsible collapsed={!!collapsedCols.in_progress} onToggleCollapse={() => toggleCollapse("in_progress")}>
           {renderCards([...filterByType(assigned), ...filterByType(inProgress)])}
         </Column>
-        <Column title="Blocked" color="#D84315" count={filterByType(blocked).length} isTablet={isTablet}>
+        <Column title="Blocked" color="#D84315" count={filterByType(blocked).length} isTablet={isTablet}
+          collapsible collapsed={!!collapsedCols.blocked} onToggleCollapse={() => toggleCollapse("blocked")}>
           {renderCards(filterByType(blocked))}
         </Column>
-        <Column title="QA Testing" color="#7B5EA7" count={filterByType(qa).length} isTablet={isTablet}>
+        <Column title="QA Testing" color="#7B5EA7" count={filterByType(qa).length} isTablet={isTablet}
+          collapsible collapsed={!!collapsedCols.qa_testing} onToggleCollapse={() => toggleCollapse("qa_testing")}>
           {renderCards(filterByType(qa).slice(0, 30))}
         </Column>
         <Column title="Completed" color="#1B5E20" count={filterByType(completed).length} isTablet={isTablet}
