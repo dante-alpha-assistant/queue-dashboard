@@ -81,14 +81,10 @@ function AddRelationshipForm({ taskId, onAdd, onCancel }) {
     if (!q || q.length < 2) { setResults([]); return; }
     setLoading(true);
     try {
-      const resp = await fetch('/api/tasks');
+      const resp = await fetch(`/api/tasks?search=${encodeURIComponent(q)}`);
       const tasks = await resp.json();
-      const lower = q.toLowerCase();
       const filtered = (Array.isArray(tasks) ? tasks : [])
-        .filter(t => t.id !== taskId && (
-          t.title?.toLowerCase().includes(lower) ||
-          t.id?.toLowerCase().includes(lower)
-        ))
+        .filter(t => t.id !== taskId)
         .slice(0, 8);
       setResults(filtered);
     } catch { setResults([]); }
@@ -140,33 +136,33 @@ function AddRelationshipForm({ taskId, onAdd, onCancel }) {
 
       {/* Search input */}
       {!selectedTask ? (
-        <div style={{ position: 'relative' }}>
-          <input
-            type="text"
-            placeholder="Search tasks by title or ID…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            autoFocus
-            style={{
-              width: '100%', padding: '8px 10px', borderRadius: 8,
-              border: '1px solid var(--md-surface-variant, #E7E0EC)',
-              fontSize: 13, fontFamily: 'inherit', outline: 'none',
-              background: 'var(--md-surface, #FFFBFE)',
-              boxSizing: 'border-box',
-            }}
-            onFocus={e => { e.target.style.borderColor = 'var(--md-primary, #6750A4)'; }}
-            onBlur={e => { e.target.style.borderColor = 'var(--md-surface-variant, #E7E0EC)'; }}
-          />
-          {loading && <span style={{ position: 'absolute', right: 10, top: 8, fontSize: 12, color: 'var(--md-outline)' }}>⏳</span>}
+        <div>
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              placeholder="Search tasks by title…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              autoFocus
+              style={{
+                width: '100%', padding: '8px 10px', borderRadius: 8,
+                border: '1px solid var(--md-surface-variant, #E7E0EC)',
+                fontSize: 13, fontFamily: 'inherit', outline: 'none',
+                background: 'var(--md-surface, #FFFBFE)',
+                boxSizing: 'border-box',
+              }}
+              onFocus={e => { e.target.style.borderColor = 'var(--md-primary, #6750A4)'; }}
+              onBlur={e => { e.target.style.borderColor = 'var(--md-surface-variant, #E7E0EC)'; }}
+            />
+            {loading && <span style={{ position: 'absolute', right: 10, top: 8, fontSize: 12, color: 'var(--md-outline)' }}>⏳</span>}
+          </div>
 
-          {/* Results dropdown */}
+          {/* Results list — rendered inline to avoid overflow clipping in modals */}
           {results.length > 0 && (
             <div style={{
-              position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
               background: 'var(--md-surface, #FFFBFE)',
               border: '1px solid var(--md-surface-variant, #E7E0EC)',
               borderRadius: 8, marginTop: 4,
-              boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
               maxHeight: 200, overflowY: 'auto',
             }}>
               {results.map(t => {
@@ -192,6 +188,11 @@ function AddRelationshipForm({ taskId, onAdd, onCancel }) {
                   </div>
                 );
               })}
+            </div>
+          )}
+          {search.length >= 2 && !loading && results.length === 0 && (
+            <div style={{ fontSize: 11, color: 'var(--md-outline, #79747E)', marginTop: 4, padding: '4px 2px' }}>
+              No tasks found for &ldquo;{search}&rdquo;
             </div>
           )}
         </div>
