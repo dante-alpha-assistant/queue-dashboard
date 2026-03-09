@@ -10,7 +10,7 @@ import TaskRelationships from './TaskRelationships';
 import { ProgressDetail } from './ProgressFeed';
 import CostsTab from './CostsTab';
 import HumanInterventionForm from './HumanInterventionForm';
-import { Activity, AlertTriangle, BarChart3, Bot, Brain, CheckCircle2, Circle, ClipboardList, Clock, FileText, Glasses, Hammer, Lightbulb, Link, Package, Pause, Pencil, RefreshCw, Rocket, Target, Timer, Waves, Wrench, XCircle, Zap } from 'lucide-react';
+import { AgentAvatar, TaskTypeIcon, BlockerTypeIcon, PriorityDot, RefreshIcon, UserPlusIcon, RocketIcon, FolderIcon, OpsIcon } from './Icons';
 
 /* ── Constants ────────────────────────────────────────────── */
 
@@ -25,7 +25,6 @@ const GHERKIN_KEYWORDS = [
 ];
 const GHERKIN_TEST = /^(Given|When|Then|And|But|Scenario|Background|Feature|Scenario Outline|Examples)\b/;
 
-const AGENT_ICONS = { neo: Glasses, mu: Wrench, beta: Zap, alpha: Brain, flow: Waves, ifra: Hammer };
 const AGENT_ROLES = { neo: "Builder", alpha: "Leader", beta: "QA", mu: "Builder", flow: "Orchestrator", ifra: "Ops" };
 
 const STATUS_CONFIG = {
@@ -1088,7 +1087,6 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   if (!task) return null;
 
   const agent = task.assigned_agent?.toLowerCase();
-  const IconComp = AGENT_ICONS[agent] || Bot;
   const role = AGENT_ROLES[agent] || "Agent";
   const sc = STATUS_CONFIG[task.status] || STATUS_CONFIG.todo;
   const typeColor = TYPE_COLORS[task.type] || "#79747E";
@@ -1160,12 +1158,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
         <div className="tdm-sidebar-card">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ position: 'relative' }}>
-              <span style={{
-                fontSize: 16, width: 32, height: 32, borderRadius: '50%',
-                background: 'var(--md-surface, #FFFBFE)',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                border: '1px solid var(--md-surface-variant, #E7E0EC)',
-              }}>{icon}</span>
+              <AgentAvatar agent={agent} size={32} style={{ border: '1px solid var(--md-surface-variant, #E7E0EC)' }} />
               {isActive && <div className="tdm-live-dot" style={{ position: 'absolute', bottom: -1, right: -1, border: '2px solid var(--md-surface-container-low, #F7F2FA)' }} />}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>

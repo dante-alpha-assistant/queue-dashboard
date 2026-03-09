@@ -1,21 +1,25 @@
 import { useState, useEffect } from 'react';
 import AgentPicker from './AgentPicker';
 import { ProgressBadge } from './ProgressFeed';
-import { AlertTriangle, Ban, Bot, Brain, Building2, Circle, Clock, Folder, Glasses, Hammer, Key, Link, Lock, MessageSquare, Pause, RefreshCw, Rocket, Search, Settings, Waves, Wrench, Zap } from 'lucide-react';
+import {
+  PriorityDot, TaskTypeIcon, BlockerTypeIcon, AgentAvatar,
+  RefreshIcon, UserPlusIcon, RocketIcon, KeyIcon, MessageSquareIcon,
+  FolderIcon, SearchCheckIcon, PauseIcon, SlashIcon,
+  KubernetesIcon, GitMergeIcon,
+} from './Icons';
 
 const BLOCKER_TYPE_STYLES = {
-  missing_credential: { color: "#E65100", bg: "#E6510018", label: "Missing Credential", icon: Key },
-  missing_config: { color: "#E65100", bg: "#E6510018", label: "Missing Config", icon: Settings },
-  permission_denied: { color: "#C62828", bg: "#C6282818", label: "Permission Denied", icon: Lock },
-  permission: { color: "#C62828", bg: "#C6282818", label: "Permission", icon: Lock },
-  ambiguous_requirement: { color: "#1565C0", bg: "#1565C018", label: "Ambiguous", icon: "❓" },
-  ambiguous: { color: "#1565C0", bg: "#1565C018", label: "Ambiguous", icon: "❓" },
-  external_dependency: { color: "#6A1B9A", bg: "#6A1B9A18", label: "External Dep", icon: Link },
-  infrastructure: { color: "#AD1457", bg: "#AD145718", label: "Infrastructure", icon: Building2 },
-  human_decision: { color: "#00695C", bg: "#00695C18", label: "Human Decision", icon: "🧑" },
+  missing_credential: { color: "#E65100", bg: "#E6510018", label: "Missing Credential" },
+  missing_config: { color: "#E65100", bg: "#E6510018", label: "Missing Config" },
+  permission_denied: { color: "#C62828", bg: "#C6282818", label: "Permission Denied" },
+  permission: { color: "#C62828", bg: "#C6282818", label: "Permission" },
+  ambiguous_requirement: { color: "#1565C0", bg: "#1565C018", label: "Ambiguous" },
+  ambiguous: { color: "#1565C0", bg: "#1565C018", label: "Ambiguous" },
+  external_dependency: { color: "#6A1B9A", bg: "#6A1B9A18", label: "External Dep" },
+  infrastructure: { color: "#AD1457", bg: "#AD145718", label: "Infrastructure" },
+  human_decision: { color: "#00695C", bg: "#00695C18", label: "Human Decision" },
 };
 
-const AGENT_ICONS = { neo: Glasses, mu: Wrench, beta: Zap, alpha: Brain, flow: Waves, ifra: Hammer };
 const AGENT_ROLES = { neo: "Builder", alpha: "Leader", beta: "QA", mu: "Builder", flow: "Orchestrator", ifra: "Ops" };
 const STATUS_COLORS = {
   todo: "#79747E", assigned: "#6750A4", in_progress: "#E8A317", running: "#E8A317",
@@ -197,9 +201,19 @@ function Badge({ label, color, bg, style: extraStyle }) {
 function BlockerBadge({ task }) {
   const blockerType = task.metadata?.blocker?.type;
   if (!blockerType) return null;
-  const style = BLOCKER_TYPE_STYLES[blockerType] || { color: "#79747E", bg: "#79747E18", label: blockerType.replace(/_/g, " "), icon: AlertTriangle };
+  const style = BLOCKER_TYPE_STYLES[blockerType] || { color: "#79747E", bg: "#79747E18", label: blockerType.replace(/_/g, " ") };
   return (
-    <Badge label={`${style.icon} ${style.label}`} color={style.color} bg={style.bg} />
+    <span style={{
+      fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 100,
+      background: style.bg, color: style.color,
+      textTransform: "uppercase", letterSpacing: "0.04em",
+      lineHeight: 1.2, whiteSpace: "nowrap",
+      fontFamily: "'Roboto', system-ui, sans-serif",
+      display: "inline-flex", alignItems: "center", gap: 4,
+    }}>
+      <BlockerTypeIcon type={blockerType} size={12} color={style.color} />
+      {style.label}
+    </span>
   );
 }
 
@@ -229,7 +243,7 @@ function BlockedDurationTicker({ task }) {
       padding: "3px 8px", borderRadius: 100,
       background: isLong ? "#C6282812" : "#D8431512",
     }}>
-      <Ban size={14} /> Blocked {formatDuration(elapsed)}
+      <SlashIcon size={11} color="currentColor" /> Blocked {formatDuration(elapsed)}
     </span>
   );
 }
@@ -269,19 +283,19 @@ function BlockedQuickActions({ task, onStatusChange }) {
         <button
           onClick={() => setShowInput(v => !v)}
           style={{ ...btnStyle, background: "#E6510018", color: "#E65100" }}
-        ><Key size={14} /> Provide Keys</button>
+        ><KeyIcon size={12} color="#E65100" /> Provide Keys</button>
       )}
       {(blockerType === "ambiguous_requirement" || blockerType === "ambiguous" || blockerType === "human_decision") && (
         <button
           onClick={() => setShowInput(v => !v)}
           style={{ ...btnStyle, background: "#1565C018", color: "#1565C0" }}
-        ><MessageSquare size={14} /> Clarify</button>
+        ><MessageSquareIcon size={12} color="#1565C0" /> Clarify</button>
       )}
       <button
         onClick={() => handleUnblock(null)}
         disabled={submitting}
         style={{ ...btnStyle, background: "#2E7D3218", color: "#2E7D32", opacity: submitting ? 0.6 : 1 }}
-      ><RefreshCw size={14} /> Retry</button>
+      ><RefreshIcon size={12} color="#2E7D32" /> Retry</button>
 
       {showInput && (
         <div style={{
@@ -314,10 +328,10 @@ function BlockedQuickActions({ task, onStatusChange }) {
 
 /* ── Action Bar ───────────────────────────────────────────── */
 const DEPLOY_TARGET_OPTIONS = [
-  { value: "kubernetes", label: "Kubernetes", icon: "☸️" },
-  { value: "vercel", label: "Vercel", icon: "▲" },
-  { value: "railway", label: "Railway", icon: "🚂" },
-  { value: "none", label: "None (merge only)", icon: "🔀" },
+  { value: "kubernetes", label: "Kubernetes", IconComponent: KubernetesIcon },
+  { value: "vercel", label: "Vercel", IconComponent: null },
+  { value: "railway", label: "Railway", IconComponent: null },
+  { value: "none", label: "None (merge only)", IconComponent: GitMergeIcon },
 ];
 
 function ActionBar({ task, onStatusChange, isMobile }) {
@@ -362,9 +376,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
         onClick={(e) => { e.stopPropagation(); onStatusChange?.(task.id, { status: 'todo', assigned_agent: null, idle_retries: 0, qa_retries: 0 }); }}
         style={{ ...btnBase, background: "#E65100", color: "#fff" }}
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 105.64-12.48L1 10" />
-        </svg>
+        <RefreshIcon size={14} />
         Retry
       </button>
     );
@@ -414,7 +426,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
           {deploying ? (
             <span style={{ display: "inline-block", width: 14, height: 14, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
           ) : (
-            <span style={{ fontSize: 14, lineHeight: 1 }}><Rocket size={14} /></span>
+            <RocketIcon size={14} />
           )}
           {deploying ? "Deploying…" : "Deploy"}
         </button>
@@ -447,7 +459,9 @@ function ActionBar({ task, onStatusChange, isMobile }) {
                 onMouseEnter={(e) => e.currentTarget.style.background = "var(--md-surface-container-low, #F7F2FA)"}
                 onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
               >
-                <span>{opt.icon}</span>
+                <span style={{ display: "inline-flex", alignItems: "center" }}>
+                  {opt.IconComponent ? <opt.IconComponent size={14} /> : <RocketIcon size={14} />}
+                </span>
                 <span>{opt.label}</span>
               </button>
             ))}
@@ -482,11 +496,9 @@ function ActionBar({ task, onStatusChange, isMobile }) {
           }}
         >
           {assigning ? (
-            <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}><Clock size={14} /></span>
+            <span style={{ display: "inline-block", width: 14, height: 14, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
           ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="23" y1="11" x2="17" y2="11" />
-            </svg>
+            <UserPlusIcon size={14} color="var(--md-on-primary, #fff)" />
           )}
           {assigning ? "Assigning…" : "Assign"}
         </button>
@@ -511,7 +523,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
             fontSize: 12, color: "#D84315", fontWeight: 500, marginBottom: 8,
             display: "flex", alignItems: "flex-start", gap: 6,
           }}>
-            <Ban size={14} />
+            <SlashIcon size={14} color="#D84315" />
             <span>{task.blocked_reason}</span>
           </div>
         )}
@@ -547,7 +559,6 @@ function ActionBar({ task, onStatusChange, isMobile }) {
 /* ── Task Card ────────────────────────────────────────────── */
 export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, progress, monitor, transitioning }) {
   const agent = task.assigned_agent?.toLowerCase();
-  const IconComp = AGENT_ICONS[agent] || Bot;
   const role = AGENT_ROLES[agent] || "Agent";
   const statusColor = STATUS_COLORS[task.status] || "#79747E";
   const isActive = ACTIVE_STATUSES.has(task.status);
@@ -620,18 +631,54 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
             color={statusColor}
             bg={STATUS_BG[task.status] || `${statusColor}14`}
           />
-          <Badge label={task.type} color={typeColor} />
-          {false && priority && (
-            <Badge label={priority.label} color={priority.color} bg={priority.bg} />
+          <span style={{
+            fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 100,
+            background: `${typeColor}14`, color: typeColor,
+            textTransform: "uppercase", letterSpacing: "0.04em",
+            lineHeight: 1.2, whiteSpace: "nowrap",
+            fontFamily: "'Roboto', system-ui, sans-serif",
+            display: "inline-flex", alignItems: "center", gap: 4,
+          }}>
+            <TaskTypeIcon type={task.type} size={11} color={typeColor} />
+            {task.type}
+          </span>
+          {priority && (
+            <span style={{
+              fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 100,
+              background: priority.bg, color: priority.color,
+              textTransform: "uppercase", letterSpacing: "0.04em",
+              lineHeight: 1.2, whiteSpace: "nowrap",
+              fontFamily: "'Roboto', system-ui, sans-serif",
+              display: "inline-flex", alignItems: "center", gap: 4,
+            }}>
+              <PriorityDot priority={task.priority} size={8} />
+              {priority.label}
+            </span>
           )}
           {task.status === "blocked" && <BlockerBadge task={task} />}
           {task.paused && (
-            <Badge label="Paused" icon={Pause} color="#E65100" bg="#E6510020" />
+            <span style={{
+              fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 100,
+              background: "#E6510020", color: "#E65100",
+              display: "inline-flex", alignItems: "center", gap: 4,
+              textTransform: "uppercase", letterSpacing: "0.04em", lineHeight: 1.2,
+              fontFamily: "'Roboto', system-ui, sans-serif",
+            }}>
+              <PauseIcon size={11} color="#E65100" /> Paused
+            </span>
           )}
           {task.status === "qa_testing" && (
             task.qa_agent && task.assigned_agent
-              ? <Badge label={`QA: ${task.qa_agent}`} icon={Search} color="#2E7D32" bg="#2E7D3220" />
-              : <Badge label="Waiting for QA" icon={Clock} color="#7B5EA7" bg="#7B5EA720" />
+              ? <span style={{
+                  fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 100,
+                  background: "#2E7D3220", color: "#2E7D32",
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                  textTransform: "uppercase", letterSpacing: "0.04em", lineHeight: 1.2,
+                  fontFamily: "'Roboto', system-ui, sans-serif",
+                }}>
+                  <SearchCheckIcon size={11} color="#2E7D32" /> QA: {task.qa_agent}
+                </span>
+              : <Badge label="Waiting for QA" color="#7B5EA7" bg="#7B5EA720" />
           )}
         </div>
         {task.status === "blocked"
@@ -683,12 +730,7 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
               display: "inline-flex", alignItems: "center", gap: 8,
               fontSize: 13, color: "var(--md-on-surface-variant, #49454F)",
             }}>
-              <span style={{
-                fontSize: 14, lineHeight: 1,
-                width: 28, height: 28, borderRadius: "50%",
-                background: "var(--md-surface-container-low, #F7F2FA)",
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-              }}>{icon}</span>
+              <AgentAvatar agent={agent} size={28} />
               <span style={{ fontWeight: 600 }}>{agent}</span>
               <span style={{ color: "var(--md-outline, #79747E)", fontSize: 12 }}>·</span>
               <span style={{
@@ -714,7 +756,8 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
             fontSize: 11, color: "var(--md-outline, #79747E)",
             marginTop: 8, fontWeight: 500,
           }}>
-            <Folder size={14} /> {task.project.name}
+            <FolderIcon size={12} color="#79747E" style={{ marginRight: 4, verticalAlign: "middle" }} />
+            {task.project.name}
           </div>
         )}
       </div>
