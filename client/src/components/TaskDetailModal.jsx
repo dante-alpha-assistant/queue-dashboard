@@ -117,14 +117,16 @@ function ensureModalStyles() {
     .tdm-panel { animation: tdm-panel-in 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
     .tdm-mobile-panel { animation: tdm-slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
 
-    .tdm-md table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 13px; }
+    .tdm-md { overflow: hidden; }
+    .tdm-md table { border-collapse: collapse; width: 100%; max-width: 100%; margin: 8px 0; font-size: 13px; display: block; overflow-x: auto; }
     .tdm-md table th, .tdm-md table td { border: 1px solid var(--md-surface-variant, #E7E0EC); padding: 6px 10px; text-align: left; }
     .tdm-md table th { background: var(--md-surface-container-low, #F7F2FA); font-weight: 600; }
     .tdm-md table tr:nth-child(even) td { background: var(--md-surface, #FFFBFE); }
     .tdm-md blockquote { border-left: 3px solid var(--md-primary, #6750A4); background: var(--md-surface-container-low, #F7F2FA); margin: 8px 0; padding: 8px 16px; border-radius: 0 8px 8px 0; }
     .tdm-md a { color: var(--md-primary, #6750A4); text-decoration: underline; text-underline-offset: 2px; }
     .tdm-md a:hover { opacity: 0.8; }
-    .tdm-md pre { background: var(--md-surface-container-low, #F7F2FA); border-radius: 8px; padding: 12px; overflow-x: auto; font-size: 13px; }
+    .tdm-md pre { background: var(--md-surface-container-low, #F7F2FA); border-radius: 8px; padding: 12px; overflow-x: auto; max-width: 100%; font-size: 13px; }
+    .tdm-md pre code { display: block; overflow-x: auto; }
     .tdm-md code { font-family: 'Roboto Mono', 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.9em; }
     .tdm-md code:not(pre code) { background: var(--md-surface-container-low, #F7F2FA); padding: 2px 6px; border-radius: 4px; }
 
@@ -1079,7 +1081,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
             <div style={{ marginBottom: 16 }}>
               <SectionLabel icon="📝" collapsible collapsed={collapsedSections.desc} onToggle={() => toggleSection('desc')}>Description</SectionLabel>
               {!collapsedSections.desc && (
-                <div style={{ padding: 14, background: 'var(--md-surface-container-low, #F7F2FA)', borderRadius: 10, border: '1px solid var(--md-surface-variant, #E7E0EC)' }}>
+                <div style={{ padding: 14, background: 'var(--md-surface-container-low, #F7F2FA)', borderRadius: 10, border: '1px solid var(--md-surface-variant, #E7E0EC)', overflow: 'hidden' }}>
                   <MarkdownContent text={task.description} />
                 </div>
               )}
@@ -1089,7 +1091,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
             <div style={{ marginBottom: 16 }}>
               <SectionLabel icon="✅" color="#E65100" collapsible collapsed={collapsedSections.criteria} onToggle={() => toggleSection('criteria')}>Acceptance Criteria</SectionLabel>
               {!collapsedSections.criteria && (
-                <div style={{ padding: 14, background: '#E6510006', borderRadius: 10, border: '1px solid #E6510018' }}>
+                <div style={{ padding: 14, background: '#E6510006', borderRadius: 10, border: '1px solid #E6510018', overflow: 'hidden' }}>
                   <MarkdownContent text={task.acceptance_criteria} />
                 </div>
               )}
