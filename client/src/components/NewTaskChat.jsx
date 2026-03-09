@@ -532,7 +532,14 @@ export default function NewTaskChat({ isMobile }) {
             const parsed = JSON.parse(data);
             const delta = parsed.choices?.[0]?.delta?.content;
             if (delta) {
-              accumulated += delta;
+              // Handle \r as "clear last line" (used by server during tool execution)
+              if (delta === "\r") {
+                // Remove the last line (e.g., "⏳ Creating task...")
+                const lastNewline = accumulated.lastIndexOf("\n\n");
+                if (lastNewline >= 0) accumulated = accumulated.slice(0, lastNewline);
+              } else {
+                accumulated += delta;
+              }
               const acc = accumulated;
               setMessages(prev => {
                 const updated = [...prev];

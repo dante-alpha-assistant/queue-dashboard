@@ -11,14 +11,60 @@ const SYSTEM_PROMPT = `You are Neo, an AI engineering assistant embedded in the 
 The user is describing work they need done. Your job is to:
 1. Understand what they need
 2. Ask clarifying questions if the request is vague
-3. When you have enough info, create a task on the task board
-
-To create a task, use your tools (you have access to exec, web_fetch, etc).
-Create tasks via the dashboard API:
-  curl -s -X POST "https://tasks.dante.id/api/tasks" -H "Content-Type: application/json" -d '{"title":"...","description":"...","type":"coding|ops|research|design","priority":"low|normal|high|urgent"}'
+3. When you have enough info, create a task using the create_task function
 
 Be conversational, helpful, and concise. You're talking to Dante or a team member.
 If the user just wants to chat, that's fine too — you're a full agent.`;
+
+const CHAT_TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "create_task",
+      description: "Create a new task on the task board. Use this when the user wants to create a task.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Short, descriptive task title" },
+          description: { type: "string", description: "Detailed task description with context, requirements, and acceptance criteria (markdown supported)" },
+          type: { type: "string", enum: ["coding", "ops", "general", "review", "research", "qa"], description: "Task type" },
+          priority: { type: "string", enum: ["low", "normal", "high", "urgent"], description: "Task priority, default normal" },
+        },
+        required: ["title"],
+      },
+    },
+  },
+];
+
+// Execute a tool call locally and return the result
+async function executeToolCall(name, args) {
+  if (name === "create_task") {
+    try {
+      const { data, error } = await supabase
+        .from("agent_tasks")
+        .insert({
+          title: args.title,
+          description: args.description || null,
+          type: args.type || "general",
+          priority: args.priority || "normal",
+          dispatched_by: "neo-chat",
+          status: "todo",
+        })
+        .select()
+        .single();
+      if (error) return JSON.stringify({ error: error.message });
+      return JSON.stringify({
+        success: true,
+        task_id: data.id,
+        title: data.title,
+        url: `https://tasks.dante.id/?task=${data.id}`,
+      });
+    } catch (e) {
+      return JSON.stringify({ error: e.message });
+    }
+  }
+  return JSON.stringify({ error: `Unknown tool: ${name}` });
+}
 
 // ─── Conversation CRUD ───
 
@@ -131,20 +177,26 @@ neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
       fullMessages[fullMessages.length - 1] = { role: last.role, content: parts };
     }
 
-    const response = await fetch(`${NEO_GATEWAY}/v1/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${NEO_TOKEN}`,
-        "Content-Type": "application/json",
-        "x-openclaw-agent-id": "main",
-      },
-      body: JSON.stringify({
-        model: "openclaw:main",
-        messages: fullMessages,
-        stream: true,
-        user: `conversation-${conversationId}`,
-      }),
-    });
+    // Helper to call Neo gateway
+    async function callNeo(msgs, stream = true) {
+      return fetch(`${NEO_GATEWAY}/v1/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${NEO_TOKEN}`,
+          "Content-Type": "application/json",
+          "x-openclaw-agent-id": "main",
+        },
+        body: JSON.stringify({
+          model: "openclaw:main",
+          messages: msgs,
+          tools: CHAT_TOOLS,
+          stream,
+          user: `conversation-${conversationId}`,
+        }),
+      });
+    }
+
+    const response = await callNeo(fullMessages);
 
     if (!response.ok) {
       const err = await response.text();
@@ -167,39 +219,108 @@ neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
     res.setHeader("Connection", "keep-alive");
     res.setHeader("X-Accel-Buffering", "no");
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let accumulated = "";
+    // Read the stream, detect tool_calls, handle them server-side
+    async function readStream(resp) {
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = "";
+      let toolCalls = {}; // index -> { id, name, arguments }
 
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        res.write(chunk);
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
 
-        // Parse chunks to accumulate response text
-        const lines = chunk.split("\n");
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6);
-          if (data === "[DONE]") continue;
-          try {
-            const parsed = JSON.parse(data);
-            const delta = parsed.choices?.[0]?.delta?.content;
-            if (delta) accumulated += delta;
-          } catch {}
+          const lines = chunk.split("\n");
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const data = line.slice(6);
+            if (data === "[DONE]") continue;
+            try {
+              const parsed = JSON.parse(data);
+              const delta = parsed.choices?.[0]?.delta;
+              if (!delta) continue;
+
+              // Accumulate text content and forward to client
+              if (delta.content) {
+                accumulated += delta.content;
+                res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: delta.content } }] })}\n\n`);
+              }
+
+              // Accumulate tool calls (don't forward to client)
+              if (delta.tool_calls) {
+                for (const tc of delta.tool_calls) {
+                  const idx = tc.index ?? 0;
+                  if (!toolCalls[idx]) toolCalls[idx] = { id: "", name: "", arguments: "" };
+                  if (tc.id) toolCalls[idx].id = tc.id;
+                  if (tc.function?.name) toolCalls[idx].name = tc.function.name;
+                  if (tc.function?.arguments) toolCalls[idx].arguments += tc.function.arguments;
+                }
+              }
+            } catch {}
+          }
         }
+      } catch (streamErr) {
+        console.error("Stream error:", streamErr.message);
       }
-    } catch (streamErr) {
-      console.error("Stream error:", streamErr.message);
+
+      return { accumulated, toolCalls };
     }
+
+    let { accumulated, toolCalls } = await readStream(response);
+
+    // If tool calls were made, execute them and get Neo's follow-up response
+    const toolCallList = Object.values(toolCalls).filter(tc => tc.name);
+    if (toolCallList.length > 0) {
+      // Send a "creating task..." indicator to the client
+      res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "\n\n⏳ Creating task..." } }] })}\n\n`);
+
+      // Build the tool call messages for the follow-up
+      const assistantMsg = {
+        role: "assistant",
+        content: accumulated || null,
+        tool_calls: toolCallList.map((tc, i) => ({
+          id: tc.id || `call_${i}`,
+          type: "function",
+          function: { name: tc.name, arguments: tc.arguments },
+        })),
+      };
+
+      const toolResultMsgs = [];
+      for (const tc of toolCallList) {
+        let args = {};
+        try { args = JSON.parse(tc.arguments); } catch {}
+        const result = await executeToolCall(tc.name, args);
+        toolResultMsgs.push({
+          role: "tool",
+          tool_call_id: tc.id || `call_0`,
+          content: result,
+        });
+      }
+
+      // Call Neo again with tool results to get the final response
+      const followUpMsgs = [...fullMessages, assistantMsg, ...toolResultMsgs];
+      const followUpResp = await callNeo(followUpMsgs);
+
+      if (followUpResp.ok) {
+        // Clear the "creating task..." indicator by sending a replacement
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "\r" } }] })}\n\n`);
+        const followUp = await readStream(followUpResp);
+        accumulated = (accumulated || "") + "\n\n" + followUp.accumulated;
+      }
+    }
+
+    // Send done signal
+    res.write("data: [DONE]\n\n");
 
     // Save assistant message
     if (accumulated) {
+      // Clean up any control characters from tool call flow
+      const cleanContent = accumulated.replace(/\n\n⏳ Creating task\.\.\.\r/g, "").trim();
       const { error: assistMsgErr } = await supabase
         .from("chat_messages")
-        .insert({ conversation_id: conversationId, role: "assistant", content: accumulated });
+        .insert({ conversation_id: conversationId, role: "assistant", content: cleanContent });
       if (assistMsgErr) console.error("Failed to save assistant message:", assistMsgErr.message);
     }
 
