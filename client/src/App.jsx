@@ -11,6 +11,7 @@ import TaskCard from "./components/TaskCard";
 import NewTaskChat from "./components/NewTaskChat";
 import TaskDetailModal from "./components/TaskDetailModal";
 import Pingboard from "./pages/Pingboard";
+import HealthDashboard from "./pages/HealthDashboard";
 import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
 
 const MOBILE_TABS = [
@@ -108,7 +109,13 @@ export default function App() {
     return <SpeedLoader text="Loading tasks..." />;
   }
 
-  if (view === "pingboard") {
+  const VIEW_TABS = [
+    { key: "board", label: "📋 Board" },
+    { key: "pingboard", label: "🤖 Pingboard" },
+    { key: "health", label: "💓 Health" },
+  ];
+
+  if (view === "pingboard" || view === "health") {
     return (
       <div style={{ fontFamily: "'Roboto', system-ui, sans-serif" }}>
         <div style={{
@@ -116,7 +123,7 @@ export default function App() {
           background: "var(--md-background)", borderBottom: "1px solid var(--md-surface-variant)",
           display: "flex", gap: 0, padding: "0 16px",
         }}>
-          {[{ key: "board", label: "📋 Board" }, { key: "pingboard", label: "🤖 Pingboard" }].map(t => (
+          {VIEW_TABS.map(t => (
             <button key={t.key} onClick={() => setView(t.key)} style={{
               padding: "10px 20px", background: "none", border: "none",
               borderBottom: view === t.key ? "2px solid var(--md-primary)" : "2px solid transparent",
@@ -127,7 +134,7 @@ export default function App() {
           ))}
         </div>
         <div style={{ paddingTop: 42 }}>
-          <Pingboard />
+          {view === "pingboard" ? <Pingboard /> : <HealthDashboard />}
         </div>
       </div>
     );
@@ -201,11 +208,18 @@ export default function App() {
             <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: "-0.02em" }}>
               tasks<span style={{ color: "var(--md-primary)" }}>.</span>dante<span style={{ color: "var(--md-primary)" }}>.</span>id
             </span>
-            <button onClick={() => setView("pingboard")} style={{
-              marginLeft: "auto", padding: "4px 10px", borderRadius: 6,
-              background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)",
-              color: "var(--md-on-surface-variant)", cursor: "pointer", fontSize: 11, fontWeight: 600,
-            }}>🤖</button>
+            <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+              <button onClick={() => setView("pingboard")} style={{
+                padding: "4px 10px", borderRadius: 6,
+                background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)",
+                color: "var(--md-on-surface-variant)", cursor: "pointer", fontSize: 11, fontWeight: 600,
+              }}>🤖</button>
+              <button onClick={() => setView("health")} style={{
+                padding: "4px 10px", borderRadius: 6,
+                background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)",
+                color: "var(--md-on-surface-variant)", cursor: "pointer", fontSize: 11, fontWeight: 600,
+              }}>💓</button>
+            </div>
           </div>
         </div>
 
@@ -375,6 +389,12 @@ export default function App() {
               color: "var(--md-on-surface-variant)", cursor: "pointer", fontSize: 12, fontWeight: 600,
               fontFamily: "'Roboto', system-ui, sans-serif",
             }}>🤖 Pingboard</button>
+            <button onClick={() => setView("health")} style={{
+              padding: "6px 14px", borderRadius: 8,
+              background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)",
+              color: "var(--md-on-surface-variant)", cursor: "pointer", fontSize: 12, fontWeight: 600,
+              fontFamily: "'Roboto', system-ui, sans-serif",
+            }}>💓 Health</button>
             <span style={{ fontSize: 10, color: 'var(--md-on-surface-variant)', opacity: 0.6, fontFamily: 'monospace', marginLeft: 8, background: 'var(--md-surface-variant)', padding: '2px 6px', borderRadius: 4 }}>{__COMMIT_HASH__}</span>
           </div>
           <StatsBar stats={stats} isTablet={isTablet} />
