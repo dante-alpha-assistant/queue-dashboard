@@ -1,4 +1,5 @@
 import SpeedLoader from "../components/SpeedLoader";
+import SkillsModal from "../components/SkillsModal";
 import { useState, useEffect, useCallback } from "react";
 
 const STATUS_COLORS = {
@@ -622,6 +623,7 @@ export default function Pingboard() {
   const [viewMode, setViewMode] = useState("grid"); // "grid" | "orgchart"
   const [allReplicas, setAllReplicas] = useState({});
   const [allReplicasLoading, setAllReplicasLoading] = useState(false);
+  const [skillsOpen, setSkillsOpen] = useState(false);
 
   const fetchAgents = useCallback(async () => {
     try {
@@ -757,7 +759,22 @@ export default function Pingboard() {
             </div>
           </div>
 
-          {/* View mode toggle */}
+          {/* View mode toggle + Skills */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            onClick={() => setSkillsOpen(true)}
+            style={{
+              padding: "6px 14px", borderRadius: 10, fontSize: 12, fontWeight: 600,
+              border: "1px solid var(--md-surface-variant)",
+              background: "var(--md-surface)", color: "var(--md-on-surface-variant)",
+              cursor: "pointer", fontFamily: "'Roboto', system-ui, sans-serif",
+              transition: "all 150ms",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "var(--md-primary-container)"; e.currentTarget.style.color = "var(--md-on-primary-container)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "var(--md-surface)"; e.currentTarget.style.color = "var(--md-on-surface-variant)"; }}
+          >
+            🧩 Skills
+          </button>
           <div style={{ display: "flex", gap: 4, background: "var(--md-surface-container)", borderRadius: 12, padding: 3 }}>
             {[
               { key: "grid", label: "⊞ Grid" },
@@ -782,6 +799,7 @@ export default function Pingboard() {
                 {mode.label}
               </button>
             ))}
+          </div>
           </div>
         </div>
 
@@ -980,6 +998,21 @@ export default function Pingboard() {
                   </div>
                 )}
 
+                {Array.isArray(selectedAgent.skills) && selectedAgent.skills.length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--md-on-surface-variant)", opacity: 0.7, marginBottom: 6 }}>
+                      🧩 Skills
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {selectedAgent.skills.map((s, i) => (
+                        <span key={i} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 8, background: "var(--md-primary-container)", color: "var(--md-on-primary-container)", fontWeight: 500 }}>
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--md-on-surface-variant)", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
                     <span>Pod Replicas</span>
@@ -1030,6 +1063,7 @@ export default function Pingboard() {
           </div>
         )}
       </div>
+      <SkillsModal open={skillsOpen} onClose={() => setSkillsOpen(false)} />
     </div>
   );
 }
