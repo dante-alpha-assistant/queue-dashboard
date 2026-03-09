@@ -201,6 +201,8 @@ function HistoryDropdown({ conversations, activeConvoId, onSelect, onDelete, onC
       )}
     </div>
   );
+}
+
 const markdownComponents = {
   a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
   p: ({ node, ...props }) => <p {...props} style={{ margin: "0 0 8px 0" }} />,
@@ -597,6 +599,11 @@ export default function NewTaskChat({ isMobile }) {
       {/* Inject hover styles for history delete buttons */}
       <style>{`
         .history-item:hover .history-delete-btn { opacity: 1 !important; }
+        @keyframes typingDot {
+          0%, 20% { opacity: 0.2; }
+          50% { opacity: 1; }
+          80%, 100% { opacity: 0.2; }
+        }
       `}</style>
 
       {/* Drop zone overlay */}
@@ -690,6 +697,8 @@ export default function NewTaskChat({ isMobile }) {
         )}
         {messages.map((msg, i) => {
           const isUser = msg.role === "user";
+          // Skip empty assistant message while streaming (typing indicator shows instead)
+          if (!isUser && !msg.content && streaming && i === messages.length - 1) return null;
           return (
             <div key={msg.id || i} style={{
               display: "flex",
@@ -705,16 +714,8 @@ export default function NewTaskChat({ isMobile }) {
                 background: isUser
                   ? "linear-gradient(135deg, #6750A4, #7B68EE)"
                   : "var(--md-surface-container)",
-                color: isUser ? "#fff" : "var(--md-on-surface)",
-                fontSize: 13, lineHeight: 1.55, whiteSpace: "pre-wrap", wordBreak: "break-word",
-              }}>
-                {renderContent(msg.content)}
-                {!msg.content && streaming && i === messages.length - 1 && <span style={{ opacity: 0.5 }}>●●●</span>}
-                color: isUser
-                  ? "var(--md-on-primary)"
-                  : "var(--md-on-surface)",
-                fontSize: 13,
-                lineHeight: 1.6,
+                color: isUser ? "var(--md-on-primary)" : "var(--md-on-surface)",
+                fontSize: 13, lineHeight: 1.6,
                 ...(isUser ? { whiteSpace: "pre-wrap" } : {}),
                 wordBreak: "break-word",
               }}>
@@ -725,9 +726,6 @@ export default function NewTaskChat({ isMobile }) {
                   }}>Neo</div>
                 )}
                 {isUser ? renderContent(msg.content) : renderMarkdownContent(msg.content)}
-                {!msg.content && streaming && i === messages.length - 1 && (
-                  <span style={{ opacity: 0.5 }}>●●●</span>
-                )}
                 <div style={{
                   fontSize: 9, marginTop: 3, textAlign: isUser ? "right" : "left",
                   color: isUser ? "rgba(255,255,255,0.5)" : "var(--md-on-surface-variant)",
@@ -739,6 +737,26 @@ export default function NewTaskChat({ isMobile }) {
             </div>
           );
         })}
+        {streaming && messages.length > 0 && messages[messages.length - 1]?.role === "assistant" && !messages[messages.length - 1]?.content && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8, marginBottom: 8, marginTop: 4,
+          }}>
+            <NeoAvatar size={22} />
+            <div style={{
+              padding: "8px 14px", borderRadius: "16px 16px 16px 4px",
+              background: "var(--md-surface-container)",
+              color: "var(--md-on-surface-variant)", fontSize: 13,
+              display: "flex", alignItems: "center", gap: 4,
+            }}>
+              <span>Neo is typing</span>
+              <span className="typing-dots" style={{ display: "inline-flex", gap: 2 }}>
+                <span style={{ animation: "typingDot 1.4s infinite", animationDelay: "0s" }}>.</span>
+                <span style={{ animation: "typingDot 1.4s infinite", animationDelay: "0.2s" }}>.</span>
+                <span style={{ animation: "typingDot 1.4s infinite", animationDelay: "0.4s" }}>.</span>
+              </span>
+            </div>
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
 
