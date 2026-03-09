@@ -27,12 +27,15 @@ describe('Chat expand panel feature', () => {
     expect(code).toContain('cubic-bezier');
   });
 
-  it('hides sidebar in expanded mode by default', () => {
-    expect(code).toContain('!isMobile && !expanded');
+  it('has header icons instead of sidebar', () => {
+    expect(code).toContain('HeaderIconBtn');
+    expect(code).toContain('New chat');
+    expect(code).toContain('History');
+    expect(code).toContain('Clear conversation');
   });
 
-  it('has history toggle in expanded mode', () => {
-    expect(code).toContain('isMobile || expanded');
-    expect(code).toContain('Conversation history');
+  it('has history dropdown component', () => {
+    expect(code).toContain('HistoryDropdown');
+    expect(code).toContain('historyOpen');
   });
 });
