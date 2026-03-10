@@ -288,7 +288,7 @@ export default function TaskRelationships({ taskId, onNavigateToTask }) {
 
   for (const rel of relationships) {
     if (rel.type === 'deployed_by') {
-      grouped.deployed_by.push(rel);
+      groups.deployed_by.push(rel);
     } else if (rel.type === 'depends_on' && rel.direction === 'outgoing') {
       groups.depends_on.push(rel);
     } else if (rel.type === 'depends_on' && rel.direction === 'incoming') {
