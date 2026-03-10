@@ -1076,7 +1076,7 @@ export default function NewTaskChat({ isMobile }) {
           }}>↑</button>
       </div>
       </>}
-    </div>
       {modalImage && <ImageModal src={modalImage} onClose={() => setModalImage(null)} />}
+    </div>
   );
 }
