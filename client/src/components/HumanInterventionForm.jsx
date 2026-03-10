@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AlertTriangle, CheckCircle2, Lightbulb, Unlock } from 'lucide-react';
 
 /**
  * HumanInterventionForm — renders a dynamic form for blocked tasks
