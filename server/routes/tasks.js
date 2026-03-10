@@ -661,7 +661,7 @@ router.post("/tasks/:id/comments", async (req, res) => {
     const insertPayload = {
       task_id: req.params.id,
       author: author || "dante",
-      author_type: author_type || "human",
+      author_type: author_type || "user",
       body: body.trim(),
     };
     // Only include mentions if the array is non-empty (column may not exist yet)

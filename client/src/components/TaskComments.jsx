@@ -140,7 +140,7 @@ export default function TaskComments({ taskId }) {
         body: JSON.stringify({
           body: body.trim(),
           author: 'dante',
-          author_type: 'human',
+          author_type: 'user',
           mentions: mentions.length > 0 ? mentions : undefined,
         }),
       });
