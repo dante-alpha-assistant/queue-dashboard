@@ -112,11 +112,7 @@ export const neoChatRouter = Router();
 const NEO_GATEWAY = process.env.NEO_GATEWAY_URL || "http://neo.agents.svc.cluster.local:18789";
 const NEO_TOKEN = process.env.NEO_GATEWAY_TOKEN || "neo-gw-tok-2026";
 
-// Direct LLM API for vision support (OpenClaw chatCompletions strips image_url parts)
-// Set CHAT_LLM_URL + CHAT_LLM_KEY to use a vision-capable model directly
-const CHAT_LLM_URL = process.env.CHAT_LLM_URL || "https://openrouter.ai/api/v1/chat/completions";
-const CHAT_LLM_KEY = process.env.CHAT_LLM_KEY || process.env.OPENROUTER_API_KEY || "";
-const CHAT_LLM_MODEL = process.env.CHAT_LLM_MODEL || "anthropic/claude-sonnet-4";
+// Vision: images are uploaded to Supabase storage and passed as HTTP URLs through OpenClaw gateway
 
 const SYSTEM_PROMPT = `You are Neo, an AI engineering assistant embedded in the tasks.dante.id dashboard.
 The user is describing work they need done. Your job is to:
@@ -420,81 +416,41 @@ neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
       }),
     ];
 
-    // Strip oversized base64 images (>4MB) to prevent payload failures
-    function stripOversizedImages(msgs) {
-      return msgs.map(m => {
+    // Helper to call LLM via OpenClaw gateway
+    // Images are passed as HTTP URLs (uploaded to Supabase) — OpenClaw handles vision natively
+    async function callNeo(msgs, stream = true) {
+      // Replace base64 data URLs with a text note (gateway can't handle them)
+      // HTTP URLs are kept as-is — OpenClaw fetches them natively
+      const sanitized = msgs.map(m => {
         if (!Array.isArray(m.content)) return m;
-        const filtered = m.content.map(part => {
-          if (part.type === "image_url" && part.image_url?.url?.startsWith("data:")) {
-            // Base64 data URLs: rough size = length * 0.75
-            const sizeBytes = part.image_url.url.length * 0.75;
-            if (sizeBytes > 4 * 1024 * 1024) {
-              console.warn(`Stripping oversized base64 image (~${Math.round(sizeBytes / 1024 / 1024)}MB) from chat message`);
-              return { type: "text", text: "[Image removed: too large (>4MB). Please resize and try again.]" };
-            }
+        const parts = m.content.map(part => {
+          if (part.type === 'image_url' && part.image_url?.url?.startsWith('data:')) {
+            return { type: 'text', text: '[Image attached — see uploaded URL version]' };
           }
           return part;
         });
-        return { ...m, content: filtered };
+        // If only text parts remain, flatten to string
+        const hasImages = parts.some(p => p.type === 'image_url');
+        if (!hasImages) {
+          return { ...m, content: parts.map(p => p.text || '').join('\n').trim() };
+        }
+        return { ...m, content: parts };
       });
-    }
 
-    // Strip image_url parts entirely (for gateway fallback that doesn't support vision)
-    function stripImageParts(msgs) {
-      return msgs.map(m => {
-        if (!Array.isArray(m.content)) return m;
-        const hasImages = m.content.some(p => p.type === "image_url");
-        if (!hasImages) return m;
-        const textParts = m.content.filter(p => p.type === "text");
-        const text = textParts.map(p => p.text).join("\n") || "";
-        return { ...m, content: text + "\n[Note: User attached an image but vision is not available via this endpoint.]" };
-      });
-    }
-
-    // Helper to call LLM — uses direct API for vision, OpenClaw gateway for text-only
-    // Returns a Response or a synthetic error Response on failure
-    async function callNeo(msgs, stream = true) {
-      const hasImages = msgs.some(m =>
-        Array.isArray(m.content) && m.content.some(p => p.type === "image_url")
-      );
-
-      // 120s timeout to prevent hanging requests
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 120_000);
 
       try {
-        if (hasImages && CHAT_LLM_KEY) {
-          // Direct LLM call — preserves image_url parts for vision
-          const sanitized = stripOversizedImages(msgs);
-          return await fetch(CHAT_LLM_URL, {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${CHAT_LLM_KEY}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              model: CHAT_LLM_MODEL,
-              messages: sanitized,
-              tools: CHAT_TOOLS,
-              stream,
-              max_tokens: 4096,
-            }),
-            signal: controller.signal,
-          });
-        }
-
-        // Text-only or no LLM key: use OpenClaw gateway (strip images if present)
-        const gatewayMsgs = hasImages ? stripImageParts(msgs) : msgs;
         return await fetch(`${NEO_GATEWAY}/v1/chat/completions`, {
-          method: "POST",
+          method: 'POST',
           headers: {
-            "Authorization": `Bearer ${NEO_TOKEN}`,
-            "Content-Type": "application/json",
-            "x-openclaw-agent-id": "main",
+            'Authorization': `Bearer ${NEO_TOKEN}`,
+            'Content-Type': 'application/json',
+            'x-openclaw-agent-id': 'main',
           },
           body: JSON.stringify({
-            model: "openclaw:main",
-            messages: gatewayMsgs,
+            model: 'openclaw:main',
+            messages: sanitized,
             tools: CHAT_TOOLS,
             stream,
             user: `conversation-${conversationId}`,
@@ -502,15 +458,14 @@ neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
           signal: controller.signal,
         });
       } catch (err) {
-        const isTimeout = err.name === "AbortError";
+        const isTimeout = err.name === 'AbortError';
         const message = isTimeout
-          ? "Request timed out after 120 seconds. Please try again with a shorter message or smaller image."
-          : `Neo is temporarily unavailable. Please try again. (${err.message})`;
-        console.error(`callNeo ${isTimeout ? "timeout" : "fetch error"}:`, err.message);
-        // Return a synthetic 502 Response so callers don't throw
+          ? 'Request timed out after 120 seconds. Please try again.'
+          : `Neo is temporarily unavailable. (${err.message})`;
+        console.error(`callNeo ${isTimeout ? 'timeout' : 'fetch error'}:`, err.message);
         return new Response(JSON.stringify({ error: message }), {
           status: 502,
-          headers: { "Content-Type": "application/json" },
+          headers: { 'Content-Type': 'application/json' },
         });
       } finally {
         clearTimeout(timeout);
