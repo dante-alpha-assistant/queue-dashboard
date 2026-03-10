@@ -3,13 +3,31 @@ import { useState, useEffect, useRef, useCallback } from "react";
 /**
  * SSE hook that connects to the task-dispatcher's event stream via the dashboard proxy.
  * Maintains per-task progress and monitor data.
+ * Accepts optional onStatusChange callback for optimistic board updates.
  */
-export default function useTaskEvents() {
+export default function useTaskEvents({ onStatusChange } = {}) {
   const [progress, setProgress] = useState({}); // taskId → { percent, step, log, timestamp }
   const [monitor, setMonitor] = useState({});   // taskId → { sessionAlive, idleSeconds, elapsed, timestamp }
   const [connected, setConnected] = useState(false);
   const esRef = useRef(null);
   const retryRef = useRef(null);
+  const onStatusChangeRef = useRef(onStatusChange);
+  onStatusChangeRef.current = onStatusChange;
+
+  // Debounce SSE status events to prevent cascade refreshes
+  const statusDebounceRef = useRef(null);
+  const pendingStatusRef = useRef(new Map());
+
+  const flushStatusUpdates = useCallback(() => {
+    const pending = pendingStatusRef.current;
+    if (pending.size === 0) return;
+    for (const [taskId, status] of pending) {
+      if (onStatusChangeRef.current) {
+        onStatusChangeRef.current(taskId, status);
+      }
+    }
+    pending.clear();
+  }, []);
 
   const connect = useCallback(() => {
     if (esRef.current) {
@@ -73,6 +91,10 @@ export default function useTaskEvents() {
             return next;
           });
         }
+        // Debounce status changes - batch within 500ms window
+        pendingStatusRef.current.set(data.taskId, data.status);
+        if (statusDebounceRef.current) clearTimeout(statusDebounceRef.current);
+        statusDebounceRef.current = setTimeout(flushStatusUpdates, 500);
       } catch {}
     });
 
@@ -83,13 +105,14 @@ export default function useTaskEvents() {
       // Retry with backoff
       retryRef.current = setTimeout(connect, 5000);
     };
-  }, []);
+  }, [flushStatusUpdates]);
 
   useEffect(() => {
     connect();
     return () => {
       if (esRef.current) esRef.current.close();
       if (retryRef.current) clearTimeout(retryRef.current);
+      if (statusDebounceRef.current) clearTimeout(statusDebounceRef.current);
     };
   }, [connect]);
 

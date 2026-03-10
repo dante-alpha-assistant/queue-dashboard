@@ -872,6 +872,28 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
 /* ── Main Modal ───────────────────────────────────────────── */
 
 export default function TaskDetailModal({ task, onClose, onStatusChange, isMobile, isTablet, progress, monitor }) {
+  // Lazy load full task details (description, result, qa_result) for lightweight list mode
+  const [fullTask, setFullTask] = useState(null);
+  const [loadingDetail, setLoadingDetail] = useState(!effectiveTask.description && !effectiveTask.result);
+  useEffect(() => {
+    if (effectiveTask.description !== undefined && effectiveTask.result !== undefined) {
+      // Already have full data
+      setFullTask(task);
+      setLoadingDetail(false);
+      return;
+    }
+    let cancelled = false;
+    setLoadingDetail(true);
+    fetch(`/api/tasks/${task.id}/detail`)
+      .then(r => r.json())
+      .then(data => { if (!cancelled) { setFullTask(data); setLoadingDetail(false); } })
+      .catch(() => { if (!cancelled) setLoadingDetail(false); });
+    return () => { cancelled = true; };
+  }, [task.id]);
+
+  // Merge full task data with lightweight task data
+  const effectiveTask = fullTask ? { ...task, ...fullTask } : task;
+
   const [closing, setClosing] = useState(false);
   const [actionProcessing, setActionProcessing] = useState(false);
   const [fieldSaving, setFieldSaving] = useState(false);
@@ -1104,11 +1126,11 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const sc = STATUS_CONFIG[task.status] || STATUS_CONFIG.todo;
   const typeColor = TYPE_COLORS[task.type] || "#79747E";
   const isActive = ACTIVE_STATUSES.has(task.status);
-  const hasResult = !!task.result;
+  const hasResult = !!effectiveTask.result;
   const hasError = !!task.error;
-  const hasQA = !!task.qa_result;
+  const hasQA = !!effectiveTask.qa_result;
   const hasCriteria = !!task.acceptance_criteria;
-  const hasDescription = !!task.description;
+  const hasDescription = !!effectiveTask.description;
   const hasMetadata = !!task.metadata && typeof task.metadata === 'object' && Object.keys(task.metadata).length > 0;
 
   const hasDeployment = ['deploying', 'deployed', 'deploy_failed'].includes(task.status) || !!task.deployment_url || !!task.deploy_target;
@@ -1348,7 +1370,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
               <SectionLabel icon={<FileText size={14} />} collapsible collapsed={collapsedSections.desc} onToggle={() => toggleSection('desc')}>Description</SectionLabel>
               {!collapsedSections.desc && (
                 <div style={{ padding: 14, background: 'var(--md-surface-container-low, #F7F2FA)', borderRadius: 10, border: '1px solid var(--md-surface-variant, #E7E0EC)', overflow: 'hidden', overflowWrap: 'break-word', wordBreak: 'break-word', maxWidth: '100%' }}>
-                  <MarkdownContent text={task.description} />
+                  <MarkdownContent text={effectiveTask.description} />
                 </div>
               )}
             </div>
@@ -1395,10 +1417,10 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
 
       {activeTab === 'qa' && hasQA && (
         <div>
-          <SectionLabel icon={task.qa_result.passed ? "✓" : "✕"} color={task.qa_result.passed ? "#386A20" : "#BA1A1A"}>
-            {task.qa_result.passed ? "QA Passed" : "QA Failed"}
+          <SectionLabel icon={effectiveTask.qa_result.passed ? "✓" : "✕"} color={effectiveTask.qa_result.passed ? "#386A20" : "#BA1A1A"}>
+            {effectiveTask.qa_result.passed ? "QA Passed" : "QA Failed"}
           </SectionLabel>
-          <ResultDisplay result={task.qa_result} variant={task.qa_result.passed ? "success" : "error"} />
+          <ResultDisplay result={effectiveTask.qa_result} variant={effectiveTask.qa_result.passed ? "success" : "error"} />
         </div>
       )}
 
@@ -1528,13 +1550,13 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
             {/* Vercel-specific links */}
             {(task.deploy_target === 'vercel') && (
               <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {task.result?.project_url && (
-                  <a href={task.result.project_url} target="_blank" rel="noopener noreferrer" style={{ color: '#6750A4', textDecoration: 'none', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                {effectiveTask.result?.project_url && (
+                  <a href={effectiveTask.result.project_url} target="_blank" rel="noopener noreferrer" style={{ color: '#6750A4', textDecoration: 'none', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span><BarChart3 size={14} /></span> Vercel Project Dashboard
                   </a>
                 )}
-                {task.result?.project_name && (
-                  <a href={`https://vercel.com/~/projects/${task.result.project_name}/deployments`} target="_blank" rel="noopener noreferrer" style={{ color: '#6750A4', textDecoration: 'none', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                {effectiveTask.result?.project_name && (
+                  <a href={`https://vercel.com/~/projects/${effectiveTask.result.project_name}/deployments`} target="_blank" rel="noopener noreferrer" style={{ color: '#6750A4', textDecoration: 'none', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span><ClipboardList size={14} /></span> Deployment History
                   </a>
                 )}
@@ -1544,14 +1566,14 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
             {/* Railway-specific info */}
             {task.deploy_target === 'railway' && (
               <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {task.result?.project_url && (
-                  <a href={task.result.project_url} target="_blank" rel="noopener noreferrer" style={{ color: '#6750A4', textDecoration: 'none', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                {effectiveTask.result?.project_url && (
+                  <a href={effectiveTask.result.project_url} target="_blank" rel="noopener noreferrer" style={{ color: '#6750A4', textDecoration: 'none', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span><BarChart3 size={14} /></span> Railway Project Dashboard
                   </a>
                 )}
-                {task.result?.project_name && (
+                {effectiveTask.result?.project_name && (
                   <span style={{ fontSize: 12, color: 'var(--md-on-surface-variant, #49454F)' }}>
-                    🚂 Project: {task.result.project_name}
+                    🚂 Project: {effectiveTask.result.project_name}
                   </span>
                 )}
               </div>
@@ -1560,9 +1582,9 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
             {/* Kubernetes-specific info */}
             {(task.deploy_target === 'kubernetes' || !task.deploy_target) && (
               <div style={{ marginTop: 10, fontSize: 12, color: 'var(--md-on-surface-variant, #49454F)' }}>
-                {task.result?.argocd_synced ? (
+                {effectiveTask.result?.argocd_synced ? (
                   <span style={{ color: '#386A20', fontWeight: 500 }}><CheckCircle2 size={14} /> ArgoCD synced</span>
-                ) : task.result?.sync_triggered ? (
+                ) : effectiveTask.result?.sync_triggered ? (
                   <span style={{ color: '#E8A317', fontWeight: 500 }}><Clock size={14} /> ArgoCD sync triggered</span>
                 ) : (
                   <span style={{ color: 'var(--md-outline, #79747E)', fontStyle: 'italic' }}>ArgoCD status unknown</span>

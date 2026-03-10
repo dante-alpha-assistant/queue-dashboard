@@ -3,22 +3,47 @@ import { useState, useEffect, useCallback, useRef } from "react";
 export default function useQueue() {
   const [stats, setStats] = useState({ todo: 0, assigned: 0, in_progress: 0, qa: 0, completed: 0, failed: 0 });
   const [tasks, setTasks] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState("");
   const [loading, setLoading] = useState(true);
   const [transitioning, setTransitioning] = useState({});
   const initialLoad = useRef(true);
+  const etagRef = useRef(null);
 
-  const fetchAll = useCallback(async () => {
+  const PER_PAGE = 50;
+
+  const fetchAll = useCallback(async (page = currentPage) => {
     try {
-      const params = selectedProject ? `?project_id=${selectedProject}` : "";
+      const params = new URLSearchParams();
+      if (selectedProject) params.set("project_id", selectedProject);
+      params.set("page", String(page));
+      params.set("per_page", String(PER_PAGE));
+
+      const headers = {};
+      if (etagRef.current) headers["If-None-Match"] = etagRef.current;
+
       const [sRes, tRes, pRes] = await Promise.all([
-        fetch(`/api/stats${params}`),
-        fetch(`/api/tasks${params}`),
+        fetch(`/api/stats${selectedProject ? `?project_id=${selectedProject}` : ""}`),
+        fetch(`/api/tasks?${params.toString()}`, { headers }),
         fetch("/api/projects"),
       ]);
+
       setStats(await sRes.json());
-      setTasks(await tRes.json());
+
+      if (tRes.status === 304) {
+        // Data unchanged, skip update
+      } else {
+        const tasksData = await tRes.json();
+        setTasks(tasksData);
+        setTotalCount(parseInt(tRes.headers.get("X-Total-Count") || "0", 10));
+        setTotalPages(parseInt(tRes.headers.get("X-Total-Pages") || "1", 10));
+        const newEtag = tRes.headers.get("ETag");
+        if (newEtag) etagRef.current = newEtag;
+      }
+
       setProjects(await pRes.json());
       if (initialLoad.current) {
         setLoading(false);
@@ -27,13 +52,19 @@ export default function useQueue() {
     } catch (e) {
       console.error("Poll error:", e);
     }
-  }, [selectedProject]);
+  }, [selectedProject, currentPage]);
 
   useEffect(() => {
     fetchAll();
-    const id = setInterval(fetchAll, 3000);
+    // Poll every 5s instead of 3s to reduce load
+    const id = setInterval(fetchAll, 5000);
     return () => clearInterval(id);
   }, [fetchAll]);
+
+  const goToPage = useCallback((page) => {
+    setCurrentPage(page);
+    etagRef.current = null;
+  }, []);
 
   const dispatch = useCallback(async (task) => {
     const res = await fetch("/api/tasks", {
@@ -58,6 +89,10 @@ export default function useQueue() {
         const errBody = await res.json().catch(() => ({}));
         throw new Error(errBody?.message || errBody?.error || `Update failed (${res.status})`);
       }
+      // Optimistic local update
+      if (updates.status) {
+        setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+      }
       await fetchAll();
     } finally {
       setTransitioning(prev => {
@@ -77,6 +112,13 @@ export default function useQueue() {
     await fetchAll();
   }, [fetchAll]);
 
+  // Apply status change from SSE event (optimistic local update)
+  const applyStatusChange = useCallback((taskId, newStatus) => {
+    setTasks(prev => prev.map(t =>
+      t.id === taskId ? { ...t, status: newStatus } : t
+    ));
+  }, []);
+
   const todo = tasks.filter(t => t.status === "todo");
   const assigned = [];
   const inProgress = tasks.filter(t => t.status === "in_progress");
@@ -90,7 +132,8 @@ export default function useQueue() {
 
   return {
     stats, tasks, todo, assigned, inProgress, qa, completed, deployed, blocked, failed, deploying, deployFailed,
-    loading, transitioning, dispatch, updateTask, deleteTask,
+    loading, transitioning, dispatch, updateTask, deleteTask, applyStatusChange,
     projects, selectedProject, setSelectedProject,
+    currentPage, totalPages, totalCount, goToPage, PER_PAGE,
   };
 }

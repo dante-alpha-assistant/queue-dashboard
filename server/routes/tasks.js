@@ -59,21 +59,30 @@ router.get("/stats", async (req, res) => {
   }
 });
 
-// All tasks
+// All tasks (paginated, lightweight by default)
 router.get("/tasks", async (req, res) => {
   try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const perPage = Math.min(200, Math.max(1, parseInt(req.query.per_page) || 50));
+    const offset = (page - 1) * perPage;
+
+    // Light mode: exclude heavy columns for list view (default on)
+    const isLightMode = req.query.select !== "full";
+    const selectColumns = isLightMode
+      ? "id, title, status, type, priority, assigned_agent, created_at, updated_at, error, stage, project_id, repository_id, pull_request_url, blocked_reason, deploy_target, acceptance_criteria, completed_at, started_at, metadata, project:agent_projects(id, name, slug), repository:agent_repositories(id, name, url, provider)"
+      : "*, project:agent_projects(id, name, slug), repository:agent_repositories(id, name, url, provider)";
+
     let query = supabase
       .from("agent_tasks")
-      .select("*, project:agent_projects(id, name, slug), repository:agent_repositories(id, name, url, provider)")
+      .select(selectColumns, { count: "exact" })
       .order("created_at", { ascending: false });
+
     if (req.query.project_id) query = query.eq("project_id", req.query.project_id);
     if (req.query.repository_id) query = query.eq("repository_id", req.query.repository_id);
-    // Hide deprecated tasks by default (soft-deleted); include with ?include_deprecated=true
     if (req.query.include_deprecated !== "true") {
       query = query.neq("status", "deprecated");
     }
 
-    // Text search by title (case-insensitive partial match)
     if (req.query.search) {
       query = query.ilike("title", `%${req.query.search}%`);
       query = query.limit(10);
@@ -83,7 +92,6 @@ router.get("/tasks", async (req, res) => {
     const ALWAYS_INCLUDE_STATUSES = ["todo", "in_progress", "qa_testing", "blocked"];
 
     if (since || until) {
-      // Build an OR filter: (created_at within range) OR (status in always-include list)
       const timeParts = [];
       if (since) timeParts.push(`created_at.gte.${since}`);
       if (until) timeParts.push(`created_at.lte.${until}`);
@@ -92,14 +100,55 @@ router.get("/tasks", async (req, res) => {
       query = query.or(`and(${timeFilter}),${statusFilter}`);
     }
 
-    const { data, error } = await query;
+    // Apply pagination (skip for search which has its own limit)
+    if (!req.query.search) {
+      query = query.range(offset, offset + perPage - 1);
+    }
+
+    const { data, error, count } = await query;
     if (error) throw error;
+
+    // Pagination headers
+    const totalPages = Math.ceil((count || 0) / perPage);
+    res.set("X-Total-Count", String(count || 0));
+    res.set("X-Total-Pages", String(totalPages));
+    res.set("X-Page", String(page));
+    res.set("X-Per-Page", String(perPage));
+
+    // ETag for caching
+    if (data && data.length > 0) {
+      const latestUpdate = data.reduce((max, t) => {
+        const ts = t.updated_at || t.created_at;
+        return ts > max ? ts : max;
+      }, "");
+      const etag = `"${Buffer.from(latestUpdate + count).toString("base64").slice(0, 16)}"`;
+      res.set("ETag", etag);
+      if (req.headers["if-none-match"] === etag) {
+        return res.status(304).end();
+      }
+    }
+
     res.json(data);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
+// Single task detail (full columns for detail view)
+router.get("/tasks/:id/detail", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("agent_tasks")
+      .select("*, project:agent_projects(id, name, slug), repository:agent_repositories(id, name, url, provider)")
+      .eq("id", req.params.id)
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: "Task not found" });
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 // Create task
 router.post("/tasks", async (req, res) => {
   try {

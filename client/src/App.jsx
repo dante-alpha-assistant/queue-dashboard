@@ -45,6 +45,8 @@ export default function App() {
     stats, todo, assigned, inProgress, qa, completed, deployed, blocked, failed, deploying, deployFailed,
     loading, transitioning, updateTask,
     projects, selectedProject, setSelectedProject,
+    applyStatusChange,
+    currentPage, totalPages, totalCount, goToPage,
   } = useQueue();
   const navigate = useNavigate();
   const location = useLocation();
@@ -60,7 +62,7 @@ export default function App() {
   const [timeFilter, setTimeFilter] = useState({ range: "today", customFrom: "", customTo: "" });
   const [searchQuery, setSearchQuery] = useState("");
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
-  const { progress: taskProgress, monitor: taskMonitor, connected: sseConnected } = useTaskEvents();
+  const { progress: taskProgress, monitor: taskMonitor, connected: sseConnected } = useTaskEvents({ onStatusChange: applyStatusChange });
 
   // Resolve deep link once tasks are loaded
   useEffect(() => {
