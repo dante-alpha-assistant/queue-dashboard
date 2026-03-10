@@ -695,10 +695,18 @@ export default function NewTaskChat({ isMobile }) {
     const cursor = e.target.selectionStart;
     // Look backwards from cursor to find an unmatched @
     const textBeforeCursor = val.slice(0, cursor);
-    const lastAt = textBeforeCursor.lastIndexOf("@");
+    // Find last @ that isn't part of a resolved mention (@[Task Title])
+    let lastAt = -1;
+    for (let i = textBeforeCursor.length - 1; i >= 0; i--) {
+      if (textBeforeCursor[i] === "@") {
+        // Skip if followed by [ (resolved mention)
+        if (textBeforeCursor[i + 1] === "[") continue;
+        lastAt = i;
+        break;
+      }
+    }
 
     if (lastAt >= 0) {
-      // Check there's no space before @ (or it's at start) — and text after @ has no newline
       const charBefore = lastAt > 0 ? textBeforeCursor[lastAt - 1] : " ";
       const textAfterAt = textBeforeCursor.slice(lastAt + 1);
       if ((charBefore === " " || charBefore === "\n" || lastAt === 0) && !textAfterAt.includes("\n")) {
