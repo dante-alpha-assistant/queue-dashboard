@@ -73,16 +73,17 @@ export default function App() {
   const handleSseStatusChange = useCallback((data) => { if (data.taskId && data.status) applyStatusChange(data.taskId, data.status); }, [applyStatusChange]);
   const { progress: taskProgress, monitor: taskMonitor, connected: sseConnected } = useTaskEvents({ onStatusChange: handleSseStatusChange });
 
-  // Resolve deep link once tasks are loaded
+  // Resolve deep link once tasks are loaded (only when no task is selected yet)
   useEffect(() => {
     if (!deepLinkId || loading) return;
-    const allLoaded = [...todo, ...assigned, ...inProgress, ...blocked, ...qa, ...completed, ...deploying, ...deployed, ...deployFailed, ...failed];
-    const found = allLoaded.find(t => t.id === deepLinkId);
-    if (found) {
-      setSelectedTask(found);
-    } else {
-      setSelectedTask({ _notFound: true, id: deepLinkId });
-    }
+    // Don't overwrite if we already have this task selected (prevents infinite loop
+    // when realtime updates cause task arrays to change and strip _full flag)
+    setSelectedTask(prev => {
+      if (prev && prev.id === deepLinkId) return prev;
+      const allLoaded = [...todo, ...assigned, ...inProgress, ...blocked, ...qa, ...completed, ...deploying, ...deployed, ...deployFailed, ...failed];
+      const found = allLoaded.find(t => t.id === deepLinkId);
+      return found || { _notFound: true, id: deepLinkId };
+    });
   }, [deepLinkId, loading, todo, assigned, inProgress, blocked, qa, completed, deploying, deployed, deployFailed, failed]);
 
   // Fetch full task data when selected (list uses light columns without description/result/qa_result)
