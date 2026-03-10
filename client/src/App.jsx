@@ -47,7 +47,7 @@ export default function App() {
   // Fetch all tasks (no server-side time filter) — time filtering is done client-side
   // to ensure count badges always match visible cards
   const {
-    stats, todo, assigned, inProgress, qa, completed, deployed, blocked, failed, deploying, deployFailed,
+    stats, tasks, todo, assigned, inProgress, qa, completed, deployed, blocked, failed, deploying, deployFailed,
     loading, transitioning, updateTask, applyStatusChange,
     projects, selectedProject, setSelectedProject,
   } = useQueue();
