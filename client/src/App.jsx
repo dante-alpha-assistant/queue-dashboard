@@ -580,5 +580,6 @@ export default function App() {
         </div>
       )}
     </div>
+      {showBatchDeploy && <BatchDeployModal tasks={completed} onDeploy={() => { setShowBatchDeploy(false); }} onClose={() => setShowBatchDeploy(false)} />}
   );
 }
