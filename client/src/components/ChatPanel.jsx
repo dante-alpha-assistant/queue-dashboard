@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { MessageSquare } from 'lucide-react';
+import TaskMentionText, { parseTaskMentions } from "./TaskMentionPill";
 
 function timeAgo(iso) {
   if (!iso) return "";
@@ -183,11 +184,17 @@ export default function ChatPanel({ isMobile, open: controlledOpen, onClose }) {
               }}
               className={isUser ? "" : "chat-markdown"}
               >
-                {isUser ? cleaned : (
+                {isUser ? <TaskMentionText text={cleaned} /> : (
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     rehypePlugins={[rehypeHighlight]}
                     components={{
+                      text: ({ children }) => {
+                        if (typeof children === "string" && children.includes("@[")) {
+                          return <>{parseTaskMentions(children)}</>;
+                        }
+                        return children;
+                      },
                       a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" style={{ color: "var(--md-primary)", textDecoration: "none" }} />,
                       p: ({ node, ...props }) => <p {...props} style={{ margin: "0 0 8px 0", fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }} />,
                       h1: ({ node, ...props }) => <h1 {...props} style={{ fontSize: 20, fontWeight: 600, margin: "12px 0 6px 0", fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }} />,
