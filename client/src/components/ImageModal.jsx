@@ -1,7 +1,11 @@
 import { useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 
 /**
  * Full-size image modal overlay.
+ * Uses a React portal to render at document.body level so parent
+ * overflow/transform styles cannot clip or misposition the modal.
+ *
  * Props:
  *  - src: image URL to display
  *  - onClose: callback to close the modal
@@ -13,12 +17,18 @@ export default function ImageModal({ src, onClose }) {
 
   useEffect(() => {
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    // Prevent background scrolling while modal is open
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = prev;
+    };
   }, [handleKeyDown]);
 
   if (!src) return null;
 
-  return (
+  return createPortal(
     <div
       onClick={onClose}
       style={{
@@ -71,6 +81,7 @@ export default function ImageModal({ src, onClose }) {
           boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
         }}
       />
-    </div>
+    </div>,
+    document.body
   );
 }
