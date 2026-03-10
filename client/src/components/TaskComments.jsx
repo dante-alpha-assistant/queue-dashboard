@@ -1,11 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { AlertTriangle, Bot, Brain, Clock, Glasses, Hammer, MessageSquare, Settings, User, Waves, Wrench, Zap } from 'lucide-react';
+import AgentMentionDropdown from './AgentMentionDropdown';
 
 const AUTHOR_ICONS = {
   dante: "👤", neo: "👓", mu: "🔧", beta: "⚡", alpha: "🧠", flow: "🌊", ifra: "🔨",
-  'neo-worker': "👓", 'beta-worker': "⚡", 'ifra-worker': "🔨", system: "⚙️",
+  'neo-worker': "👓", 'beta-worker': "⚡", 'ifra-worker': "🔨",
+  'research-worker': "🔬", 'neo-chat-worker': "💬", system: "⚙️",
 };
 const AUTHOR_TYPE_COLORS = {
   human: '#6750A4',
@@ -24,6 +26,11 @@ function formatTime(iso) {
   return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+// Render @agent-name mentions as styled badges
+function renderBodyWithMentions(text) {
+  return text.replace(/@\[([^\]]+)\]/g, '**@$1**');
+}
+
 export default function TaskComments({ taskId }) {
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,6 +38,11 @@ export default function TaskComments({ taskId }) {
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState(null);
   const textareaRef = useRef(null);
+
+  // Agent mention state
+  const [mentionQuery, setMentionQuery] = useState(null); // null = closed
+  const [mentionStart, setMentionStart] = useState(null); // cursor pos of @
+  const [mentionedAgents, setMentionedAgents] = useState([]); // resolved agents
 
   const fetchComments = async () => {
     try {
@@ -57,28 +69,86 @@ export default function TaskComments({ taskId }) {
     setError(null);
     setComments([]);
     fetchComments();
-    // Poll every 10s for new comments
     const interval = setInterval(fetchComments, 10000);
     return () => clearInterval(interval);
   }, [taskId]);
 
-  // No auto-scroll needed — newest comments are already at the top
+  // Detect @mention in textarea
+  const handleInputChange = useCallback((e) => {
+    const val = e.target.value;
+    setBody(val);
+
+    const cursorPos = e.target.selectionStart;
+    const textBeforeCursor = val.slice(0, cursorPos);
+
+    // Look backwards for an unmatched @ that isn't part of a resolved mention @[name]
+    for (let i = textBeforeCursor.length - 1; i >= 0; i--) {
+      const ch = textBeforeCursor[i];
+      if (ch === ' ' || ch === '\n') break;
+      if (ch === '@') {
+        // Skip if followed by [ (already resolved)
+        if (textBeforeCursor[i + 1] === '[') break;
+        const query = textBeforeCursor.slice(i + 1);
+        setMentionQuery(query);
+        setMentionStart(i);
+        return;
+      }
+    }
+    setMentionQuery(null);
+    setMentionStart(null);
+  }, []);
+
+  const handleAgentSelect = useCallback((agent) => {
+    const before = body.slice(0, mentionStart);
+    const afterCursor = body.slice(textareaRef.current?.selectionStart || (mentionStart + (mentionQuery?.length || 0) + 1));
+    const mentionText = `@[${agent.id}] `;
+    const newBody = before + mentionText + afterCursor;
+    setBody(newBody);
+    setMentionQuery(null);
+    setMentionStart(null);
+
+    // Track mentioned agent
+    setMentionedAgents(prev => {
+      if (prev.find(a => a.id === agent.id)) return prev;
+      return [...prev, agent];
+    });
+
+    // Refocus
+    setTimeout(() => {
+      if (textareaRef.current) {
+        const pos = before.length + mentionText.length;
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(pos, pos);
+      }
+    }, 0);
+  }, [body, mentionStart, mentionQuery]);
 
   const handleSubmit = async (e) => {
     e?.preventDefault();
     if (!body.trim() || posting) return;
     setPosting(true);
     setError(null);
+
+    // Extract mentioned agent IDs from the body text
+    const mentionMatches = [...body.matchAll(/@\[([^\]]+)\]/g)];
+    const mentions = mentionMatches.map(m => m[1]);
+
     try {
       const resp = await fetch(`/api/tasks/${taskId}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body: body.trim(), author: 'dante', author_type: 'human' }),
+        body: JSON.stringify({
+          body: body.trim(),
+          author: 'dante',
+          author_type: 'human',
+          mentions: mentions.length > 0 ? mentions : undefined,
+        }),
       });
       if (!resp.ok) throw new Error('Failed to post comment');
       const newComment = await resp.json();
       setComments(prev => [newComment, ...prev]);
       setBody('');
+      setMentionedAgents([]);
       textareaRef.current?.focus();
     } catch (e) {
       setError(e.message);
@@ -88,6 +158,8 @@ export default function TaskComments({ taskId }) {
   };
 
   const handleKeyDown = (e) => {
+    // Don't send on Enter if mention dropdown is open
+    if (mentionQuery !== null && (e.key === 'Enter' || e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Tab')) return;
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       handleSubmit();
     }
@@ -107,7 +179,7 @@ export default function TaskComments({ taskId }) {
         )}
         {!loading && comments.length === 0 && (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--md-outline, #79747E)', fontSize: 13, fontStyle: 'italic' }}>
-            No comments yet. Add a comment to communicate with agents.
+            No comments yet. Type @ to mention an agent.
           </div>
         )}
         {comments.map(c => {
@@ -128,6 +200,11 @@ export default function TaskComments({ taskId }) {
                     fontSize: 9, fontWeight: 500, color: typeColor, opacity: 0.7,
                     textTransform: 'uppercase', letterSpacing: '0.04em',
                   }}>{c.author_type}</span>
+                  {c.mentions && c.mentions.length > 0 && (
+                    <span style={{ fontSize: 9, color: '#2E7D32', fontWeight: 500 }}>
+                      → {c.mentions.join(', ')}
+                    </span>
+                  )}
                   <span style={{ fontSize: 10, color: 'var(--md-outline, #79747E)', marginLeft: 'auto', fontFamily: "'Roboto Mono', monospace" }}>
                     {formatTime(c.created_at)}
                   </span>
@@ -142,23 +219,28 @@ export default function TaskComments({ taskId }) {
                       a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
                       p: ({ node, ...props }) => <p {...props} style={{ margin: '4px 0' }} />,
                     }}
-                  >{c.body}</ReactMarkdown>
+                  >{renderBodyWithMentions(c.body)}</ReactMarkdown>
                 </div>
               </div>
             </div>
           );
         })}
-
       </div>
 
-      {/* Input */}
-      <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+      {/* Input with @mention dropdown */}
+      <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', position: 'relative' }}>
+        <AgentMentionDropdown
+          query={mentionQuery}
+          onSelect={handleAgentSelect}
+          onClose={() => { setMentionQuery(null); setMentionStart(null); }}
+          inputRef={textareaRef}
+        />
         <textarea
           ref={textareaRef}
           value={body}
-          onChange={e => setBody(e.target.value)}
+          onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          placeholder="Add a comment… (Ctrl+Enter to send)"
+          placeholder="Add a comment… @ to mention an agent (Ctrl+Enter to send)"
           rows={2}
           style={{
             flex: 1, padding: '8px 12px', borderRadius: 10,
@@ -187,6 +269,20 @@ export default function TaskComments({ taskId }) {
           {posting ? <Clock size={14} /> : <MessageSquare size={14} />} Send
         </button>
       </form>
+      {/* Mention badges */}
+      {mentionedAgents.length > 0 && (
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: -4 }}>
+          {mentionedAgents.map(a => (
+            <span key={a.id} style={{
+              fontSize: 10, padding: '2px 8px', borderRadius: 12,
+              background: 'rgba(46, 125, 50, 0.1)', color: '#2E7D32',
+              fontWeight: 500,
+            }}>
+              🤖 {a.id}
+            </span>
+          ))}
+        </div>
+      )}
       {error && (
         <div style={{ fontSize: 12, color: '#BA1A1A', display: 'flex', alignItems: 'center', gap: 6 }}>
           <AlertTriangle size={14} /> {error}
