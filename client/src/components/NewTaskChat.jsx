@@ -193,95 +193,104 @@ function HeaderIconBtn({ icon, title, onClick, active, badge }) {
   );
 }
 
-/* History dropdown */
-function HistoryDropdown({ conversations, activeConvoId, onSelect, onDelete, onClose, onViewAll }) {
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        onClose();
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [onClose]);
-
+/* Inline history view — replaces message container */
+function HistoryView({ conversations, activeConvoId, onSelect, onDelete, onClose }) {
   return (
-    <div ref={dropdownRef} style={{
-      position: "absolute", top: "100%", right: 0, marginTop: 4,
-      width: 280, maxHeight: 380,
-      background: "var(--md-surface, #fff)",
-      border: "1px solid var(--md-surface-variant)",
-      borderRadius: 12, overflow: "hidden",
-      boxShadow: "0 8px 32px rgba(0,0,0,0.16)",
-      zIndex: 100,
-      display: "flex", flexDirection: "column",
-    }}>
+    <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
+      {/* History header bar */}
       <div style={{
-        padding: "10px 14px", borderBottom: "1px solid var(--md-surface-variant)",
-        fontSize: 12, fontWeight: 600, color: "var(--md-on-surface)",
+        padding: "12px 16px", display: "flex", alignItems: "center", gap: 10,
+        borderBottom: "1px solid var(--md-surface-variant)",
+        position: "sticky", top: 0, background: "var(--md-background)", zIndex: 2,
       }}>
-        Recent Conversations
+        <button onClick={onClose} title="Back to chat" style={{
+          background: "none", border: "none", cursor: "pointer", padding: "4px 8px",
+          borderRadius: 8, color: "var(--md-on-surface-variant)", fontSize: 16,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          transition: "background 150ms",
+        }}
+          onMouseEnter={e => e.currentTarget.style.background = "var(--md-surface-container)"}
+          onMouseLeave={e => e.currentTarget.style.background = "none"}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+        </button>
+        <span style={{ fontWeight: 600, fontSize: 14, color: "var(--md-on-surface)" }}>
+          Conversations
+        </span>
+        <span style={{ fontSize: 12, color: "var(--md-on-surface-variant)", marginLeft: "auto" }}>
+          {conversations.length} total
+        </span>
       </div>
+
+      {/* Conversation list */}
       <div style={{ flex: 1, overflow: "auto" }}>
         {conversations.length === 0 && (
-          <div style={{ padding: 20, textAlign: "center", fontSize: 12, color: "var(--md-on-surface-variant)" }}>
-            No conversations yet
+          <div style={{ padding: 40, textAlign: "center", color: "var(--md-on-surface-variant)" }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>💬</div>
+            <div style={{ fontSize: 13 }}>No conversations yet</div>
+            <div style={{ fontSize: 11, marginTop: 4, opacity: 0.7 }}>Start a new chat to get going</div>
           </div>
         )}
-        {conversations.slice(0, 10).map(c => (
-          <div
-            key={c.id}
-            onClick={() => { onSelect(c.id); onClose(); }}
-            className="history-item"
-            style={{
-              padding: "10px 14px", cursor: "pointer",
-              borderBottom: "1px solid rgba(0,0,0,0.04)",
-              background: c.id === activeConvoId ? "rgba(103, 80, 164, 0.08)" : "transparent",
-              display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8,
-              transition: "background 100ms",
-            }}
-            onMouseEnter={e => { if (c.id !== activeConvoId) e.currentTarget.style.background = "rgba(0,0,0,0.03)"; }}
-            onMouseLeave={e => { if (c.id !== activeConvoId) e.currentTarget.style.background = c.id === activeConvoId ? "rgba(103, 80, 164, 0.08)" : "transparent"; }}
-          >
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{
-                fontSize: 12, fontWeight: c.id === activeConvoId ? 600 : 400,
-                color: "var(--md-on-surface)", overflow: "hidden",
-                textOverflow: "ellipsis", whiteSpace: "nowrap",
-              }}>{c.title || "New conversation"}</div>
-              <div style={{ fontSize: 10, color: "var(--md-on-surface-variant)", marginTop: 2 }}>
-                {timeAgo(c.updated_at)}
-              </div>
-            </div>
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete(c.id, e); }}
-              title="Delete"
-              className="history-delete-btn"
+        {conversations.map(c => {
+          const isActive = c.id === activeConvoId;
+          const preview = c.title || c.first_message || "New conversation";
+          const msgCount = c.message_count || 0;
+          return (
+            <div
+              key={c.id}
+              onClick={() => onSelect(c.id)}
+              className="history-item"
               style={{
-                background: "none", border: "none", fontSize: 12, cursor: "pointer",
-                color: "var(--md-on-surface-variant)", padding: "4px 6px", borderRadius: 6,
-                opacity: 0, transition: "opacity 150ms, background 150ms",
-                flexShrink: 0,
+                padding: "14px 16px", cursor: "pointer",
+                borderBottom: "1px solid rgba(0,0,0,0.04)",
+                background: isActive ? "rgba(103, 80, 164, 0.08)" : "transparent",
+                display: "flex", alignItems: "center", gap: 12,
+                transition: "background 150ms",
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = "rgba(179,38,30,0.08)"; e.currentTarget.style.color = "var(--md-error, #B3261E)"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "var(--md-on-surface-variant)"; }}
-            >🗑</button>
-          </div>
-        ))}
+              onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "rgba(0,0,0,0.03)"; }}
+              onMouseLeave={e => e.currentTarget.style.background = isActive ? "rgba(103, 80, 164, 0.08)" : "transparent"}
+            >
+              <div style={{
+                width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+                background: isActive ? "linear-gradient(135deg, #6750A4, #7B68EE)" : "var(--md-surface-container)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: isActive ? "#fff" : "var(--md-on-surface-variant)", fontSize: 14,
+              }}>
+                <MessageSquare size={16} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontSize: 13, fontWeight: isActive ? 600 : 500,
+                  color: "var(--md-on-surface)", overflow: "hidden",
+                  textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>{preview}</div>
+                <div style={{
+                  fontSize: 11, color: "var(--md-on-surface-variant)", marginTop: 3,
+                  display: "flex", alignItems: "center", gap: 8,
+                }}>
+                  <span>{timeAgo(c.updated_at)}</span>
+                  {msgCount > 0 && <span>· {msgCount} message{msgCount !== 1 ? "s" : ""}</span>}
+                </div>
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); onDelete(c.id, e); }}
+                title="Delete"
+                className="history-delete-btn"
+                style={{
+                  background: "none", border: "none", fontSize: 14, cursor: "pointer",
+                  color: "var(--md-on-surface-variant)", padding: "6px 8px", borderRadius: 8,
+                  opacity: 0, transition: "opacity 150ms, background 150ms",
+                  flexShrink: 0,
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(179,38,30,0.08)"; e.currentTarget.style.color = "var(--md-error, #B3261E)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "var(--md-on-surface-variant)"; }}
+              >🗑</button>
+            </div>
+          );
+        })}
       </div>
-      {conversations.length > 10 && (
-        <div style={{
-          padding: "8px 14px", borderTop: "1px solid var(--md-surface-variant)",
-          textAlign: "center",
-        }}>
-          <button onClick={onViewAll} style={{
-            background: "none", border: "none", color: "var(--md-primary, #6750A4)",
-            fontSize: 12, fontWeight: 500, cursor: "pointer",
-          }}>View all ({conversations.length})</button>
-        </div>
-      )}
     </div>
   );
 }
@@ -823,25 +832,13 @@ export default function NewTaskChat({ isMobile }) {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
           <HeaderIconBtn icon={ChatIcons.newChat} title="New chat" onClick={newConversation} />
-          <div style={{ position: "relative" }}>
-            <HeaderIconBtn
-              icon={ChatIcons.history}
-              title="History"
-              onClick={() => setHistoryOpen(prev => !prev)}
-              active={historyOpen}
-              badge={conversations.length}
-            />
-            {historyOpen && (
-              <HistoryDropdown
-                conversations={conversations}
-                activeConvoId={activeConvoId}
-                onSelect={(id) => setActiveConvoId(id)}
-                onDelete={deleteConversation}
-                onClose={() => setHistoryOpen(false)}
-                onViewAll={() => setHistoryOpen(false)}
-              />
-            )}
-          </div>
+          <HeaderIconBtn
+            icon={ChatIcons.history}
+            title="History"
+            onClick={() => setHistoryOpen(prev => !prev)}
+            active={historyOpen}
+            badge={conversations.length}
+          />
           <HeaderIconBtn icon={ChatIcons.clear} title="Clear conversation" onClick={clearConversation} />
           <div style={{ width: 1, height: 18, background: "var(--md-surface-variant)", margin: "0 4px" }} />
           {!isMobile && (
@@ -855,8 +852,19 @@ export default function NewTaskChat({ isMobile }) {
         </div>
       </div>
 
+      {/* History view (inline, replaces messages) */}
+      {historyOpen && (
+        <HistoryView
+          conversations={conversations}
+          activeConvoId={activeConvoId}
+          onSelect={(id) => { setActiveConvoId(id); setHistoryOpen(false); }}
+          onDelete={deleteConversation}
+          onClose={() => setHistoryOpen(false)}
+        />
+      )}
+
       {/* Messages */}
-      <div style={{ flex: 1, overflow: "auto", padding: "12px 16px" }}>
+      {!historyOpen && <div style={{ flex: 1, overflow: "auto", padding: "12px 16px" }}>
         {loadingMessages && (
           <div style={{ textAlign: "center", padding: 20, color: "var(--md-on-surface-variant)", fontSize: 13 }}>Loading messages...</div>
         )}
@@ -948,8 +956,9 @@ export default function NewTaskChat({ isMobile }) {
           </div>
         )}
         <div ref={bottomRef} />
-      </div>
+      </div>}
 
+      {!historyOpen && <>
       {/* Error banner */}
       {error && (
         <div style={{
@@ -1055,6 +1064,7 @@ export default function NewTaskChat({ isMobile }) {
             transition: "background 150ms, box-shadow 150ms",
           }}>↑</button>
       </div>
+      </>}
     </div>
   );
 }
