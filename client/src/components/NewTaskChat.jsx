@@ -695,10 +695,23 @@ export default function NewTaskChat({ isMobile }) {
     const cursor = e.target.selectionStart;
     // Look backwards from cursor to find an unmatched @
     const textBeforeCursor = val.slice(0, cursor);
-    const lastAt = textBeforeCursor.lastIndexOf("@");
 
-    if (lastAt >= 0) {
-      // Check there's no space before @ (or it's at start) — and text after @ has no newline
+    // Walk backwards through all @ signs to find one that's a live (unresolved) mention trigger
+    let searchFrom = textBeforeCursor.length;
+    while (searchFrom > 0) {
+      const lastAt = textBeforeCursor.lastIndexOf("@", searchFrom - 1);
+      if (lastAt < 0) break;
+
+      // Skip @[...] patterns — these are already-resolved mention references
+      if (val[lastAt + 1] === "[") {
+        const closingBracket = val.indexOf("]", lastAt + 2);
+        if (closingBracket >= 0 && closingBracket < cursor) {
+          // Cursor is past the closing bracket — this mention is fully resolved, skip it
+          searchFrom = lastAt;
+          continue;
+        }
+      }
+
       const charBefore = lastAt > 0 ? textBeforeCursor[lastAt - 1] : " ";
       const textAfterAt = textBeforeCursor.slice(lastAt + 1);
       if ((charBefore === " " || charBefore === "\n" || lastAt === 0) && !textAfterAt.includes("\n")) {
@@ -706,7 +719,10 @@ export default function NewTaskChat({ isMobile }) {
         setMentionStart(lastAt);
         return;
       }
+      // This @ didn't qualify, keep looking further back
+      searchFrom = lastAt;
     }
+
     setMentionQuery(null);
     setMentionStart(null);
   }, []);
