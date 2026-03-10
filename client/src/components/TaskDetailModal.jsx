@@ -907,6 +907,19 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   }, [deploySuccess]);
 
   // Sync deploying overlay with Realtime status updates
+  const deployPollRef = useRef(null);
+  const deployTimeoutRef = useRef(null);
+
+  const stopDeployPolling = useCallback(() => {
+    clearInterval(deployPollRef.current);
+    clearTimeout(deployTimeoutRef.current);
+    deployPollRef.current = null;
+    deployTimeoutRef.current = null;
+  }, []);
+
+  // Cleanup deploy polling on unmount
+  useEffect(() => () => stopDeployPolling(), [stopDeployPolling]);
+
   useEffect(() => {
     if (task.status === 'deploying') {
       setDeploying(true);
@@ -954,18 +967,6 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
 
   const [deployConfirm, setDeployConfirm] = useState(false);
   const deployConfirmTimer = useRef(null);
-  const deployPollRef = useRef(null);
-  const deployTimeoutRef = useRef(null);
-
-  const stopDeployPolling = useCallback(() => {
-    clearInterval(deployPollRef.current);
-    clearTimeout(deployTimeoutRef.current);
-    deployPollRef.current = null;
-    deployTimeoutRef.current = null;
-  }, []);
-
-  // Cleanup deploy polling on unmount
-  useEffect(() => () => stopDeployPolling(), [stopDeployPolling]);
 
   const handleDeploy = async () => {
     if (!deployConfirm) {
