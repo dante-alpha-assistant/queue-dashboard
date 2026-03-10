@@ -175,7 +175,7 @@ export default function App() {
     );
   }
 
-  const allTasksRaw = [...todo, ...assigned, ...inProgress, ...blocked, ...qa, ...completed, ...deploying, ...deployed, ...deployFailed, ...failed];
+  const allTasksRaw = tasks;
   const allTasks = filterTasksByTime(allTasksRaw, timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
 
   // Compute time-period counts from actual fetched tasks (ensures badge matches visible cards)
@@ -196,7 +196,7 @@ export default function App() {
       all: base.length,
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todo, assigned, inProgress, blocked, qa, completed, deploying, deployed, deployFailed, failed, typeFilter, stageFilter, searchQuery]);
+  }, [tasks, typeFilter, stageFilter, searchQuery]);
   const activeTypes = ["all", ...new Set(allTasks.map(t => t.type).filter(Boolean))];
   const activeStages = ["all", ...new Set(allTasks.map(t => t.stage).filter(Boolean))];
   const filterTasks = (tasks) => {
