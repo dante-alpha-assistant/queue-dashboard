@@ -734,7 +734,7 @@ const AGENT_TOKENS = {
 // Send webhook to mentioned agents with full task context
 // Uses the standard OpenClaw /hooks/agent format: { message, name, sessionKey, wakeMode }
 async function notifyMentionedAgents(taskId, comment, mentions) {
-  // Fetch full task
+  // Fetch full task (all columns — same context as TaskDetailModal)
   const { data: task } = await supabase
     .from("agent_tasks")
     .select("*")
@@ -745,9 +745,17 @@ async function notifyMentionedAgents(taskId, comment, mentions) {
   // Fetch all comments for context
   const { data: allComments } = await supabase
     .from("task_comments")
-    .select("author, author_type, body, created_at")
+    .select("author, author_type, body, created_at, reply_to, mentions")
     .eq("task_id", taskId)
     .order("created_at", { ascending: true })
+    .limit(50);
+
+  // Fetch activity log for full context
+  const { data: activityLog } = await supabase
+    .from("task_activity_log")
+    .select("field, old_value, new_value, changed_by, changed_at")
+    .eq("task_id", taskId)
+    .order("changed_at", { ascending: true })
     .limit(50);
 
   // Fetch agent cards for endpoint URLs
@@ -762,42 +770,84 @@ async function notifyMentionedAgents(taskId, comment, mentions) {
   // Build comment thread text
   const commentThread = (allComments || []).map(c => {
     const time = new Date(c.created_at).toISOString().replace("T", " ").slice(0, 16);
-    return `**${c.author}** (${c.author_type}) — ${time}:\n> ${c.body.replace(/\n/g, "\n> ")}`;
+    const replyTag = c.reply_to ? ` (reply)` : '';
+    const mentionTag = c.mentions?.length ? ` → ${c.mentions.join(', ')}` : '';
+    return `**${c.author}** (${c.author_type}${replyTag}${mentionTag}) — ${time}:\n> ${c.body.replace(/\n/g, "\n> ")}`;
   }).join("\n\n");
 
-  // Build the readable message for the agent (standard OpenClaw webhook format)
+  // Build activity log text
+  const activityText = (activityLog || []).map(a => {
+    const time = new Date(a.changed_at).toISOString().replace("T", " ").slice(0, 16);
+    return `- ${time} | **${a.field}**: \`${a.old_value || '—'}\` → \`${a.new_value || '—'}\` (by ${a.changed_by || 'system'})`;
+  }).join("\n");
+
+  // Build the readable message for the agent — FULL task context matching TaskDetailModal
   const prUrls = Array.isArray(task.pull_request_url) ? task.pull_request_url.join(", ") : (task.pull_request_url || "none");
-  const message = `## 💬 Task Comment — @mention from ${comment.author}
+  const sections = [];
+
+  sections.push(`## 💬 Task Comment — @mention from ${comment.author}
 
 **Task:** ${task.title}
 **Status:** ${task.status} | **Type:** ${task.type} | **Priority:** ${task.priority}
 **Task ID:** ${taskId}
-**PR:** ${prUrls}
-**Task URL:** ${DASHBOARD_URL}/task/${taskId}
+**Assigned Agent:** ${task.assigned_agent || "unassigned"}
+**Stage:** ${task.stage || "none"}
+**PR:** ${prUrls}${task.repository_url ? `\n**Repository:** ${task.repository_url}` : ""}${task.deployment_url ? `\n**Deployment:** ${task.deployment_url}` : ""}
+**Task URL:** ${DASHBOARD_URL}/task/${taskId}`);
 
----
+  sections.push(`---
 
 ### Comment from ${comment.author}:
-${comment.body}
+${comment.body}`);
 
----
+  sections.push(`---
 
 ### Full Comment Thread:
-${commentThread}
+${commentThread || "(no previous comments)"}`);
 
----
+  sections.push(`---
 
 ### Task Description:
-${task.description || "(no description)"}
+${task.description || "(no description)"}`);
 
-${task.result ? `### Previous Result:\n${typeof task.result === "object" ? JSON.stringify(task.result, null, 2) : task.result}\n` : ""}
-${task.qa_result ? `### QA Result:\n${typeof task.qa_result === "object" ? JSON.stringify(task.qa_result, null, 2) : task.qa_result}\n` : ""}
----
+  if (task.acceptance_criteria) {
+    sections.push(`### Acceptance Criteria:
+${task.acceptance_criteria}`);
+  }
+
+  if (task.result) {
+    sections.push(`### Previous Result:
+${typeof task.result === "object" ? JSON.stringify(task.result, null, 2) : task.result}`);
+  }
+
+  if (task.qa_result) {
+    sections.push(`### QA Result:
+${typeof task.qa_result === "object" ? JSON.stringify(task.qa_result, null, 2) : task.qa_result}`);
+  }
+
+  if (task.error) {
+    sections.push(`### Error:
+${task.error}`);
+  }
+
+  if (task.blocked_reason) {
+    sections.push(`### Blocked Reason:
+${task.blocked_reason}`);
+  }
+
+  if (activityText) {
+    sections.push(`### Activity Log:
+${activityText}`);
+  }
+
+  sections.push(`---
 
 **Reply callback:** To reply, POST to: \`${callbackUrl}\`
 \`\`\`json
 { "body": "your reply text", "author": "${mentions[0]}", "comment_id": "${comment.id}" }
-\`\`\``;
+\`\`\``);
+
+  const message = sections.join("\n\n");
 
   for (const agent of (agents || [])) {
     if (!agent.endpoint_url || agent.status === "disabled") continue;
