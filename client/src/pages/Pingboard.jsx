@@ -567,11 +567,11 @@ function PipelineView() {
   const { pipeline_state, current_by_stage, stage_durations, agent_summary, bottlenecks, agents } = data;
 
   const stages = [
-    { key: "todo", label: "Backlog", emoji: ClipboardList, color: "#79747E" },
-    { key: "in_progress", label: "Coding", emoji: Wrench, color: "#2E7D32" },
-    { key: "qa_testing", label: "QA Review", emoji: FlaskConical, color: "#E65100" },
-    { key: "completed", label: "Completed", emoji: CheckCircle2, color: "#1565C0" },
-    { key: "deployed", label: "Deployed", emoji: Rocket, color: "#6A1B9A" },
+    { key: "todo", label: "Backlog", emoji: "📋", color: "#79747E" },
+    { key: "in_progress", label: "Coding", emoji: "🔧", color: "#2E7D32" },
+    { key: "qa_testing", label: "QA Review", emoji: "🧪", color: "#E65100" },
+    { key: "completed", label: "Completed", emoji: "✅", color: "#1565C0" },
+    { key: "deployed", label: "Deployed", emoji: "🚀", color: "#6A1B9A" },
   ];
 
   const qaAgents = (agents || []).filter(a => (a.capabilities || []).includes("qa"));
