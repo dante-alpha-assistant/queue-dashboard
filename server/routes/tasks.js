@@ -406,6 +406,15 @@ router.post("/deploy/batch", async (req, res) => {
     if (fetchErr) return res.status(500).json({ error: fetchErr.message });
     if (!tasks || tasks.length === 0) return res.status(404).json({ error: "No tasks found" });
 
+    // Check for tasks already deploying (duplicate guard)
+    const alreadyDeploying = tasks.filter(t => t.status === "deploying");
+    if (alreadyDeploying.length > 0) {
+      return res.status(409).json({
+        error: "Some tasks are already deploying",
+        deploying: alreadyDeploying.map(t => ({ id: t.id, title: t.title })),
+      });
+    }
+
     // Only deploy completed tasks that have PRs
     const deployable = tasks.filter(t => t.status === "completed" && getPrUrl(t));
     const skipped = tasks.filter(t => t.status !== "completed" || !getPrUrl(t));
