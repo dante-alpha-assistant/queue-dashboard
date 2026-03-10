@@ -158,9 +158,10 @@ export default function TaskComments({ taskId }) {
   };
 
   const handleKeyDown = (e) => {
-    // Don't send on Enter if mention dropdown is open
+    // Don't intercept keys if mention dropdown is open
     if (mentionQuery !== null && (e.key === 'Enter' || e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Tab')) return;
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
       handleSubmit();
     }
   };
@@ -240,7 +241,7 @@ export default function TaskComments({ taskId }) {
           value={body}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          placeholder="Add a comment… @ to mention an agent (Ctrl+Enter to send)"
+          placeholder="Add a comment… @ to mention an agent (Shift+Enter for newline)"
           rows={2}
           style={{
             flex: 1, padding: '8px 12px', borderRadius: 10,
