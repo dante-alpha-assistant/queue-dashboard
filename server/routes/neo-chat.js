@@ -13,6 +13,9 @@ The user is describing work they need done. Your job is to:
 2. Ask clarifying questions if the request is vague
 3. When you have enough info, create a task using the create_task function
 
+You have vision capabilities — users can share screenshots and images with you.
+When a user shares a screenshot, analyze what's shown (task cards, error messages, UI issues, etc.) and respond with context-aware analysis. Reference specific details you see in the image.
+
 Be conversational, helpful, and concise. You're talking to Dante or a team member.
 If the user just wants to chat, that's fine too — you're a full agent.`;
 
@@ -158,29 +161,29 @@ neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
         .eq("id", conversationId);
     }
 
-    // Get conversation history for context
+    // Get conversation history for context (include metadata for image reconstruction)
     const { data: history } = await supabase
       .from("chat_messages")
-      .select("role, content")
+      .select("role, content, metadata")
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true });
 
-    // Build messages for gateway
+    // Build messages for gateway, reconstructing multipart content for messages with images
     const fullMessages = [
       { role: "system", content: SYSTEM_PROMPT },
-      ...(history || []).map(m => ({ role: m.role, content: m.content })),
+      ...(history || []).map(m => {
+        // Reconstruct multipart content if this message had images stored in metadata
+        if (m.role === "user" && m.metadata?.images?.length) {
+          const parts = [];
+          if (m.content) parts.push({ type: "text", text: m.content });
+          for (const imgUrl of m.metadata.images) {
+            parts.push({ type: "image_url", image_url: { url: imgUrl } });
+          }
+          return { role: m.role, content: parts };
+        }
+        return { role: m.role, content: m.content };
+      }),
     ];
-
-    // Add images to last message if present
-    if (images && images.length && fullMessages.length > 1) {
-      const last = fullMessages[fullMessages.length - 1];
-      const parts = [];
-      if (last.content) parts.push({ type: "text", text: last.content });
-      for (const img of images) {
-        parts.push({ type: "image_url", image_url: { url: img } });
-      }
-      fullMessages[fullMessages.length - 1] = { role: last.role, content: parts };
-    }
 
     // Helper to call Neo gateway
     async function callNeo(msgs, stream = true) {
