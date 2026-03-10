@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 
 const PRESETS = [
   { key: "today", label: "Today" },
@@ -66,32 +66,14 @@ function save(state) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch {}
 }
 
-export default function TimeFilter({ value, onChange, isMobile, projectId }) {
+export default function TimeFilter({ value, onChange, isMobile, projectId, counts: countsProp }) {
   const [saved] = useState(loadSaved);
   const [range, setRange] = useState(value?.range || saved.range || "today");
   const [customFrom, setCustomFrom] = useState(value?.customFrom || saved.customFrom || "");
   const [customTo, setCustomTo] = useState(value?.customTo || saved.customTo || "");
   const [showCustom, setShowCustom] = useState(range === "custom");
-  const [counts, setCounts] = useState(null);
+  const counts = countsProp || null;
   const didMount = useRef(false);
-
-  const fetchCounts = useCallback(() => {
-    const params = new URLSearchParams();
-    if (projectId) params.set("project_id", projectId);
-    fetch(`/api/tasks/counts-by-period?${params}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data) setCounts(data); })
-      .catch(() => {});
-  }, [projectId]);
-
-  useEffect(() => {
-    fetchCounts();
-    const interval = setInterval(fetchCounts, 30000);
-    return () => clearInterval(interval);
-  }, [fetchCounts]);
-
-  // Re-fetch when filter changes (tasks may have been created)
-  useEffect(() => { fetchCounts(); }, [range, fetchCounts]);
 
   useEffect(() => {
     if (!didMount.current) {
