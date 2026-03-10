@@ -357,16 +357,25 @@ router.post("/deploy/batch/dry-run", async (req, res) => {
         continue;
       }
       try {
-        const ghRes = await fetch(`https://api.github.com/repos/${match[1]}/${match[2]}/pulls/${match[3]}`, {
-          headers: { Authorization: `token ${process.env.GH_TOKEN || process.env.GITHUB_TOKEN || ""}` },
-        });
-        const pr = await ghRes.json();
+        const ghUrl = `https://api.github.com/repos/${match[1]}/${match[2]}/pulls/${match[3]}`;
+        const ghHeaders = { Authorization: `token ${process.env.GH_TOKEN || process.env.GITHUB_TOKEN || ""}` };
+        let ghRes = await fetch(ghUrl, { headers: ghHeaders });
+        let pr = await ghRes.json();
+        // GitHub returns mergeable:null on first request — retry after 2s
+        if (pr.mergeable === null) {
+          await new Promise(r => setTimeout(r, 2000));
+          ghRes = await fetch(ghUrl, { headers: ghHeaders });
+          pr = await ghRes.json();
+        }
+        const mergeable = pr.mergeable === true;
+        let reason = null;
+        if (pr.state !== "open") reason = `PR is ${pr.state}`;
+        else if (pr.mergeable === false) reason = "has conflicts";
+        else if (pr.mergeable === null) reason = "mergeability unknown (try again)";
         results.push({
-          id: t.id, title: t.title,
-          mergeable: pr.mergeable === true,
-          state: pr.state,
-          mergeable_state: pr.mergeable_state,
-          reason: pr.mergeable === false ? "has conflicts" : pr.state !== "open" ? `PR is ${pr.state}` : null,
+          id: t.id, title: t.title, mergeable,
+          state: pr.state, mergeable_state: pr.mergeable_state,
+          pr_number: match[3], reason,
         });
       } catch (e) {
         results.push({ id: t.id, title: t.title, mergeable: false, reason: e.message });
