@@ -353,6 +353,7 @@ export default function NewTaskChat({ isMobile }) {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [pendingImages, setPendingImages] = useState([]);
+  const [uploading, setUploading] = useState(false);
   const [modalImage, setModalImage] = useState(null);
   useEffect(() => { window.__openImageModal = setModalImage; return () => { delete window.__openImageModal; }; }, []);
   const [dragging, setDragging] = useState(false);
@@ -472,6 +473,7 @@ export default function NewTaskChat({ isMobile }) {
   const addImages = useCallback(async (files) => {
     const newImages = [];
     const errors = [];
+    setUploading(true);
     for (const file of files) {
       if (!ACCEPTED_TYPES.includes(file.type)) {
         errors.push(`${file.name}: unsupported format (use PNG, JPG, GIF, or WebP)`);
@@ -504,6 +506,7 @@ export default function NewTaskChat({ isMobile }) {
         errors.push(`${file.name}: failed to read`);
       }
     }
+    setUploading(false);
     if (errors.length) setError(errors.join("; "));
     if (newImages.length) setPendingImages(prev => [...prev, ...newImages]);
   }, []);
@@ -819,7 +822,7 @@ export default function NewTaskChat({ isMobile }) {
         transition: "all 300ms cubic-bezier(0.4, 0, 0.2, 1)",
       };
 
-  const hasInput = input.trim() || pendingImages.length > 0;
+  const hasInput = (input.trim() || pendingImages.length > 0) && !uploading;
 
   return (
     <div style={containerStyle} onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} onDragOver={handleDragOver} onDrop={handleDrop}>
@@ -1013,6 +1016,12 @@ export default function NewTaskChat({ isMobile }) {
                 title="Remove image">✕</button>
             </div>
           ))}
+        </div>
+      )}
+
+      {uploading && (
+        <div style={{ padding: "4px 12px", fontSize: 12, color: "var(--md-on-surface-variant)", opacity: 0.7 }}>
+          ⏳ Uploading image...
         </div>
       )}
 

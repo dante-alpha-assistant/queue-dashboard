@@ -17,6 +17,53 @@ async function attachImagesToTask(taskId, imageUrls) {
         ext = contentType.split('/')[1] || 'png';
         buffer = Buffer.from(match[2], 'base64');
       } else if (imgUrl.startsWith('http')) {
+        // If already in our Supabase storage, just reference it (no re-upload)
+        const bucketBase = supabase.storage.from(ATTACHMENT_BUCKET).getPublicUrl('').data?.publicUrl?.replace(/\/$/, '');
+        if (bucketBase && imgUrl.startsWith(bucketBase)) {
+          const existingPath = imgUrl.replace(bucketBase + '/', '');
+          const urlFilename = existingPath.split('/').pop() || 'image.png';
+          const guessedType = urlFilename.endsWith('.png') ? 'image/png'
+            : urlFilename.endsWith('.jpg') || urlFilename.endsWith('.jpeg') ? 'image/jpeg'
+            : urlFilename.endsWith('.gif') ? 'image/gif'
+            : urlFilename.endsWith('.webp') ? 'image/webp' : 'image/png';
+          // Copy to task-specific path if not already under taskId
+          if (!existingPath.startsWith(taskId + '/')) {
+            const newPath = taskId + '/' + urlFilename;
+            const { error: copyErr } = await supabase.storage.from(ATTACHMENT_BUCKET).copy(existingPath, newPath);
+            if (!copyErr) {
+              const { data: newUrlData } = supabase.storage.from(ATTACHMENT_BUCKET).getPublicUrl(newPath);
+              attached.push({
+                url: newUrlData?.publicUrl,
+                filename: urlFilename,
+                type: guessedType,
+                storage_path: newPath,
+                uploaded_at: new Date().toISOString(),
+                source: 'chat',
+              });
+            } else {
+              // Copy failed, just reference original URL
+              attached.push({
+                url: imgUrl,
+                filename: urlFilename,
+                type: guessedType,
+                storage_path: existingPath,
+                uploaded_at: new Date().toISOString(),
+                source: 'chat',
+              });
+            }
+          } else {
+            attached.push({
+              url: imgUrl,
+              filename: urlFilename,
+              type: guessedType,
+              storage_path: existingPath,
+              uploaded_at: new Date().toISOString(),
+              source: 'chat',
+            });
+          }
+          continue;
+        }
+        // External URL: download and re-upload
         const resp = await fetch(imgUrl);
         if (!resp.ok) continue;
         contentType = resp.headers.get('content-type') || 'image/png';
