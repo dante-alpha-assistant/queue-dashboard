@@ -377,7 +377,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
         setDeploySuccess(task.status === 'deployed');
         if (task.status === 'deploy_failed') {
           setDeployError('Deploy failed');
-          setTimeout(() => setDeployError(null), 5000);
+          // Error persists until dismissed
         }
       }
     }
@@ -400,7 +400,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
       await onStatusChange?.(task.id, { status: "assigned", assigned_agent: agentId });
     } catch (e) {
       setAssignError(e.message || "Assignment failed");
-      setTimeout(() => setAssignError(null), 3000);
+      // Error persists until dismissed
     } finally {
       setAssigning(false);
     }
@@ -462,7 +462,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
               setDeploySuccess(st === 'deployed');
               if (st === 'deploy_failed') {
                 setDeployError('Deploy failed');
-                setTimeout(() => setDeployError(null), 5000);
+                // Error persists until dismissed
               }
             }
           }
@@ -473,13 +473,13 @@ function ActionBar({ task, onStatusChange, isMobile }) {
         stopDeployPolling();
         setDeploying(false);
         setDeployError('Deploy may still be in progress. Refresh to check status.');
-        setTimeout(() => setDeployError(null), 8000);
+        // Error persists until dismissed
       }, 30000);
     } catch (e) {
       stopDeployPolling();
       setDeploying(false);
       setDeployError(e.message || "Deploy failed");
-      setTimeout(() => setDeployError(null), 5000);
+      // Error persists until dismissed
     }
   };
 
@@ -604,8 +604,9 @@ function ActionBar({ task, onStatusChange, isMobile }) {
         )}
         <BlockedQuickActions task={task} onStatusChange={onStatusChange} />
         {assignError && (
-          <span style={{ fontSize: 12, color: "#BA1A1A", fontWeight: 500, marginTop: 6, display: "block" }}>
+          <span style={{ fontSize: 12, color: "#BA1A1A", fontWeight: 500, marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}>
             <AlertTriangleIcon size={14} /> {assignError}
+            <button onClick={(e) => { e.stopPropagation(); setAssignError(null); }} style={{ background: "none", border: "none", cursor: "pointer", color: "#BA1A1A", fontSize: 16, padding: "0 2px", lineHeight: 1 }} title="Dismiss">×</button>
           </span>
         )}
       </div>
@@ -622,8 +623,9 @@ function ActionBar({ task, onStatusChange, isMobile }) {
       flexWrap: "wrap",
     }}>
       {(assignError || deployError) && (
-        <span style={{ fontSize: 12, color: "#BA1A1A", fontWeight: 500, marginRight: "auto" }}>
+        <span style={{ fontSize: 12, color: "#BA1A1A", fontWeight: 500, marginRight: "auto", display: "flex", alignItems: "center", gap: 4 }}>
           <AlertTriangleIcon size={14} /> {assignError || deployError}
+          <button onClick={(e) => { e.stopPropagation(); setAssignError(null); setDeployError(null); }} style={{ background: "none", border: "none", cursor: "pointer", color: "#BA1A1A", fontSize: 16, padding: "0 2px", lineHeight: 1 }} title="Dismiss">×</button>
         </span>
       )}
       {actions}
