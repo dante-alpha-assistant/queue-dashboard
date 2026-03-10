@@ -346,11 +346,12 @@ router.post("/deploy/batch/dry-run", async (req, res) => {
 
     const results = [];
     for (const t of (tasks || [])) {
-      if (!t.pull_request_url) {
+      const prUrl = getPrUrl(t);
+      if (!prUrl) {
         results.push({ id: t.id, title: t.title, mergeable: false, reason: "no PR" });
         continue;
       }
-      const match = t.pull_request_url.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+      const match = prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
       if (!match) {
         results.push({ id: t.id, title: t.title, mergeable: false, reason: "invalid PR URL" });
         continue;
@@ -406,13 +407,13 @@ router.post("/deploy/batch", async (req, res) => {
     if (!tasks || tasks.length === 0) return res.status(404).json({ error: "No tasks found" });
 
     // Only deploy completed tasks that have PRs
-    const deployable = tasks.filter(t => t.status === "completed" && t.pull_request_url);
-    const skipped = tasks.filter(t => t.status !== "completed" || !t.pull_request_url);
+    const deployable = tasks.filter(t => t.status === "completed" && getPrUrl(t));
+    const skipped = tasks.filter(t => t.status !== "completed" || !getPrUrl(t));
 
     if (deployable.length === 0) {
       return res.status(400).json({ 
         error: "No deployable tasks. Tasks must be completed with a PR URL.",
-        skipped: skipped.map(t => ({ id: t.id, title: t.title, reason: !t.pull_request_url ? "no PR" : `status: ${t.status}` }))
+        skipped: skipped.map(t => ({ id: t.id, title: t.title, reason: !getPrUrl(t) ? "no PR" : `status: ${t.status}` }))
       });
     }
 
@@ -420,14 +421,15 @@ router.post("/deploy/batch", async (req, res) => {
     const byRepo = {};
     for (const t of deployable) {
       // Extract repo from PR URL: https://github.com/owner/repo/pull/123
-      const match = t.pull_request_url?.match(/github\.com\/([^/]+\/[^/]+)\/pull/);
+      const prUrl = getPrUrl(t);
+      const match = prUrl?.match(/github\.com\/([^/]+\/[^/]+)\/pull/);
       const repo = match ? match[1] : t.repository_url || "unknown";
       if (!byRepo[repo]) byRepo[repo] = [];
       byRepo[repo].push({
         id: t.id,
         title: t.title,
-        pr_url: t.pull_request_url,
-        pr_number: t.pull_request_url?.match(/\/pull\/(\d+)/)?.[1],
+        pr_url: getPrUrl(t),
+        pr_number: prUrl?.match(/\/pull\/(\d+)/)?.[1],
         deploy_target: t.deploy_target || "kubernetes",
       });
     }
@@ -441,9 +443,9 @@ router.post("/deploy/batch", async (req, res) => {
         priority: "urgent",
         status: "todo",
         deploy_target: deployable[0].deploy_target || "kubernetes",
-        description: `Merge and deploy ${deployable.length} PRs:\n\n${deployable.map(t => `- ${t.title} (${t.pull_request_url})`).join("\n")}`,
+        description: `Merge and deploy ${deployable.length} PRs:\n\n${deployable.map(t => `- ${t.title} (${getPrUrl(t)})`).join("\n")}`,
         metadata: {
-          batch_tasks: deployable.map(t => ({ id: t.id, title: t.title, pr_url: t.pull_request_url })),
+          batch_tasks: deployable.map(t => ({ id: t.id, title: t.title, pr_url: getPrUrl(t) })),
           repos: byRepo,
           strategy: "sequential_rebase",
         },
@@ -475,7 +477,7 @@ router.post("/deploy/batch", async (req, res) => {
       ok: true,
       deployTask: { id: deployTask.id, title: deployTask.title },
       deploying: deployable.map(t => ({ id: t.id, title: t.title })),
-      skipped: skipped.map(t => ({ id: t.id, title: t.title, reason: !t.pull_request_url ? "no PR" : `status: ${t.status}` })),
+      skipped: skipped.map(t => ({ id: t.id, title: t.title, reason: !getPrUrl(t) ? "no PR" : `status: ${t.status}` })),
     });
   } catch (e) {
     console.error("[BATCH_DEPLOY] Error:", e);
@@ -1398,4 +1400,13 @@ router.delete("/relationships/:id", async (req, res) => {
     res.status(500).json({ ok: false, error: e.message });
   }
 });
+
+// Helper: normalize pull_request_url (can be string or array)
+function getPrUrl(task) {
+  const pr = task.pull_request_url;
+  if (!pr) return null;
+  if (Array.isArray(pr)) return pr[0] || null;
+  return pr;
+}
+
 

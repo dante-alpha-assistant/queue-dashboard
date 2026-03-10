@@ -2,21 +2,21 @@ import { useState, useMemo } from "react";
 
 export default function BatchDeployModal({ tasks, onDeploy, onClose }) {
   const [selected, setSelected] = useState(() => new Set(
-    tasks.filter(t => t.pull_request_url).map(t => t.id)
+    tasks.filter(t => Array.isArray(t.pull_request_url) ? t.pull_request_url[0] : t.pull_request_url).map(t => t.id)
   ));
   const [deploying, setDeploying] = useState(false);
   const [error, setError] = useState(null);
   const [dryRunning, setDryRunning] = useState(false);
   const [dryRunResult, setDryRunResult] = useState(null);
 
-  const deployable = useMemo(() => tasks.filter(t => t.pull_request_url), [tasks]);
+  const deployable = useMemo(() => tasks.filter(t => Array.isArray(t.pull_request_url) ? t.pull_request_url[0] : t.pull_request_url), [tasks]);
   const noPR = useMemo(() => tasks.filter(t => !t.pull_request_url), [tasks]);
 
   // Group selected by repo
   const byRepo = useMemo(() => {
     const map = {};
     for (const t of deployable.filter(t => selected.has(t.id))) {
-      const match = t.pull_request_url?.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/);
+      const match = ((Array.isArray(t.pull_request_url) ? t.pull_request_url[0] : t.pull_request_url) || '').match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/);
       const repo = match ? match[1] : "unknown";
       const pr = match ? `#${match[2]}` : t.pull_request_url;
       if (!map[repo]) map[repo] = [];
@@ -125,7 +125,7 @@ export default function BatchDeployModal({ tasks, onDeploy, onClose }) {
         {/* Task list */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
           {deployable.map(t => {
-            const match = t.pull_request_url?.match(/\/pull\/(\d+)/);
+            const match = ((Array.isArray(t.pull_request_url) ? t.pull_request_url[0] : t.pull_request_url) || '').match(/\/pull\/(\d+)/);
             return (
               <label key={t.id} style={{
                 display: "flex", alignItems: "center", gap: 8, padding: "8px 10px",

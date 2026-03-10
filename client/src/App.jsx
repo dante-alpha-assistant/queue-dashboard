@@ -511,7 +511,7 @@ export default function App() {
         </Column>
         <Column title="Completed" color="#1B5E20" count={filterByType(completed).length} isTablet={isTablet}
           collapsible collapsed={!!collapsedCols.completed} onToggleCollapse={() => toggleCollapse("completed")}
-          headerAction={completed.filter(t => t.pull_request_url).length > 0 && (
+          headerAction={completed.filter(t => Array.isArray(t.pull_request_url) ? t.pull_request_url[0] : t.pull_request_url).length > 0 && (
             <button
               onClick={() => setShowBatchDeploy(true)}
               style={{
@@ -521,7 +521,7 @@ export default function App() {
                 textTransform: "uppercase", letterSpacing: "0.5px",
               }}
             >
-              Deploy All ({completed.filter(t => t.pull_request_url).length})
+              Deploy All ({completed.filter(t => Array.isArray(t.pull_request_url) ? t.pull_request_url[0] : t.pull_request_url).length})
             </button>
           )}>
           {renderCards(filterByType(completed).slice(0, 20))}
