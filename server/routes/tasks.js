@@ -3,6 +3,63 @@ import supabase from "../supabase.js";
 
 export const router = Router();
 
+// --- Counts by time period (cached 30s in-memory) ---
+const _countsCacheMap = {};
+
+router.get("/tasks/counts-by-period", async (req, res) => {
+  try {
+    const now = Date.now();
+    const projectId = req.query.project_id || "all";
+    const cached = _countsCacheMap[projectId];
+    if (cached && cached.expires > now) {
+      return res.json(cached.data);
+    }
+
+    const nowDate = new Date();
+    const todayStart = new Date(nowDate);
+    todayStart.setHours(0, 0, 0, 0);
+
+    const periods = {
+      today: todayStart.toISOString(),
+      last_24h: new Date(now - 24 * 60 * 60 * 1000).toISOString(),
+      last_7d: new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      last_30d: new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    };
+
+    const ALWAYS_INCLUDE_STATUSES = ["todo", "in_progress", "qa_testing", "blocked"];
+
+    const buildQuery = (since) => {
+      let q = supabase.from("agent_tasks").select("id", { count: "exact", head: true }).neq("status", "deprecated");
+      if (projectId !== "all") q = q.eq("project_id", projectId);
+      if (since) {
+        q = q.or(`created_at.gte.${since},status.in.(${ALWAYS_INCLUDE_STATUSES.join(",")})`);
+      }
+      return q;
+    };
+
+    const [todayRes, h24Res, d7Res, d30Res, allRes] = await Promise.all([
+      buildQuery(periods.today),
+      buildQuery(periods.last_24h),
+      buildQuery(periods.last_7d),
+      buildQuery(periods.last_30d),
+      buildQuery(null),
+    ]);
+
+    const counts = {
+      today: todayRes.count ?? 0,
+      last_24h: h24Res.count ?? 0,
+      last_7d: d7Res.count ?? 0,
+      last_30d: d30Res.count ?? 0,
+      all: allRes.count ?? 0,
+    };
+
+    _countsCacheMap[projectId] = { data: counts, expires: now + 30_000 };
+    res.json(counts);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 const DISPATCHER_URL = process.env.DISPATCHER_URL || "http://task-dispatcher.agents.svc.cluster.local:8080";
 
 // Manual dispatch — proxy to task-dispatcher

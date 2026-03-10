@@ -1,7 +1,4 @@
-import { useState, useRef, useEffect } from "react";
-
-const ACTIVE_STATUSES = new Set(["todo", "in_progress", "qa", "qa_testing"]);
-const TERMINAL_STATUSES = new Set(["deployed", "completed", "failed", "deploy_failed"]);
+import { useState, useRef, useEffect, useCallback } from "react";
 
 const PRESETS = [
   { key: "today", label: "Today" },
@@ -11,6 +8,15 @@ const PRESETS = [
   { key: "all", label: "All time" },
   { key: "custom", label: "Custom" },
 ];
+
+// Map preset keys to server response keys
+const KEY_MAP = {
+  today: "today",
+  "24h": "last_24h",
+  "7d": "last_7d",
+  "30d": "last_30d",
+  all: "all",
+};
 
 export function getRange(key, customFrom, customTo) {
   const now = new Date();
@@ -32,24 +38,13 @@ export function getRange(key, customFrom, customTo) {
   }
 }
 
-function countTasksInRange(tasks, key, customFrom, customTo) {
-  const { from, to } = getRange(key, customFrom, customTo);
-  if (!from && !to) return tasks.length;
-  return tasks.filter(t => {
-    const d = new Date(t.created_at);
-    if (from && d < from) return false;
-    if (to && d > to) return false;
-    return true;
-  }).length;
-}
+const ACTIVE_STATUSES = new Set(["todo", "in_progress", "qa", "qa_testing"]);
 
 export function filterTasksByTime(tasks, timeRange, customFrom, customTo) {
   const { from, to } = getRange(timeRange, customFrom, customTo);
   if (!from && !to) return tasks; // all time
   return tasks.filter(t => {
-    // Active tasks always show
     if (ACTIVE_STATUSES.has(t.status)) return true;
-    // Terminal tasks filtered by created_at
     const d = new Date(t.created_at);
     if (from && d < from) return false;
     if (to && d > to) return false;
@@ -71,13 +66,32 @@ function save(state) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch {}
 }
 
-export default function TimeFilter({ allTasks, value, onChange, isMobile }) {
+export default function TimeFilter({ value, onChange, isMobile, projectId }) {
   const [saved] = useState(loadSaved);
   const [range, setRange] = useState(value?.range || saved.range || "today");
   const [customFrom, setCustomFrom] = useState(value?.customFrom || saved.customFrom || "");
   const [customTo, setCustomTo] = useState(value?.customTo || saved.customTo || "");
   const [showCustom, setShowCustom] = useState(range === "custom");
+  const [counts, setCounts] = useState(null);
   const didMount = useRef(false);
+
+  const fetchCounts = useCallback(() => {
+    const params = new URLSearchParams();
+    if (projectId) params.set("project_id", projectId);
+    fetch(`/api/tasks/counts-by-period?${params}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setCounts(data); })
+      .catch(() => {});
+  }, [projectId]);
+
+  useEffect(() => {
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 30000);
+    return () => clearInterval(interval);
+  }, [fetchCounts]);
+
+  // Re-fetch when filter changes (tasks may have been created)
+  useEffect(() => { fetchCounts(); }, [range, fetchCounts]);
 
   useEffect(() => {
     if (!didMount.current) {
@@ -91,7 +105,7 @@ export default function TimeFilter({ allTasks, value, onChange, isMobile }) {
     setRange(key);
     if (key === "custom") {
       setShowCustom(true);
-      return; // don't fire onChange until dates are set
+      return;
     }
     setShowCustom(false);
     const state = { range: key, customFrom: "", customTo: "" };
@@ -105,10 +119,6 @@ export default function TimeFilter({ allTasks, value, onChange, isMobile }) {
     onChange(state);
   };
 
-  // Only terminal tasks are relevant for counting (active always show)
-  const terminalTasks = allTasks.filter(t => TERMINAL_STATUSES.has(t.status));
-  const activeTasks = allTasks.filter(t => ACTIVE_STATUSES.has(t.status));
-
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
       <span style={{
@@ -117,9 +127,8 @@ export default function TimeFilter({ allTasks, value, onChange, isMobile }) {
       }}>Time</span>
       {PRESETS.map(p => {
         const isActive = range === p.key;
-        const count = p.key === "custom"
-          ? null
-          : activeTasks.length + countTasksInRange(terminalTasks, p.key, customFrom, customTo);
+        const serverKey = KEY_MAP[p.key];
+        const count = p.key === "custom" ? null : (counts ? counts[serverKey] : null);
         return (
           <button key={p.key} onClick={() => handleSelect(p.key)} style={{
             padding: isMobile ? "6px 12px" : "4px 12px",
