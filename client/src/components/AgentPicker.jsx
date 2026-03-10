@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { AlertTriangle, Bot, Brain, Glasses, Hammer, User, Waves, Wrench, Zap } from 'lucide-react';
 
 const AGENT_ICONS = {
-  neo: Glasses, mu: Wrench, beta: Zap, alpha: Brain, flow: Waves, ifra: Hammer,
-  "neo-worker": Glasses, "ifra-worker": Hammer, "beta-worker": Zap,
+  neo: "👓", mu: "🔧", beta: "⚡", alpha: "🧠", flow: "🌊", ifra: "🔨",
+  "neo-worker": "👓", "ifra-worker": "🔨", "beta-worker": "⚡",
 };
 
 const STATUS_DOT = {
