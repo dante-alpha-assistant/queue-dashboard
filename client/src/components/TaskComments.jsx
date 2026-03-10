@@ -186,12 +186,15 @@ export default function TaskComments({ taskId }) {
         {comments.map(c => {
           const icon = AUTHOR_ICONS[c.author] || (c.author_type === 'agent' ? "🤖" : "👤");
           const typeColor = AUTHOR_TYPE_COLORS[c.author_type] || '#79747E';
+          const isReply = !!c.reply_to;
+          const parentComment = isReply ? comments.find(p => p.id === c.reply_to) : null;
           return (
             <div key={c.id} style={{
               display: 'flex', gap: 10, padding: '8px 12px',
-              background: c.author_type === 'system' ? 'var(--md-surface-container-low, #F7F2FA)' : 'transparent',
+              background: c.author_type === 'system' ? 'var(--md-surface-container-low, #F7F2FA)' : isReply ? 'var(--md-surface-container-low, #F7F2FA)' : 'transparent',
               borderRadius: 8,
-              borderLeft: `3px solid ${typeColor}20`,
+              borderLeft: `3px solid ${typeColor}${isReply ? '40' : '20'}`,
+              marginLeft: isReply ? 28 : 0,
             }}>
               <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{icon}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -210,6 +213,14 @@ export default function TaskComments({ taskId }) {
                     {formatTime(c.created_at)}
                   </span>
                 </div>
+                {isReply && parentComment && (
+                  <div style={{
+                    fontSize: 10, color: 'var(--md-outline, #79747E)', fontStyle: 'italic',
+                    marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4,
+                  }}>
+                    ↩ replying to <span style={{ fontWeight: 600 }}>{parentComment.author}</span>
+                  </div>
+                )}
                 <div className="tdm-md" style={{
                   fontSize: 13, lineHeight: 1.6, color: 'var(--md-on-surface, #1C1B1F)',
                   wordBreak: 'break-word',

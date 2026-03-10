@@ -765,14 +765,34 @@ async function notifyMentionedAgents(taskId, comment, mentions) {
     return `**${c.author}** (${c.author_type}) — ${time}:\n> ${c.body.replace(/\n/g, "\n> ")}`;
   }).join("\n\n");
 
+  // Fetch activity log for full context
+  const { data: activityLog } = await supabase
+    .from("task_activity_log")
+    .select("field, old_value, new_value, changed_by, changed_at")
+    .eq("task_id", taskId)
+    .order("changed_at", { ascending: true })
+    .limit(50);
+
+  const activityText = (activityLog || []).map(a => {
+    const time = new Date(a.changed_at).toISOString().replace("T", " ").slice(0, 16);
+    return `- ${time} | **${a.changed_by || "system"}** changed \`${a.field}\`: ${a.old_value || "∅"} → ${a.new_value || "∅"}`;
+  }).join("\n");
+
   // Build the readable message for the agent (standard OpenClaw webhook format)
   const prUrls = Array.isArray(task.pull_request_url) ? task.pull_request_url.join(", ") : (task.pull_request_url || "none");
-  const message = `## 💬 Task Comment — @mention from ${comment.author}
+
+  for (const agent of (agents || [])) {
+    if (!agent.endpoint_url || agent.status === "disabled") continue;
+
+    // Build per-agent message with full task context
+    const message = `## 💬 Task Comment — @mention from ${comment.author}
 
 **Task:** ${task.title}
 **Status:** ${task.status} | **Type:** ${task.type} | **Priority:** ${task.priority}
+**Stage:** ${task.stage || "none"} | **Assigned:** ${task.assigned_agent || "unassigned"}
 **Task ID:** ${taskId}
 **PR:** ${prUrls}
+**Repository:** ${task.repository_url || "none"}
 **Task URL:** ${DASHBOARD_URL}/task/${taskId}
 
 ---
@@ -790,17 +810,21 @@ ${commentThread}
 ### Task Description:
 ${task.description || "(no description)"}
 
+${task.acceptance_criteria ? `### Acceptance Criteria:\n${task.acceptance_criteria}\n` : ""}
 ${task.result ? `### Previous Result:\n${typeof task.result === "object" ? JSON.stringify(task.result, null, 2) : task.result}\n` : ""}
 ${task.qa_result ? `### QA Result:\n${typeof task.qa_result === "object" ? JSON.stringify(task.qa_result, null, 2) : task.qa_result}\n` : ""}
+${task.error ? `### Error:\n${task.error}\n` : ""}
+${task.blocked_reason ? `### Blocked Reason:\n${task.blocked_reason}\n` : ""}
+${activityText ? `### Activity Log:\n${activityText}\n` : ""}
 ---
 
-**Reply callback:** To reply, POST to: \`${callbackUrl}\`
-\`\`\`json
-{ "body": "your reply text", "author": "${mentions[0]}", "comment_id": "${comment.id}" }
+**⚠️ MANDATORY: You MUST reply to this comment.**
+POST to: \`${callbackUrl}\`
+\`\`\`bash
+curl -s -X POST "${callbackUrl}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"body": "YOUR REPLY HERE", "author": "${agent.id}", "comment_id": "${comment.id}"}'
 \`\`\``;
-
-  for (const agent of (agents || [])) {
-    if (!agent.endpoint_url || agent.status === "disabled") continue;
 
     const webhookUrl = `${agent.endpoint_url}/hooks/agent`;
     const token = AGENT_TOKENS[agent.id];
