@@ -85,6 +85,8 @@ IMPORTANT: When you create a task, ALWAYS include the clickable task URL in your
 Be conversational, helpful, and concise. You're talking to Dante or a team member.
 If the user just wants to chat, that's fine too — you're a full agent.
 
+When the user shares screenshots, the images are automatically uploaded and will be attached to any task you create. You can also use attach_screenshot_to_task to add images to existing tasks.
+
 IMPORTANT: After creating a task, ALWAYS include the clickable URL in your response.
 The create_task tool returns a task_id (UUID). Use it to build the link.
 Format: Created task: [task title](https://tasks.dante.id/task/{uuid})
@@ -103,15 +105,31 @@ const CHAT_TOOLS = [
           description: { type: "string", description: "Detailed task description with context, requirements, and acceptance criteria (markdown supported)" },
           type: { type: "string", enum: ["coding", "ops", "general", "review", "research", "qa"], description: "Task type" },
           priority: { type: "string", enum: ["low", "normal", "high", "urgent"], description: "Task priority, default normal" },
+          image_urls: { type: "array", items: { type: "string" }, description: "Array of image URLs (from /upload endpoint) to attach to the task" },
         },
         required: ["title"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "attach_screenshot_to_task",
+      description: "Attach screenshot image(s) to an existing task. Use when the user wants to add images to a task that already exists.",
+      parameters: {
+        type: "object",
+        properties: {
+          task_id: { type: "string", description: "The UUID of the task to attach images to" },
+          image_urls: { type: "array", items: { type: "string" }, description: "Array of image URLs (from /upload endpoint) to attach" },
+        },
+        required: ["task_id", "image_urls"],
       },
     },
   },
 ];
 
 // Execute a tool call locally and return the result
-async function executeToolCall(name, args, conversationImages = []) {
+async function executeToolCall(name, args, conversationImages = [], uploadedImageUrls = []) {
   if (name === "create_task") {
     try {
       const { data, error } = await supabase
@@ -127,10 +145,13 @@ async function executeToolCall(name, args, conversationImages = []) {
         .select()
         .single();
       if (error) return JSON.stringify({ error: error.message });
-      // Attach conversation images to the newly created task
+      // Attach images: prefer explicit image_urls from tool args, then uploaded URLs, then conversation images
       let attachedCount = 0;
-      if (conversationImages.length > 0) {
-        const attached = await attachImagesToTask(data.id, conversationImages);
+      const imagesToAttach = args.image_urls?.length ? args.image_urls
+        : uploadedImageUrls.length ? uploadedImageUrls
+        : conversationImages;
+      if (imagesToAttach.length > 0) {
+        const attached = await attachImagesToTask(data.id, imagesToAttach);
         attachedCount = attached.length;
       }
       return JSON.stringify({
@@ -144,8 +165,68 @@ async function executeToolCall(name, args, conversationImages = []) {
       return JSON.stringify({ error: e.message });
     }
   }
+  if (name === "attach_screenshot_to_task") {
+    try {
+      if (!args.task_id || !args.image_urls?.length) {
+        return JSON.stringify({ error: "task_id and image_urls are required" });
+      }
+      const attached = await attachImagesToTask(args.task_id, args.image_urls);
+      return JSON.stringify({ success: true, task_id: args.task_id, attachments: attached.length });
+    } catch (e) {
+      return JSON.stringify({ error: e.message });
+    }
+  }
   return JSON.stringify({ error: `Unknown tool: ${name}` });
 }
+
+// ─── Screenshot Upload ───
+
+// Upload a screenshot to Supabase storage, returns a public URL
+// Called by the client immediately when a user pastes/drops an image
+neoChatRouter.post("/upload", async (req, res) => {
+  try {
+    const { image, filename } = req.body;
+    if (!image) return res.status(400).json({ error: "image (base64 data URL) required" });
+
+    let buffer, contentType, ext;
+    if (image.startsWith("data:")) {
+      const match = image.match(/^data:(image\/\w+);base64,(.+)$/);
+      if (!match) return res.status(400).json({ error: "Invalid data URL format" });
+      contentType = match[1];
+      ext = contentType.split("/")[1] || "png";
+      buffer = Buffer.from(match[2], "base64");
+    } else {
+      return res.status(400).json({ error: "Only base64 data URLs are supported" });
+    }
+
+    if (buffer.length > 10 * 1024 * 1024) {
+      return res.status(413).json({ error: "Image too large (max 10MB)" });
+    }
+
+    const storageName = filename || `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const storagePath = `chat-uploads/${storageName}`;
+
+    const { error: uploadErr } = await supabase.storage
+      .from(ATTACHMENT_BUCKET)
+      .upload(storagePath, buffer, { contentType, upsert: false });
+
+    if (uploadErr) {
+      console.error("[UPLOAD] Supabase storage error:", uploadErr.message);
+      return res.status(500).json({ error: "Failed to upload image" });
+    }
+
+    const { data: urlData } = supabase.storage.from(ATTACHMENT_BUCKET).getPublicUrl(storagePath);
+    res.json({
+      url: urlData?.publicUrl,
+      filename: storageName,
+      storage_path: storagePath,
+      content_type: contentType,
+    });
+  } catch (e) {
+    console.error("[UPLOAD] Error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // ─── Conversation CRUD ───
 
@@ -495,7 +576,10 @@ neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
       for (const tc of toolCallList) {
         let args = {};
         try { args = JSON.parse(tc.arguments); } catch {}
-        const result = await executeToolCall(tc.name, args, conversationImages);
+        // Separate uploaded URLs (http) from base64 data URLs
+        const uploadedUrls = conversationImages.filter(u => u.startsWith('http'));
+        const base64Images = conversationImages.filter(u => u.startsWith('data:'));
+        const result = await executeToolCall(tc.name, args, base64Images, uploadedUrls);
         toolResultMsgs.push({
           role: "tool",
           tool_call_id: tc.id || `call_0`,

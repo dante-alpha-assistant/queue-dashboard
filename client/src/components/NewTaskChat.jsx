@@ -483,7 +483,23 @@ export default function NewTaskChat({ isMobile }) {
       }
       try {
         const dataUrl = await compressImage(file);
-        newImages.push({ dataUrl, name: file.name });
+        // Upload immediately to get a permanent URL
+        try {
+          const uploadResp = await fetch('/api/neo-chat/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: dataUrl, filename: file.name }),
+          });
+          if (uploadResp.ok) {
+            const uploadData = await uploadResp.json();
+            newImages.push({ dataUrl, name: file.name, uploadedUrl: uploadData.url });
+          } else {
+            // Fallback: keep base64 if upload fails
+            newImages.push({ dataUrl, name: file.name });
+          }
+        } catch {
+          newImages.push({ dataUrl, name: file.name });
+        }
       } catch (e) {
         errors.push(`${file.name}: failed to read`);
       }
@@ -570,7 +586,8 @@ export default function NewTaskChat({ isMobile }) {
 
     setError(null);
     const content = text;
-    const imageUrls = pendingImages.map(img => img.dataUrl);
+    // Prefer uploaded URLs (permanent) over base64 data URLs
+    const imageUrls = pendingImages.map(img => img.uploadedUrl || img.dataUrl);
 
     // Collect task mention IDs referenced in this message
     const mentionedTaskIds = taskMentions
