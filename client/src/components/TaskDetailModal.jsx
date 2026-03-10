@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { AlertTriangle, BarChart3, CheckCircle2, ClipboardList, Clock, FileText, Lightbulb, Link, Package, Pencil, RefreshCw, Timer, Wrench, XCircle, Pause, Rocket } from "lucide-react";
+import { AlertTriangle, BarChart3, CheckCircle2, ClipboardList, Clock, FileText, Image, Lightbulb, Link, Package, Pencil, RefreshCw, Timer, Wrench, XCircle, Pause, Rocket } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -11,6 +11,7 @@ import TaskRelationships from './TaskRelationships';
 import { ProgressDetail } from './ProgressFeed';
 import CostsTab from './CostsTab';
 import HumanInterventionForm from './HumanInterventionForm';
+import TaskAttachments from './TaskAttachments';
 import { AgentAvatar, TaskTypeIcon, BlockerTypeIcon, PriorityDot, RefreshIcon, UserPlusIcon, RocketIcon, FolderIcon, OpsIcon } from './Icons';
 
 /* ── Constants ────────────────────────────────────────────── */
@@ -1350,6 +1351,16 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
               No description or acceptance criteria provided.
             </div>
           )}
+          {/* Attachments */}
+          <div style={{ marginBottom: 16 }}>
+            <SectionLabel icon={<Image size={14} />}>Attachments</SectionLabel>
+            <TaskAttachments
+              taskId={task.id}
+              attachments={task.metadata?.attachments || []}
+              onAttachmentsChange={() => {}}
+              readonly={['deployed', 'deprecated'].includes(task.status)}
+            />
+          </div>
           <TaskRelationships taskId={task.id} onNavigateToTask={(id) => { window.location.href = `/task/${id}`; }} />
           <div style={{ marginTop: 16 }}>
             <SectionLabel icon={<Link size={14} />}>Links</SectionLabel>

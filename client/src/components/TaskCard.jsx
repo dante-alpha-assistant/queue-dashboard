@@ -9,6 +9,7 @@ import {
   BlockerIcon, RetryIcon, DeployIcon, AssignIcon, ChatIcon,
   QAIcon, WaitingIcon, BlockedIcon, UserIcon, AlertTriangleIcon,
 } from './Icons';
+import { AttachmentIndicator } from './TaskAttachments';
 
 const BLOCKER_TYPE_STYLES = {
   missing_credential: { color: "#E65100", bg: "#E6510018", label: "Missing Credential" },
@@ -741,6 +742,7 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
               <PauseIcon size={11} color="#E65100" /> Paused
             </span>
           )}
+          <AttachmentIndicator count={task.metadata?.attachments?.length} />
           {task.status === "qa_testing" && (
             task.qa_agent && task.assigned_agent
               ? <span style={{
