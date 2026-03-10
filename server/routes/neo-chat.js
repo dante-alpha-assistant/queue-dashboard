@@ -246,7 +246,8 @@ neoChatRouter.post("/upload", async (req, res) => {
       return res.status(413).json({ error: "Image too large (max 10MB)" });
     }
 
-    const storageName = filename || `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const sanitized = filename ? filename.replace(/[^a-zA-Z0-9._-]/g, "_") : null;
+    const storageName = sanitized || `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
     const storagePath = `chat-uploads/${storageName}`;
 
     const { error: uploadErr } = await supabase.storage
@@ -421,21 +422,43 @@ neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
     async function callNeo(msgs, stream = true) {
       // Replace base64 data URLs with a text note (gateway can't handle them)
       // HTTP URLs are kept as-is — OpenClaw fetches them natively
-      const sanitized = msgs.map(m => {
+      const sanitized = await Promise.all(msgs.map(async (m) => {
         if (!Array.isArray(m.content)) return m;
-        const parts = m.content.map(part => {
+        const parts = await Promise.all(m.content.map(async (part) => {
           if (part.type === 'image_url' && part.image_url?.url?.startsWith('data:')) {
-            return { type: 'text', text: '[Image attached — see uploaded URL version]' };
+            // Upload base64 image on the fly to get an HTTP URL
+            try {
+              const dataUrl = part.image_url.url;
+              const match = dataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+              if (match) {
+                const ct = match[1];
+                const ex = ct.split('/')[1] || 'png';
+                const buf = Buffer.from(match[2], 'base64');
+                const fname = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ex}`;
+                const spath = `chat-uploads/${fname}`;
+                const { error: upErr } = await supabase.storage.from(ATTACHMENT_BUCKET).upload(spath, buf, { contentType: ct, upsert: false });
+                if (!upErr) {
+                  const { data: urlD } = supabase.storage.from(ATTACHMENT_BUCKET).getPublicUrl(spath);
+                  if (urlD?.publicUrl) {
+                    return { type: 'image_url', image_url: { url: urlD.publicUrl } };
+                  }
+                }
+              }
+            } catch (e) {
+              console.error('[CHAT] Failed to upload base64 image on-the-fly:', e.message);
+            }
+            // If upload failed, strip it (gateway can't handle base64)
+            return { type: 'text', text: '[Image could not be processed]' };
           }
           return part;
-        });
+        }));
         // If only text parts remain, flatten to string
         const hasImages = parts.some(p => p.type === 'image_url');
         if (!hasImages) {
           return { ...m, content: parts.map(p => p.text || '').join('\n').trim() };
         }
         return { ...m, content: parts };
-      });
+      }));
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 120_000);
