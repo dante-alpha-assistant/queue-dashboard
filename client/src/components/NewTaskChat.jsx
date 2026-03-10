@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { AlertTriangle, Lightbulb, MessageSquare, Paperclip } from 'lucide-react';
+import TaskMentionDropdown from "./TaskMentionDropdown";
 
 function formatTime(date) {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -346,6 +347,9 @@ export default function NewTaskChat({ isMobile }) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [error, setError] = useState(null);
+  const [mentionQuery, setMentionQuery] = useState(null); // null = closed, string = open with query
+  const [mentionStart, setMentionStart] = useState(null); // cursor position of the @ character
+  const [taskMentions, setTaskMentions] = useState([]); // [{id, title, ...}] attached to current message
 
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
@@ -556,6 +560,11 @@ export default function NewTaskChat({ isMobile }) {
     const content = text;
     const imageUrls = pendingImages.map(img => img.dataUrl);
 
+    // Collect task mention IDs referenced in this message
+    const mentionedTaskIds = taskMentions
+      .filter(t => text.includes(`@[${t.title}]`))
+      .map(t => t.id);
+
     // Build user message content: include images as multipart array if present
     let userContent;
     if (imageUrls.length) {
@@ -574,6 +583,9 @@ export default function NewTaskChat({ isMobile }) {
     setMessages(newMessages);
     setInput("");
     setPendingImages([]);
+    setTaskMentions([]);
+    setMentionQuery(null);
+    setMentionStart(null);
     setStreaming(true);
 
     const assistantMsg = { role: "assistant", content: "", time: new Date().toISOString() };
@@ -586,7 +598,11 @@ export default function NewTaskChat({ isMobile }) {
       const resp = await fetch(`/api/neo-chat/conversations/${convoId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, images: imageUrls.length ? imageUrls : undefined }),
+        body: JSON.stringify({
+          content,
+          images: imageUrls.length ? imageUrls : undefined,
+          taskMentions: mentionedTaskIds.length ? mentionedTaskIds : undefined,
+        }),
         signal: controller.signal,
       });
 
@@ -662,7 +678,53 @@ export default function NewTaskChat({ isMobile }) {
     setStreaming(false);
   }, [input, streaming, messages, activeConvoId, pendingImages, loadConversations]);
 
+  // Detect @mention in input
+  const handleInputChange = useCallback((e) => {
+    const val = e.target.value;
+    setInput(val);
+
+    const cursor = e.target.selectionStart;
+    // Look backwards from cursor to find an unmatched @
+    const textBeforeCursor = val.slice(0, cursor);
+    const lastAt = textBeforeCursor.lastIndexOf("@");
+
+    if (lastAt >= 0) {
+      // Check there's no space before @ (or it's at start) — and text after @ has no newline
+      const charBefore = lastAt > 0 ? textBeforeCursor[lastAt - 1] : " ";
+      const textAfterAt = textBeforeCursor.slice(lastAt + 1);
+      if ((charBefore === " " || charBefore === "\n" || lastAt === 0) && !textAfterAt.includes("\n")) {
+        setMentionQuery(textAfterAt);
+        setMentionStart(lastAt);
+        return;
+      }
+    }
+    setMentionQuery(null);
+    setMentionStart(null);
+  }, []);
+
+  const handleMentionSelect = useCallback((task) => {
+    // Replace @query with @[Task Title]
+    const before = input.slice(0, mentionStart);
+    const after = input.slice(inputRef.current?.selectionStart || input.length);
+    const mentionText = `@[${task.title}] `;
+    setInput(before + mentionText + after);
+    setMentionQuery(null);
+    setMentionStart(null);
+    setTaskMentions(prev => {
+      if (prev.find(t => t.id === task.id)) return prev;
+      return [...prev, task];
+    });
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }, [input, mentionStart]);
+
+  const handleMentionClose = useCallback(() => {
+    setMentionQuery(null);
+    setMentionStart(null);
+  }, []);
+
   const handleKey = (e) => {
+    // Don't send on Enter if mention dropdown is open
+    if (mentionQuery !== null && (e.key === "Enter" || e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Tab")) return;
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
   };
 
@@ -917,13 +979,43 @@ export default function NewTaskChat({ isMobile }) {
         </div>
       )}
 
+      {/* Task mention badges */}
+      {taskMentions.length > 0 && (
+        <div style={{
+          padding: "4px 12px", display: "flex", gap: 6, flexWrap: "wrap",
+          borderTop: "1px solid var(--md-surface-variant)",
+        }}>
+          {taskMentions.map(t => (
+            <span key={t.id} style={{
+              fontSize: 10, padding: "2px 8px", borderRadius: 10,
+              background: "rgba(103,80,164,0.1)", color: "var(--md-primary, #6750A4)",
+              fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4,
+            }}>
+              📌 {t.title.length > 30 ? t.title.slice(0, 30) + "…" : t.title}
+              <button onClick={() => setTaskMentions(prev => prev.filter(x => x.id !== t.id))}
+                style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", fontSize: 10, padding: 0, lineHeight: 1 }}>✕</button>
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* Input area — polished */}
       <div style={{
         padding: "10px 12px",
-        borderTop: pendingImages.length ? "none" : "1px solid var(--md-surface-variant)",
+        borderTop: pendingImages.length || taskMentions.length ? "none" : "1px solid var(--md-surface-variant)",
         display: "flex", gap: 8, alignItems: "flex-end",
         paddingBottom: isMobile ? "max(12px, env(safe-area-inset-bottom, 12px))" : 12,
+        position: "relative",
       }}>
+        {/* Task mention autocomplete dropdown */}
+        {mentionQuery !== null && (
+          <TaskMentionDropdown
+            query={mentionQuery}
+            onSelect={handleMentionSelect}
+            onClose={handleMentionClose}
+            inputRef={inputRef}
+          />
+        )}
         <button onClick={() => fileInputRef.current?.click()} title="Attach image"
           style={{
             background: "none", border: "none", color: "var(--md-on-surface-variant)",
@@ -935,7 +1027,7 @@ export default function NewTaskChat({ isMobile }) {
           onMouseLeave={e => e.currentTarget.style.background = "none"}
         ><Paperclip size={14} /></button>
         <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple style={{ display: "none" }} onChange={handleFileSelect} />
-        <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKey}
+        <textarea ref={inputRef} value={input} onChange={handleInputChange} onKeyDown={handleKey}
           placeholder="Describe what you need..." rows={1}
           style={{
             flex: 1, background: "var(--md-surface-container)",

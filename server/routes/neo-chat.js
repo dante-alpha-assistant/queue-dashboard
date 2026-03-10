@@ -124,9 +124,32 @@ neoChatRouter.get("/conversations/:id/messages", async (req, res) => {
 neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
   try {
     const conversationId = req.params.id;
-    const { content, images } = req.body;
+    const { content, images, taskMentions } = req.body;
     if (!content && (!images || !images.length)) {
       return res.status(400).json({ error: "content required" });
+    }
+
+    // Fetch full task context for mentioned tasks
+    let taskContext = "";
+    if (Array.isArray(taskMentions) && taskMentions.length > 0) {
+      try {
+        const { data: tasks } = await supabase
+          .from("agent_tasks")
+          .select("id, title, description, status, type, priority, assigned_agent, pull_request_url, result, error, created_at, completed_at")
+          .in("id", taskMentions.slice(0, 5));
+        if (tasks && tasks.length) {
+          taskContext = "\n\n---\n**Referenced Tasks:**\n" + tasks.map(t =>
+            `- **${t.title}** (${t.id})\n  Status: ${t.status} | Type: ${t.type} | Priority: ${t.priority}\n` +
+            (t.description ? `  Description: ${t.description.slice(0, 500)}\n` : "") +
+            (t.assigned_agent ? `  Assigned to: ${t.assigned_agent}\n` : "") +
+            (t.pull_request_url ? `  PR: ${Array.isArray(t.pull_request_url) ? t.pull_request_url.join(", ") : t.pull_request_url}\n` : "") +
+            (t.result?.summary ? `  Result: ${t.result.summary}\n` : "") +
+            (t.error ? `  Error: ${t.error}\n` : "")
+          ).join("\n");
+        }
+      } catch (e) {
+        console.error("Failed to fetch task context:", e.message);
+      }
     }
 
     // Save user message (with images in metadata if present)
@@ -134,7 +157,10 @@ neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
       conversation_id: conversationId,
       role: "user",
       content: content || "",
-      metadata: images?.length ? { images } : {},
+      metadata: {
+        ...(images?.length ? { images } : {}),
+        ...(taskMentions?.length ? { taskMentions } : {}),
+      },
     };
     const { error: userMsgErr } = await supabase
       .from("chat_messages")
@@ -168,9 +194,12 @@ neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true });
 
-    // Build messages for gateway, reconstructing multipart content for messages with images
+// Build messages for gateway, with task context and image reconstruction
+    const systemContent = taskContext
+      ? SYSTEM_PROMPT + taskContext
+      : SYSTEM_PROMPT;
     const fullMessages = [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: systemContent },
       ...(history || []).map(m => {
         // Reconstruct multipart content if this message had images stored in metadata
         if (m.role === "user" && m.metadata?.images?.length) {
