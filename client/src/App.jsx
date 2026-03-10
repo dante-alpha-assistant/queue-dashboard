@@ -13,7 +13,7 @@ import TaskDetailModal from "./components/TaskDetailModal";
 import Pingboard from "./pages/Pingboard";
 import HealthDashboard from "./pages/HealthDashboard";
 import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
-import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Rocket, Search, XCircle, Zap } from 'lucide-react';
+import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, LayoutDashboard, Rocket, Search, XCircle, Zap } from 'lucide-react';
 
 const MOBILE_TABS = [
   { key: "todo", label: "Todo", icon: ClipboardList },
@@ -27,18 +27,113 @@ const MOBILE_TABS = [
   { key: "failed", label: "Failed", icon: XCircle },
 ];
 
-// Merged tabs for bottom nav (assigned + in_progress = Active)
 const BOTTOM_TABS = [
-  { key: "todo", label: "Todo", icon: ClipboardList, color: "#79747E" },
-  { key: "active", label: "Active", icon: Zap, color: "#E8A317" },
-  { key: "blocked", label: "Blocked", icon: Ban, color: "#D84315" },
-  { key: "qa", label: "QA", icon: FlaskConical, color: "#7B5EA7" },
-  { key: "completed", label: "Done", icon: CheckCircle2, color: "#1B5E20" },
-  { key: "deploying", label: "Deploying", icon: Clock, color: "#E65100" },
-  { key: "deployed", label: "Deployed", icon: Rocket, color: "#00897B" },
-  { key: "failed", label: "Failed", icon: XCircle, color: "#BA1A1A" },
-
+  { key: "todo", label: "Todo", icon: ClipboardList, color: "#71717A" },
+  { key: "active", label: "Active", icon: Zap, color: "#EAB308" },
+  { key: "blocked", label: "Blocked", icon: Ban, color: "#EF4444" },
+  { key: "qa", label: "QA", icon: FlaskConical, color: "#A78BFA" },
+  { key: "completed", label: "Done", icon: CheckCircle2, color: "#22C55E" },
+  { key: "deploying", label: "Deploying", icon: Clock, color: "#F97316" },
+  { key: "deployed", label: "Deployed", icon: Rocket, color: "#14B8A6" },
+  { key: "failed", label: "Failed", icon: XCircle, color: "#EF4444" },
 ];
+
+const VIEW_TABS = [
+  { key: "board", label: "Board", Icon: LayoutDashboard },
+  { key: "pingboard", label: "Pingboard", Icon: Bot },
+  { key: "health", label: "Health", Icon: HeartPulse },
+];
+
+function HeaderLogo() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{
+        width: 30, height: 30,
+        background: "linear-gradient(135deg, #7C3AED 0%, #6750A4 100%)",
+        borderRadius: 8,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 15, fontWeight: 700, color: "#fff",
+        letterSpacing: "-0.02em",
+        boxShadow: "0 1px 3px rgba(124, 58, 237, 0.3)",
+      }}>d</div>
+      <span style={{
+        fontWeight: 700, fontSize: 16, letterSpacing: "-0.03em",
+        fontFamily: "'Inter', system-ui, sans-serif",
+        color: "var(--md-on-background)",
+      }}>
+        tasks<span style={{ color: "var(--md-primary)", opacity: 0.7 }}>.</span>dante<span style={{ color: "var(--md-primary)", opacity: 0.7 }}>.</span>id
+      </span>
+    </div>
+  );
+}
+
+function NavTabs({ view, setView }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+      {VIEW_TABS.map(t => (
+        <button
+          key={t.key}
+          onClick={() => setView(t.key)}
+          className={`nav-pill${view === t.key ? " active" : ""}`}
+        >
+          <t.Icon size={15} strokeWidth={view === t.key ? 2 : 1.5} />
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function SearchBar({ searchQuery, setSearchQuery, isMobile }) {
+  useEffect(() => {
+    if (isMobile) return;
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        document.getElementById("header-search")?.focus();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isMobile]);
+
+  return (
+    <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+      <Search size={14} strokeWidth={1.5} style={{
+        position: "absolute", left: 10, color: "var(--md-on-surface-variant)",
+        pointerEvents: "none",
+      }} />
+      <input
+        id="header-search"
+        type="text"
+        placeholder="Search tasks..."
+        value={searchQuery}
+        onChange={e => setSearchQuery(e.target.value)}
+        className="search-input"
+      />
+      {!searchQuery && !isMobile && (
+        <div style={{
+          position: "absolute", right: 10,
+          display: "flex", alignItems: "center", gap: 2,
+          pointerEvents: "none",
+        }}>
+          <span className="kbd-hint">⌘</span>
+          <span className="kbd-hint">K</span>
+        </div>
+      )}
+      {searchQuery && (
+        <button
+          onClick={() => setSearchQuery("")}
+          style={{
+            position: "absolute", right: 8, background: "none", border: "none",
+            cursor: "pointer", color: "var(--md-on-surface-variant)", fontSize: 12,
+            padding: "2px", display: "flex", alignItems: "center",
+          }}
+        ><XCircle size={14} /></button>
+      )}
+    </div>
+  );
+}
 
 export default function App() {
   const {
@@ -62,7 +157,6 @@ export default function App() {
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
   const { progress: taskProgress, monitor: taskMonitor, connected: sseConnected } = useTaskEvents();
 
-  // Resolve deep link once tasks are loaded
   useEffect(() => {
     if (!deepLinkId || loading) return;
     const allLoaded = [...todo, ...assigned, ...inProgress, ...blocked, ...qa, ...completed, ...deploying, ...deployed, ...deployFailed, ...failed];
@@ -74,7 +168,6 @@ export default function App() {
     }
   }, [deepLinkId, loading, todo, assigned, inProgress, blocked, qa, completed, deploying, deployed, deployFailed, failed]);
 
-  // Update URL when task is selected/deselected
   const handleSelectTask = useCallback((task) => {
     setSelectedTask(task);
     if (task && task.id) {
@@ -88,14 +181,12 @@ export default function App() {
     navigate("/", { replace: true });
   }, [navigate]);
 
-  // All columns are collapsible
   const COLLAPSIBLE_COLUMNS = ["todo", "in_progress", "blocked", "qa_testing", "completed", "deploying", "deployed", "deploy_failed", "failed"];
   const [collapsedCols, setCollapsedCols] = useState(() => {
     try {
       const saved = localStorage.getItem("collapsed-columns");
       if (saved) return JSON.parse(saved);
     } catch {}
-    // Default: deploying, deployed, deploy_failed and failed are collapsed
     return { deploying: true, deployed: true, deploy_failed: true, failed: true };
   });
   const toggleCollapse = useCallback((col) => {
@@ -110,31 +201,18 @@ export default function App() {
     return <SpeedLoader text="Loading tasks..." />;
   }
 
-  const VIEW_TABS = [
-    { key: "board", label: "Board", Icon: ClipboardList },
-    { key: "pingboard", label: "Pingboard", Icon: Bot },
-    { key: "health", label: "Health", Icon: HeartPulse },
-  ];
-
   if (view === "pingboard" || view === "health") {
     return (
-      <div style={{ fontFamily: "'Roboto', system-ui, sans-serif" }}>
-        <div style={{
+      <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+        <div className="header-glass" style={{
           position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
-          background: "var(--md-background)", borderBottom: "1px solid var(--md-surface-variant)",
-          display: "flex", gap: 0, padding: "0 16px",
+          display: "flex", alignItems: "center", gap: 16, padding: "0 20px", height: 48,
         }}>
-          {VIEW_TABS.map(t => (
-            <button key={t.key} onClick={() => setView(t.key)} style={{
-              padding: "10px 20px", background: "none", border: "none",
-              borderBottom: view === t.key ? "2px solid var(--md-primary)" : "2px solid transparent",
-              color: view === t.key ? "var(--md-primary)" : "var(--md-on-surface-variant)",
-              cursor: "pointer", fontSize: 13, fontWeight: 600,
-              fontFamily: "'Roboto', system-ui, sans-serif",
-            }}>{t.label}</button>
-          ))}
+          <HeaderLogo />
+          <div style={{ width: 1, height: 20, background: "var(--md-outline)" }} />
+          <NavTabs view={view} setView={setView} />
         </div>
-        <div style={{ paddingTop: 42 }}>
+        <div style={{ paddingTop: 48 }}>
           {view === "pingboard" ? <Pingboard /> : <HealthDashboard />}
         </div>
       </div>
@@ -161,8 +239,6 @@ export default function App() {
       case "todo": return filterByType(todo);
       case "active": return [...filterByType(assigned), ...filterByType(inProgress)];
       case "blocked": return [...filterByType(blocked)].sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at));
-      case "qa": return filterByType(qa);
-      case "blocked": return filterByType(blocked);
       case "qa": return filterByType(qa).sort((a, b) => {
             const aAssigned = !!a.assigned_agent;
             const bAssigned = !!b.assigned_agent;
@@ -181,21 +257,45 @@ export default function App() {
 
   const getActiveColumnMeta = () => {
     switch (activeTab) {
-      case "todo": return { title: "Todo", color: "#79747E" };
-      case "active": return { title: "Active", color: "#E8A317" };
-      case "blocked": return { title: "Blocked", color: "#D84315" };
-      case "qa": return { title: "QA Testing", color: "#7B5EA7" };
-      case "completed": return { title: "Completed", color: "#1B5E20" };
-      case "deploying": return { title: "Deploying", color: "#E65100" };
-      case "deployed": return { title: "Deployed", color: "#00897B" };
-      case "deploy_failed": return { title: "Deploy Failed", color: "#C62828" };
-      case "failed": return { title: "Failed", color: "#BA1A1A" };
-      default: return { title: "Todo", color: "#79747E" };
+      case "todo": return { title: "Todo", color: "#71717A" };
+      case "active": return { title: "Active", color: "#EAB308" };
+      case "blocked": return { title: "Blocked", color: "#EF4444" };
+      case "qa": return { title: "QA Testing", color: "#A78BFA" };
+      case "completed": return { title: "Completed", color: "#22C55E" };
+      case "deploying": return { title: "Deploying", color: "#F97316" };
+      case "deployed": return { title: "Deployed", color: "#14B8A6" };
+      case "deploy_failed": return { title: "Deploy Failed", color: "#EF4444" };
+      case "failed": return { title: "Failed", color: "#EF4444" };
+      default: return { title: "Todo", color: "#71717A" };
     }
   };
 
   const renderCards = (tasks) =>
     tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={handleSelectTask} isMobile={isMobile} progress={taskProgress[t.id]} monitor={taskMonitor[t.id]} transitioning={!!transitioning[t.id]} />);
+
+  const taskNotFoundModal = selectedTask && selectedTask._notFound && (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000,
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }} onClick={handleCloseTask}>
+      <div style={{
+        background: "var(--md-surface-container)", borderRadius: 12, padding: "32px 40px",
+        textAlign: "center", maxWidth: 400, border: "1px solid var(--md-outline)",
+      }} onClick={e => e.stopPropagation()}>
+        <Search size={32} style={{ color: "var(--md-on-surface-variant)", marginBottom: 12 }} />
+        <h2 style={{ margin: "0 0 8px", color: "var(--md-on-background)", fontSize: 18, fontWeight: 600 }}>Task Not Found</h2>
+        <p style={{ color: "var(--md-on-surface-variant)", fontSize: 13, margin: "0 0 20px" }}>
+          No task with ID <code style={{ fontSize: 11, background: "var(--md-surface-variant)", padding: "2px 6px", borderRadius: 4 }}>{selectedTask.id}</code>
+        </p>
+        <button onClick={handleCloseTask} style={{
+          padding: "8px 20px", borderRadius: 8, border: "none",
+          background: "var(--md-primary)", color: "var(--md-on-primary)",
+          cursor: "pointer", fontWeight: 600, fontSize: 13,
+          fontFamily: "'Inter', system-ui, sans-serif",
+        }}>Back to Board</button>
+      </div>
+    </div>
+  );
 
   // MOBILE LAYOUT
   if (isMobile) {
@@ -204,70 +304,48 @@ export default function App() {
     return (
       <div style={{
         display: "flex", flexDirection: "column", height: "100vh",
-        background: "var(--md-background)", fontFamily: "'Roboto', system-ui, sans-serif",
+        background: "var(--md-background)", fontFamily: "'Inter', system-ui, sans-serif",
       }}>
-        {/* Simplified header */}
-        <div style={{ padding: "12px 16px", background: "var(--md-background)", borderBottom: "1px solid var(--md-surface-variant)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{
-              width: 32, height: 32, background: "var(--md-primary)", color: "var(--md-on-primary)",
-              borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
-              fontWeight: 700, fontSize: 16,
-            }}>d</div>
-            <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: "-0.02em" }}>
-              tasks<span style={{ color: "var(--md-primary)" }}>.</span>dante<span style={{ color: "var(--md-primary)" }}>.</span>id
-            </span>
-            <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
-              <button onClick={() => setView("pingboard")} style={{
-                padding: "4px 10px", borderRadius: 6,
-                background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)",
-                color: "var(--md-on-surface-variant)", cursor: "pointer", fontSize: 11, fontWeight: 600,
-              }}><Bot size={14} /></button>
-              <button onClick={() => setView("health")} style={{
-                padding: "4px 10px", borderRadius: 6,
-                background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)",
-                color: "var(--md-on-surface-variant)", cursor: "pointer", fontSize: 11, fontWeight: 600,
-              }}><HeartPulse size={16} /></button>
+        <div className="header-glass" style={{ padding: "10px 16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <HeaderLogo />
+            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+              <div className={`connection-dot ${sseConnected ? "connected" : "disconnected"}`} title={sseConnected ? "Live" : "Disconnected"} />
+              <button onClick={() => setView("pingboard")} className="nav-pill" style={{ padding: "5px 8px" }}>
+                <Bot size={16} strokeWidth={1.5} />
+              </button>
+              <button onClick={() => setView("health")} className="nav-pill" style={{ padding: "5px 8px" }}>
+                <HeartPulse size={16} strokeWidth={1.5} />
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Filter bar - wrapping */}
-        <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--md-surface-variant)" }}>
+        <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--header-border)" }}>
           <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)} style={{
-            width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--md-surface-variant)",
-            background: "var(--md-surface)", color: "var(--md-on-background)", fontSize: 13,
-            fontWeight: 500, fontFamily: "'Roboto', system-ui, sans-serif", outline: "none",
+            width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--md-outline)",
+            background: "var(--md-surface-container)", color: "var(--md-on-background)", fontSize: 13,
+            fontWeight: 500, fontFamily: "'Inter', system-ui, sans-serif", outline: "none",
             marginBottom: 8, minHeight: 44,
           }}>
             <option value="">All Projects</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
             {activeTypes.map(type => (
-              <button key={type} onClick={() => setTypeFilter(type)} style={{
-                padding: "6px 14px", borderRadius: 16, fontSize: 12, fontWeight: 500,
-                minHeight: 36,
-                border: typeFilter === type ? "2px solid var(--md-primary)" : "1px solid var(--md-surface-variant)",
-                background: typeFilter === type ? "var(--md-primary-container)" : "var(--md-surface)",
-                color: typeFilter === type ? "var(--md-on-primary-container)" : "var(--md-on-surface-variant)",
-                cursor: "pointer", textTransform: "capitalize",
-                fontFamily: "'Roboto', system-ui, sans-serif",
-              }}>{type}</button>
+              <button key={type} onClick={() => setTypeFilter(type)}
+                className={`filter-chip${typeFilter === type ? " active" : ""}`}
+                style={{ minHeight: 36 }}
+              >{type}</button>
             ))}
           </div>
           {activeStages.length > 1 && (
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
               {activeStages.map(stage => (
-                <button key={stage} onClick={() => setStageFilter(stage)} style={{
-                  padding: "6px 14px", borderRadius: 16, fontSize: 12, fontWeight: 500,
-                  minHeight: 36,
-                  border: stageFilter === stage ? "2px solid var(--md-primary)" : "1px solid var(--md-surface-variant)",
-                  background: stageFilter === stage ? "var(--md-primary-container)" : "var(--md-surface)",
-                  color: stageFilter === stage ? "var(--md-on-primary-container)" : "var(--md-on-surface-variant)",
-                  cursor: "pointer", textTransform: "capitalize",
-                  fontFamily: "'Roboto', system-ui, sans-serif",
-                }}>{stage === "all" ? "all stages" : stage}</button>
+                <button key={stage} onClick={() => setStageFilter(stage)}
+                  className={`filter-chip${stageFilter === stage ? " active" : ""}`}
+                  style={{ minHeight: 36 }}
+                >{stage === "all" ? "all stages" : stage}</button>
               ))}
             </div>
           )}
@@ -276,18 +354,17 @@ export default function App() {
           </div>
         </div>
 
-        {/* Column header */}
         <div style={{ padding: "10px 16px 6px", display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 8, height: 8, borderRadius: "50%", background: colMeta.color }} />
-          <span style={{ fontWeight: 600, fontSize: 14 }}>{colMeta.title}</span>
+          <div style={{ width: 7, height: 7, borderRadius: "50%", background: colMeta.color }} />
+          <span style={{ fontWeight: 600, fontSize: 13, letterSpacing: "-0.01em" }}>{colMeta.title}</span>
           <span style={{
-            background: `${colMeta.color}20`, color: colMeta.color,
-            padding: "2px 10px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+            background: `${colMeta.color}15`, color: colMeta.color,
+            padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700,
+            border: `1px solid ${colMeta.color}20`,
           }}>{colTasks.length}</span>
           {activeTab === "todo" && <DispatchButton />}
         </div>
 
-        {/* Task list */}
         <div style={{ flex: 1, overflow: "auto", padding: "4px 12px 80px", minHeight: 0 }}>
           {colTasks.length === 0 && (
             <div style={{ textAlign: "center", color: "var(--md-on-surface-variant)", padding: 40, fontSize: 13 }}>No tasks</div>
@@ -295,38 +372,39 @@ export default function App() {
           {renderCards(colTasks)}
         </div>
 
-        {/* FAB */}
-        <button onClick={() => setShowModal(true)} style={{
-          position: "fixed", bottom: 76, right: 16, width: 56, height: 56,
-          borderRadius: 16, background: "var(--md-primary)", color: "var(--md-on-primary)",
-          border: "none", fontSize: 24, fontWeight: 300, cursor: "pointer", zIndex: 50,
+        <button onClick={() => {}} style={{
+          position: "fixed", bottom: 76, right: 16, width: 52, height: 52,
+          borderRadius: 14, background: "linear-gradient(135deg, #7C3AED 0%, #6750A4 100%)",
+          color: "#fff", border: "none", fontSize: 22, fontWeight: 300, cursor: "pointer", zIndex: 50,
           display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: "0 3px 5px rgba(0,0,0,0.2), 0 6px 10px rgba(0,0,0,0.14), 0 1px 18px rgba(0,0,0,0.12)",
+          boxShadow: "0 4px 12px rgba(124, 58, 237, 0.3)",
         }}>+</button>
 
-        {/* Bottom navigation */}
         <div style={{
-          position: "fixed", bottom: 0, left: 0, right: 0, height: 64,
-          background: "var(--md-background)", borderTop: "1px solid var(--md-surface-variant)",
+          position: "fixed", bottom: 0, left: 0, right: 0, height: 60,
+          background: "var(--header-bg)", backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          borderTop: "1px solid var(--header-border)",
           display: "flex", alignItems: "center", justifyContent: "space-around",
           zIndex: 40, paddingBottom: "env(safe-area-inset-bottom, 0px)",
         }}>
           {BOTTOM_TABS.map(tab => {
             const isActive = activeTab === tab.key;
+            const TabIcon = tab.icon;
             return (
               <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 1,
                 background: "none", border: "none", cursor: "pointer",
-                padding: "6px 12px", minWidth: 48, minHeight: 44,
+                padding: "6px 10px", minWidth: 44,
                 color: isActive ? "var(--md-primary)" : "var(--md-on-surface-variant)",
-                position: "relative",
+                position: "relative", transition: "color 150ms ease",
               }}>
                 {isActive && <div style={{
-                  position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)",
-                  width: 32, height: 3, borderRadius: 2, background: "var(--md-primary)",
+                  position: "absolute", top: -1, left: "50%", transform: "translateX(-50%)",
+                  width: 24, height: 2, borderRadius: 1, background: "var(--md-primary)",
                 }} />}
-                <span style={{ fontSize: 18 }}>{tab.icon}</span>
-                <span style={{ fontSize: 10, fontWeight: isActive ? 600 : 400 }}>{tab.label}</span>
+                <TabIcon size={18} strokeWidth={isActive ? 2 : 1.5} />
+                <span style={{ fontSize: 9, fontWeight: isActive ? 600 : 400, letterSpacing: "0.01em" }}>{tab.label}</span>
               </button>
             );
           })}
@@ -343,28 +421,7 @@ export default function App() {
             monitor={selectedTask ? taskMonitor[selectedTask.id] : null}
           />
         )}
-        {selectedTask && selectedTask._notFound && (
-          <div style={{
-            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000,
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }} onClick={handleCloseTask}>
-            <div style={{
-              background: "var(--md-surface)", borderRadius: 16, padding: "32px 40px",
-              textAlign: "center", maxWidth: 400,
-            }} onClick={e => e.stopPropagation()}>
-              <div style={{ fontSize: 48, marginBottom: 12 }}><Search size={14} /></div>
-              <h2 style={{ margin: "0 0 8px", color: "var(--md-on-surface)" }}>Task Not Found</h2>
-              <p style={{ color: "var(--md-on-surface-variant)", fontSize: 14, margin: "0 0 20px" }}>
-                No task with ID <code style={{ fontSize: 12 }}>{selectedTask.id}</code> was found.
-              </p>
-              <button onClick={handleCloseTask} style={{
-                padding: "8px 24px", borderRadius: 20, border: "none",
-                background: "var(--md-primary)", color: "var(--md-on-primary)",
-                cursor: "pointer", fontWeight: 600, fontSize: 14,
-              }}>Back to Board</button>
-            </div>
-          </div>
-        )}
+        {taskNotFoundModal}
       </div>
     );
   }
@@ -373,111 +430,87 @@ export default function App() {
   return (
     <div style={{
       display: "flex", flexDirection: "column", height: "100vh",
-      background: "var(--md-background)", fontFamily: "'Roboto', system-ui, sans-serif",
+      background: "var(--md-background)", fontFamily: "'Inter', system-ui, sans-serif",
     }}>
-      <div style={{ padding: "16px 24px 0", background: "var(--md-background)" }}>
+      <div className="header-glass" style={{
+        padding: "0 24px", position: "sticky", top: 0, zIndex: 100,
+      }}>
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          marginBottom: 16,
+          height: 52,
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{
-              width: 36, height: 36, background: "var(--md-primary)", color: "var(--md-on-primary)",
-              borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center",
-              fontWeight: 700, fontSize: 20,
-            }}>d</div>
-            <div>
-              <span style={{ fontWeight: 700, fontSize: 20, letterSpacing: "-0.02em" }}>
-                tasks<span style={{ color: "var(--md-primary)" }}>.</span>dante<span style={{ color: "var(--md-primary)" }}>.</span>id
-              </span>
-            </div>
-            <button onClick={() => setView("pingboard")} style={{
-              marginLeft: 16, padding: "6px 14px", borderRadius: 8,
-              background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)",
-              color: "var(--md-on-surface-variant)", cursor: "pointer", fontSize: 12, fontWeight: 600,
-              fontFamily: "'Roboto', system-ui, sans-serif",
-            }}><Bot size={14} /> Pingboard</button>
-            <button onClick={() => setView("health")} style={{
-              padding: "6px 14px", borderRadius: 8,
-              background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)",
-              color: "var(--md-on-surface-variant)", cursor: "pointer", fontSize: 12, fontWeight: 600,
-              fontFamily: "'Roboto', system-ui, sans-serif",
-            }}><HeartPulse size={14} /> Health</button>
-            <span style={{ fontSize: 10, color: 'var(--md-on-surface-variant)', opacity: 0.6, fontFamily: 'monospace', marginLeft: 8, background: 'var(--md-surface-variant)', padding: '2px 6px', borderRadius: 4 }}>{__COMMIT_HASH__}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <HeaderLogo />
+            <div style={{ width: 1, height: 20, background: "var(--md-outline)" }} />
+            <NavTabs view={view} setView={setView} />
+            <div style={{ width: 1, height: 20, background: "var(--md-outline)" }} />
+            <div className={`connection-dot ${sseConnected ? "connected" : "disconnected"}`} title={sseConnected ? "Live" : "Disconnected"} />
+            <span style={{
+              fontSize: 10, color: 'var(--md-on-surface-variant)', opacity: 0.5,
+              fontFamily: "'JetBrains Mono', monospace",
+              background: 'var(--md-surface-container)', padding: '2px 6px', borderRadius: 4,
+              border: '1px solid var(--md-outline)',
+            }}>{__COMMIT_HASH__}</span>
           </div>
-          <StatsBar stats={stats} isTablet={isTablet} />
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <SearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} isMobile={false} />
+            <StatsBar stats={stats} isTablet={isTablet} />
+          </div>
         </div>
 
         <div style={{
           display: "flex", alignItems: "center", gap: 12, flexWrap: isTablet ? "wrap" : "nowrap",
-          paddingBottom: 16, borderBottom: "1px solid var(--md-surface-variant)",
+          paddingBottom: 10, paddingTop: 2,
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Project</span>
+            <span style={{
+              fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant)",
+              textTransform: "uppercase", letterSpacing: "0.05em",
+              fontFamily: "'Inter', system-ui, sans-serif",
+            }}>Project</span>
             <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)} style={{
-              padding: "6px 12px", borderRadius: 8, border: "1px solid var(--md-surface-variant)",
-              background: "var(--md-surface)", color: "var(--md-on-background)", fontSize: 13,
-              fontWeight: 500, fontFamily: "'Roboto', system-ui, sans-serif", outline: "none",
-              cursor: "pointer", minWidth: 160,
+              padding: "5px 10px", borderRadius: 6, border: "1px solid var(--md-outline)",
+              background: "var(--md-surface-container)", color: "var(--md-on-background)", fontSize: 12,
+              fontWeight: 500, fontFamily: "'Inter', system-ui, sans-serif", outline: "none",
+              cursor: "pointer", minWidth: 140,
             }}>
               <option value="">All</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
-          <div style={{ width: 1, height: 24, background: "var(--md-surface-variant)" }} />
+          <div style={{ width: 1, height: 20, background: "var(--md-outline)" }} />
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Type</span>
+            <span style={{
+              fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant)",
+              textTransform: "uppercase", letterSpacing: "0.05em",
+              fontFamily: "'Inter', system-ui, sans-serif",
+            }}>Type</span>
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
               {activeTypes.map(type => (
-                <button key={type} onClick={() => setTypeFilter(type)} style={{
-                  padding: "4px 12px", borderRadius: 16, fontSize: 12, fontWeight: 500,
-                  border: typeFilter === type ? "2px solid var(--md-primary)" : "1px solid var(--md-surface-variant)",
-                  background: typeFilter === type ? "var(--md-primary-container)" : "var(--md-surface)",
-                  color: typeFilter === type ? "var(--md-on-primary-container)" : "var(--md-on-surface-variant)",
-                  cursor: "pointer", textTransform: "capitalize",
-                  fontFamily: "'Roboto', system-ui, sans-serif", transition: "all 150ms",
-                }}>{type}</button>
+                <button key={type} onClick={() => setTypeFilter(type)}
+                  className={`filter-chip${typeFilter === type ? " active" : ""}`}
+                >{type}</button>
               ))}
             </div>
           </div>
           {activeStages.length > 1 && (<>
-            <div style={{ width: 1, height: 24, background: "var(--md-surface-variant)" }} />
+            <div style={{ width: 1, height: 20, background: "var(--md-outline)" }} />
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Stage</span>
+              <span style={{
+                fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant)",
+                textTransform: "uppercase", letterSpacing: "0.05em",
+                fontFamily: "'Inter', system-ui, sans-serif",
+              }}>Stage</span>
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                 {activeStages.map(stage => (
-                  <button key={stage} onClick={() => setStageFilter(stage)} style={{
-                    padding: "4px 12px", borderRadius: 16, fontSize: 12, fontWeight: 500,
-                    border: stageFilter === stage ? "2px solid var(--md-primary)" : "1px solid var(--md-surface-variant)",
-                    background: stageFilter === stage ? "var(--md-primary-container)" : "var(--md-surface)",
-                    color: stageFilter === stage ? "var(--md-on-primary-container)" : "var(--md-on-surface-variant)",
-                    cursor: "pointer", textTransform: "capitalize",
-                    fontFamily: "'Roboto', system-ui, sans-serif", transition: "all 150ms",
-                  }}>{stage === "all" ? "all stages" : stage}</button>
+                  <button key={stage} onClick={() => setStageFilter(stage)}
+                    className={`filter-chip${stageFilter === stage ? " active" : ""}`}
+                  >{stage === "all" ? "all stages" : stage}</button>
                 ))}
               </div>
             </div>
           </>)}
-          <div style={{ width: 1, height: 24, background: "var(--md-surface-variant)" }} />
-          <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
-            <input
-              type="text"
-              placeholder="Search tasks..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              style={{
-                padding: "8px 32px 8px 12px", borderRadius: 20, border: "1px solid var(--md-surface-variant)",
-                background: "var(--md-surface)", fontSize: 13, fontFamily: "'Roboto', system-ui, sans-serif",
-                outline: "none", width: 200, color: "var(--md-on-surface)",
-              }}
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                style={{ position: "absolute", right: 8, background: "none", border: "none", cursor: "pointer", color: "var(--md-on-surface-variant)", fontSize: 14, padding: 0 }}
-              >✕</button>
-            )}
-          </div>
+          <div style={{ width: 1, height: 20, background: "var(--md-outline)" }} />
           <TimeFilter allTasks={allTasksRaw} value={timeFilter} onChange={setTimeFilter} isMobile={false} />
         </div>
       </div>
@@ -485,19 +518,19 @@ export default function App() {
       <div style={{
         flex: 1, display: "flex", gap: 12, padding: "16px 24px", overflowX: "auto", minHeight: 0,
       }}>
-        <Column title="Todo" color="#79747E" count={filterByType(todo).length} isTablet={isTablet} headerAction={<DispatchButton />}
+        <Column title="Todo" color="#71717A" count={filterByType(todo).length} isTablet={isTablet} headerAction={<DispatchButton />}
           collapsible collapsed={!!collapsedCols.todo} onToggleCollapse={() => toggleCollapse("todo")}>
           {renderCards(filterByType(todo))}
         </Column>
-        <Column title="In Progress" color="#E8A317" count={filterByType(assigned).length + filterByType(inProgress).length} agentCount={countActiveTasks([...filterByType(assigned), ...filterByType(inProgress)])} isTablet={isTablet}
+        <Column title="In Progress" color="#EAB308" count={filterByType(assigned).length + filterByType(inProgress).length} agentCount={countActiveTasks([...filterByType(assigned), ...filterByType(inProgress)])} isTablet={isTablet}
           collapsible collapsed={!!collapsedCols.in_progress} onToggleCollapse={() => toggleCollapse("in_progress")}>
           {renderCards([...filterByType(assigned), ...filterByType(inProgress)])}
         </Column>
-        <Column title="Blocked" color="#D84315" count={filterByType(blocked).length} isTablet={isTablet}
+        <Column title="Blocked" color="#EF4444" count={filterByType(blocked).length} isTablet={isTablet}
           collapsible collapsed={!!collapsedCols.blocked} onToggleCollapse={() => toggleCollapse("blocked")}>
           {renderCards([...filterByType(blocked)].sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at)))}
         </Column>
-        <Column title="QA Testing" color="#7B5EA7" count={filterByType(qa).length} agentCount={countActiveTasks(filterByType(qa))} isTablet={isTablet}
+        <Column title="QA Testing" color="#A78BFA" count={filterByType(qa).length} agentCount={countActiveTasks(filterByType(qa))} isTablet={isTablet}
           collapsible collapsed={!!collapsedCols.qa_testing} onToggleCollapse={() => toggleCollapse("qa_testing")}>
           {renderCards(filterByType(qa).sort((a, b) => {
             const aAssigned = !!a.assigned_agent;
@@ -507,23 +540,23 @@ export default function App() {
             return new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
           }).slice(0, 30))}
         </Column>
-        <Column title="Completed" color="#1B5E20" count={filterByType(completed).length} isTablet={isTablet}
+        <Column title="Completed" color="#22C55E" count={filterByType(completed).length} isTablet={isTablet}
           collapsible collapsed={!!collapsedCols.completed} onToggleCollapse={() => toggleCollapse("completed")}>
           {renderCards(filterByType(completed).slice(0, 20))}
         </Column>
-        <Column title="Deploying" color="#E65100" count={filterByType(deploying).length} isTablet={isTablet}
+        <Column title="Deploying" color="#F97316" count={filterByType(deploying).length} isTablet={isTablet}
           collapsible collapsed={!!collapsedCols.deploying} onToggleCollapse={() => toggleCollapse("deploying")}>
           {renderCards(filterByType(deploying))}
         </Column>
-        <Column title="Deployed" color="#00897B" count={filterByType(deployed).length} isTablet={isTablet}
+        <Column title="Deployed" color="#14B8A6" count={filterByType(deployed).length} isTablet={isTablet}
           collapsible collapsed={!!collapsedCols.deployed} onToggleCollapse={() => toggleCollapse("deployed")}>
           {renderCards(filterByType(deployed).slice(0, 20))}
         </Column>
-        <Column title="Deploy Failed" color="#C62828" count={filterByType(deployFailed).length} isTablet={isTablet}
+        <Column title="Deploy Failed" color="#EF4444" count={filterByType(deployFailed).length} isTablet={isTablet}
           collapsible collapsed={!!collapsedCols.deploy_failed} onToggleCollapse={() => toggleCollapse("deploy_failed")}>
           {renderCards(filterByType(deployFailed))}
         </Column>
-        <Column title="Failed" color="#BA1A1A" count={filterByType(failed).length} isTablet={isTablet}
+        <Column title="Failed" color="#EF4444" count={filterByType(failed).length} isTablet={isTablet}
           collapsible collapsed={!!collapsedCols.failed} onToggleCollapse={() => toggleCollapse("failed")}>
           {renderCards(filterByType(failed))}
         </Column>
@@ -542,28 +575,7 @@ export default function App() {
           monitor={selectedTask ? taskMonitor[selectedTask.id] : null}
         />
       )}
-      {selectedTask && selectedTask._notFound && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000,
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }} onClick={handleCloseTask}>
-          <div style={{
-            background: "var(--md-surface)", borderRadius: 16, padding: "32px 40px",
-            textAlign: "center", maxWidth: 400,
-          }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}><Search size={14} /></div>
-            <h2 style={{ margin: "0 0 8px", color: "var(--md-on-surface)" }}>Task Not Found</h2>
-            <p style={{ color: "var(--md-on-surface-variant)", fontSize: 14, margin: "0 0 20px" }}>
-              No task with ID <code style={{ fontSize: 12 }}>{selectedTask.id}</code> was found.
-            </p>
-            <button onClick={handleCloseTask} style={{
-              padding: "8px 24px", borderRadius: 20, border: "none",
-              background: "var(--md-primary)", color: "var(--md-on-primary)",
-              cursor: "pointer", fontWeight: 600, fontSize: 14,
-            }}>Back to Board</button>
-          </div>
-        </div>
-      )}
+      {taskNotFoundModal}
     </div>
   );
 }
