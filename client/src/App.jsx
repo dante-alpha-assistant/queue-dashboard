@@ -10,6 +10,7 @@ import DispatchButton from "./components/DispatchButton";
 import TaskCard from "./components/TaskCard";
 import NewTaskChat from "./components/NewTaskChat";
 import TaskDetailModal from "./components/TaskDetailModal";
+import BatchDeployModal from "./components/BatchDeployModal";
 import Pingboard from "./pages/Pingboard";
 import HealthDashboard from "./pages/HealthDashboard";
 import TimeFilter, { filterTasksByTime, getRange } from "./components/TimeFilter";
@@ -119,28 +120,8 @@ export default function App() {
   }, [navigate]);
 
 
-  // Batch deploy all completed tasks with PRs
-  const [batchDeploying, setBatchDeploying] = useState(false);
-  const handleBatchDeploy = useCallback(async () => {
-    const deployable = completed.filter(t => t.pull_request_url);
-    if (deployable.length === 0) return alert("No completed tasks with PRs to deploy.");
-    if (!confirm(`Deploy ${deployable.length} task(s)? This will merge all PRs and trigger a single deployment.`)) return;
-    setBatchDeploying(true);
-    try {
-      const res = await fetch("/api/deploy/batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskIds: deployable.map(t => t.id) }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Batch deploy failed");
-      alert(`Batch deploy started: ${data.deploying.length} task(s) deploying.${data.skipped.length ? ` ${data.skipped.length} skipped.` : ""}`);
-    } catch (e) {
-      alert("Batch deploy failed: " + e.message);
-    } finally {
-      setBatchDeploying(false);
-    }
-  }, [completed]);
+  // Batch deploy modal
+  const [showBatchDeploy, setShowBatchDeploy] = useState(false);
 
   // All columns are collapsible
   const COLLAPSIBLE_COLUMNS = ["todo", "in_progress", "blocked", "qa_testing", "completed", "deploying", "deployed", "deploy_failed", "failed"];
@@ -532,16 +513,15 @@ export default function App() {
           collapsible collapsed={!!collapsedCols.completed} onToggleCollapse={() => toggleCollapse("completed")}
           headerAction={completed.filter(t => t.pull_request_url).length > 0 && (
             <button
-              onClick={handleBatchDeploy}
-              disabled={batchDeploying}
+              onClick={() => setShowBatchDeploy(true)}
               style={{
                 fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 6,
-                background: batchDeploying ? "#79747E" : "#1B5E20", color: "#fff",
-                border: "none", cursor: batchDeploying ? "wait" : "pointer",
+                background: "#1B5E20", color: "#fff",
+                border: "none", cursor: "pointer",
                 textTransform: "uppercase", letterSpacing: "0.5px",
               }}
             >
-              {batchDeploying ? "Deploying..." : `Deploy All (${completed.filter(t => t.pull_request_url).length})`}
+              Deploy All ({completed.filter(t => t.pull_request_url).length})
             </button>
           )}>
           {renderCards(filterByType(completed).slice(0, 20))}

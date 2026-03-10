@@ -332,6 +332,157 @@ router.get("/events", async (req, res) => {
 
 // Deploy task — manual promotion to deployed
 // Merges PR (if present), triggers ArgoCD sync, waits for sync, updates status
+
+// Batch deploy dry-run — check if PRs can merge
+router.post("/deploy/batch/dry-run", async (req, res) => {
+  try {
+    const { taskIds } = req.body;
+    if (!taskIds?.length) return res.status(400).json({ error: "taskIds required" });
+
+    const { data: tasks } = await supabase
+      .from("agent_tasks")
+      .select("id, title, pull_request_url")
+      .in("id", taskIds);
+
+    const results = [];
+    for (const t of (tasks || [])) {
+      if (!t.pull_request_url) {
+        results.push({ id: t.id, title: t.title, mergeable: false, reason: "no PR" });
+        continue;
+      }
+      const match = t.pull_request_url.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+      if (!match) {
+        results.push({ id: t.id, title: t.title, mergeable: false, reason: "invalid PR URL" });
+        continue;
+      }
+      try {
+        const ghRes = await fetch(`https://api.github.com/repos/${match[1]}/${match[2]}/pulls/${match[3]}`, {
+          headers: { Authorization: `token ${process.env.GH_TOKEN || process.env.GITHUB_TOKEN || ""}` },
+        });
+        const pr = await ghRes.json();
+        results.push({
+          id: t.id, title: t.title,
+          mergeable: pr.mergeable === true,
+          state: pr.state,
+          mergeable_state: pr.mergeable_state,
+          reason: pr.mergeable === false ? "has conflicts" : pr.state !== "open" ? `PR is ${pr.state}` : null,
+        });
+      } catch (e) {
+        results.push({ id: t.id, title: t.title, mergeable: false, reason: e.message });
+      }
+    }
+
+    const allMergeable = results.filter(r => r.mergeable).length;
+    const conflicts = results.filter(r => !r.mergeable);
+
+    res.json({
+      mergeable: allMergeable,
+      total: results.length,
+      conflicts: conflicts.length > 0 ? conflicts : undefined,
+      results,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Batch Deploy ─────────────────────────────────────────────
+// Creates a deploy parent task, links selected tasks as subtasks,
+// and sets them all to "deploying" status.
+router.post("/deploy/batch", async (req, res) => {
+  try {
+    const { taskIds } = req.body;
+    if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
+      return res.status(400).json({ error: "taskIds array required" });
+    }
+
+    // Fetch the tasks to deploy
+    const { data: tasks, error: fetchErr } = await supabase
+      .from("agent_tasks")
+      .select("id, title, status, pull_request_url, repository_url, deploy_target, type")
+      .in("id", taskIds);
+
+    if (fetchErr) return res.status(500).json({ error: fetchErr.message });
+    if (!tasks || tasks.length === 0) return res.status(404).json({ error: "No tasks found" });
+
+    // Only deploy completed tasks that have PRs
+    const deployable = tasks.filter(t => t.status === "completed" && t.pull_request_url);
+    const skipped = tasks.filter(t => t.status !== "completed" || !t.pull_request_url);
+
+    if (deployable.length === 0) {
+      return res.status(400).json({ 
+        error: "No deployable tasks. Tasks must be completed with a PR URL.",
+        skipped: skipped.map(t => ({ id: t.id, title: t.title, reason: !t.pull_request_url ? "no PR" : `status: ${t.status}` }))
+      });
+    }
+
+    // Group by repo
+    const byRepo = {};
+    for (const t of deployable) {
+      // Extract repo from PR URL: https://github.com/owner/repo/pull/123
+      const match = t.pull_request_url?.match(/github\.com\/([^/]+\/[^/]+)\/pull/);
+      const repo = match ? match[1] : t.repository_url || "unknown";
+      if (!byRepo[repo]) byRepo[repo] = [];
+      byRepo[repo].push({
+        id: t.id,
+        title: t.title,
+        pr_url: t.pull_request_url,
+        pr_number: t.pull_request_url?.match(/\/pull\/(\d+)/)?.[1],
+        deploy_target: t.deploy_target || "kubernetes",
+      });
+    }
+
+    // Create the parent deploy task
+    const { data: deployTask, error: createErr } = await supabase
+      .from("agent_tasks")
+      .insert({
+        title: `Batch Deploy — ${deployable.length} tasks across ${Object.keys(byRepo).length} repo(s)`,
+        type: "deploy",
+        priority: "urgent",
+        status: "todo",
+        deploy_target: deployable[0].deploy_target || "kubernetes",
+        description: `Merge and deploy ${deployable.length} PRs:\n\n${deployable.map(t => `- ${t.title} (${t.pull_request_url})`).join("\n")}`,
+        metadata: {
+          batch_tasks: deployable.map(t => ({ id: t.id, title: t.title, pr_url: t.pull_request_url })),
+          repos: byRepo,
+          strategy: "sequential_rebase",
+        },
+      })
+      .select()
+      .single();
+
+    if (createErr) return res.status(500).json({ error: createErr.message });
+
+    // Create deployed_by relationships (each task is deployed_by the parent)
+    const relationships = deployable.map(t => ({
+      source_task_id: t.id,
+      target_task_id: deployTask.id,
+      relationship_type: "deployed_by",
+      created_by: "system",
+    }));
+
+    await supabase.from("task_relationships").insert(relationships);
+
+    // Set all deployable tasks to "deploying"
+    const { error: updateErr } = await supabase
+      .from("agent_tasks")
+      .update({ status: "deploying", updated_at: new Date().toISOString() })
+      .in("id", deployable.map(t => t.id));
+
+    if (updateErr) console.error("[BATCH_DEPLOY] Status update error:", updateErr.message);
+
+    res.json({
+      ok: true,
+      deployTask: { id: deployTask.id, title: deployTask.title },
+      deploying: deployable.map(t => ({ id: t.id, title: t.title })),
+      skipped: skipped.map(t => ({ id: t.id, title: t.title, reason: !t.pull_request_url ? "no PR" : `status: ${t.status}` })),
+    });
+  } catch (e) {
+    console.error("[BATCH_DEPLOY] Error:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 router.post("/deploy/:id", async (req, res) => {
   const GH_TOKEN = process.env.GH_TOKEN;
   const VERCEL_TOKEN = process.env.VERCEL_TOKEN;
@@ -1248,99 +1399,3 @@ router.delete("/relationships/:id", async (req, res) => {
   }
 });
 
-// ── Batch Deploy ─────────────────────────────────────────────
-// Creates a deploy parent task, links selected tasks as subtasks,
-// and sets them all to "deploying" status.
-router.post("/deploy/batch", async (req, res) => {
-  try {
-    const { taskIds } = req.body;
-    if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
-      return res.status(400).json({ error: "taskIds array required" });
-    }
-
-    // Fetch the tasks to deploy
-    const { data: tasks, error: fetchErr } = await supabase
-      .from("agent_tasks")
-      .select("id, title, status, pull_request_url, repository_url, deploy_target, type")
-      .in("id", taskIds);
-
-    if (fetchErr) return res.status(500).json({ error: fetchErr.message });
-    if (!tasks || tasks.length === 0) return res.status(404).json({ error: "No tasks found" });
-
-    // Only deploy completed tasks that have PRs
-    const deployable = tasks.filter(t => t.status === "completed" && t.pull_request_url);
-    const skipped = tasks.filter(t => t.status !== "completed" || !t.pull_request_url);
-
-    if (deployable.length === 0) {
-      return res.status(400).json({ 
-        error: "No deployable tasks. Tasks must be completed with a PR URL.",
-        skipped: skipped.map(t => ({ id: t.id, title: t.title, reason: !t.pull_request_url ? "no PR" : `status: ${t.status}` }))
-      });
-    }
-
-    // Group by repo
-    const byRepo = {};
-    for (const t of deployable) {
-      // Extract repo from PR URL: https://github.com/owner/repo/pull/123
-      const match = t.pull_request_url?.match(/github\.com\/([^/]+\/[^/]+)\/pull/);
-      const repo = match ? match[1] : t.repository_url || "unknown";
-      if (!byRepo[repo]) byRepo[repo] = [];
-      byRepo[repo].push({
-        id: t.id,
-        title: t.title,
-        pr_url: t.pull_request_url,
-        pr_number: t.pull_request_url?.match(/\/pull\/(\d+)/)?.[1],
-        deploy_target: t.deploy_target || "kubernetes",
-      });
-    }
-
-    // Create the parent deploy task
-    const { data: deployTask, error: createErr } = await supabase
-      .from("agent_tasks")
-      .insert({
-        title: `Batch Deploy — ${deployable.length} tasks across ${Object.keys(byRepo).length} repo(s)`,
-        type: "deploy",
-        priority: "urgent",
-        status: "todo",
-        deploy_target: deployable[0].deploy_target || "kubernetes",
-        description: `Merge and deploy ${deployable.length} PRs:\n\n${deployable.map(t => `- ${t.title} (${t.pull_request_url})`).join("\n")}`,
-        metadata: {
-          batch_tasks: deployable.map(t => ({ id: t.id, title: t.title, pr_url: t.pull_request_url })),
-          repos: byRepo,
-          strategy: "sequential_rebase",
-        },
-      })
-      .select()
-      .single();
-
-    if (createErr) return res.status(500).json({ error: createErr.message });
-
-    // Create deployed_by relationships (each task is deployed_by the parent)
-    const relationships = deployable.map(t => ({
-      source_task_id: t.id,
-      target_task_id: deployTask.id,
-      relationship_type: "deployed_by",
-      created_by: "system",
-    }));
-
-    await supabase.from("task_relationships").insert(relationships);
-
-    // Set all deployable tasks to "deploying"
-    const { error: updateErr } = await supabase
-      .from("agent_tasks")
-      .update({ status: "deploying", updated_at: new Date().toISOString() })
-      .in("id", deployable.map(t => t.id));
-
-    if (updateErr) console.error("[BATCH_DEPLOY] Status update error:", updateErr.message);
-
-    res.json({
-      ok: true,
-      deployTask: { id: deployTask.id, title: deployTask.title },
-      deploying: deployable.map(t => ({ id: t.id, title: t.title })),
-      skipped: skipped.map(t => ({ id: t.id, title: t.title, reason: !t.pull_request_url ? "no PR" : `status: ${t.status}` })),
-    });
-  } catch (e) {
-    console.error("[BATCH_DEPLOY] Error:", e);
-    res.status(500).json({ error: e.message });
-  }
-});
