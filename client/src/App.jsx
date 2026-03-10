@@ -16,27 +16,27 @@ import TimeFilter, { filterTasksByTime, getRange } from "./components/TimeFilter
 import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Rocket, Search, XCircle, Zap } from 'lucide-react';
 
 const MOBILE_TABS = [
-  { key: "todo", label: "Todo", icon: ClipboardList },
-  { key: "in_progress", label: "Active", icon: Zap },
-  { key: "blocked", label: "Blocked", icon: Ban },
-  { key: "qa", label: "QA", icon: FlaskConical },
-  { key: "completed", label: "Done", icon: CheckCircle2 },
-  { key: "deployed", label: "Deployed", icon: Rocket },
-  { key: "deploying", label: "Deploying", icon: Clock },
-  { key: "deploy_failed", label: "Deploy Failed", icon: XCircle },
-  { key: "failed", label: "Failed", icon: XCircle },
+  { key: "todo", label: "Todo", icon: "📋" },
+  { key: "in_progress", label: "Active", icon: "⚡" },
+  { key: "blocked", label: "Blocked", icon: "🚫" },
+  { key: "qa", label: "QA", icon: "🧪" },
+  { key: "completed", label: "Done", icon: "✅" },
+  { key: "deployed", label: "Deployed", icon: "🚀" },
+  { key: "deploying", label: "Deploying", icon: "⏰" },
+  { key: "deploy_failed", label: "Deploy Failed", icon: "❌" },
+  { key: "failed", label: "Failed", icon: "❌" },
 ];
 
 // Merged tabs for bottom nav (assigned + in_progress = Active)
 const BOTTOM_TABS = [
-  { key: "todo", label: "Todo", icon: ClipboardList, color: "#79747E" },
-  { key: "active", label: "Active", icon: Zap, color: "#E8A317" },
-  { key: "blocked", label: "Blocked", icon: Ban, color: "#D84315" },
-  { key: "qa", label: "QA", icon: FlaskConical, color: "#7B5EA7" },
-  { key: "completed", label: "Done", icon: CheckCircle2, color: "#1B5E20" },
-  { key: "deploying", label: "Deploying", icon: Clock, color: "#E65100" },
-  { key: "deployed", label: "Deployed", icon: Rocket, color: "#00897B" },
-  { key: "failed", label: "Failed", icon: XCircle, color: "#BA1A1A" },
+  { key: "todo", label: "Todo", icon: "📋", color: "#79747E" },
+  { key: "active", label: "Active", icon: "⚡", color: "#E8A317" },
+  { key: "blocked", label: "Blocked", icon: "🚫", color: "#D84315" },
+  { key: "qa", label: "QA", icon: "🧪", color: "#7B5EA7" },
+  { key: "completed", label: "Done", icon: "✅", color: "#1B5E20" },
+  { key: "deploying", label: "Deploying", icon: "⏰", color: "#E65100" },
+  { key: "deployed", label: "Deployed", icon: "🚀", color: "#00897B" },
+  { key: "failed", label: "Failed", icon: "❌", color: "#BA1A1A" },
 
 ];
 

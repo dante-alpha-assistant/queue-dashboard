@@ -330,9 +330,9 @@ export default function TaskRelationships({ taskId, onNavigateToTask }) {
   }
 
   const GROUP_CONFIG = [
-    { key: 'depends_on', label: 'Depends on', icon: ArrowUp },
+    { key: 'depends_on', label: 'Depends on', icon: "⬆️" },
     { key: 'blocks', label: 'Blocks', icon: '⬇️' },
-    { key: 'subtask_of', label: 'Subtask of', icon: Paperclip },
+    { key: 'subtask_of', label: 'Subtask of', icon: "📎" },
     { key: 'related_to', label: 'Related to', icon: '↔️' },
   ];
 

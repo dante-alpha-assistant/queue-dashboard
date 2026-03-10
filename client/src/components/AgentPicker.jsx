@@ -80,7 +80,7 @@ export default function AgentPicker({ onSelect, onCancel, style }) {
       {!loading && !error && (
         <div style={{ padding: "4px 0" }}>
           {agents.map((agent) => {
-            const icon = agent.avatar || AGENT_ICONS[agent.name] || Bot;
+            const icon = agent.avatar || AGENT_ICONS[agent.name] || "🤖";
             const statusColor = STATUS_DOT[agent.status] || '#9E9E9E';
             const isAvailable = agent.status === 'online';
             const types = (agent.task_types || agent.capabilities || []).slice(0, 4);

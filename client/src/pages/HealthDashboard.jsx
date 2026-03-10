@@ -33,9 +33,9 @@ function HealthBadge({ level, score }) {
 
 function SummaryCards({ summary }) {
   const cards = [
-    { label: "Online Agents", value: `${summary.online_agents}/${summary.total_agents}`, icon: Bot, color: summary.online_agents === summary.total_agents ? "#16a34a" : "#ca8a04" },
-    { label: "Stuck Tasks", value: summary.stuck_count, icon: Clock, color: summary.stuck_count === 0 ? "#16a34a" : "#dc2626" },
-    { label: "Failed (24h)", value: summary.failed_24h_count, icon: XCircle, color: summary.failed_24h_count === 0 ? "#16a34a" : "#dc2626" },
+    { label: "Online Agents", value: `${summary.online_agents}/${summary.total_agents}`, icon: "🤖", color: summary.online_agents === summary.total_agents ? "#16a34a" : "#ca8a04" },
+    { label: "Stuck Tasks", value: summary.stuck_count, icon: "⏰", color: summary.stuck_count === 0 ? "#16a34a" : "#dc2626" },
+    { label: "Failed (24h)", value: summary.failed_24h_count, icon: "❌", color: summary.failed_24h_count === 0 ? "#16a34a" : "#dc2626" },
     { label: "Merge Queue", value: summary.merge_pending, icon: "🔀", color: summary.merge_pending === 0 ? "#16a34a" : "#ca8a04" },
   ];
   return (
