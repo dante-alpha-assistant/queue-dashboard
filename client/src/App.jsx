@@ -288,7 +288,7 @@ export default function App() {
             </div>
           )}
           <div style={{ marginTop: 6 }}>
-            <TimeFilter allTasks={allTasksRaw} value={timeFilter} onChange={setTimeFilter} isMobile={true} />
+            <TimeFilter value={timeFilter} onChange={setTimeFilter} isMobile={true} projectId={selectedProject} />
           </div>
         </div>
 
@@ -475,7 +475,7 @@ export default function App() {
               </span>
             )}
           </div>
-          <TimeFilter allTasks={allTasksRaw} value={timeFilter} onChange={setTimeFilter} isMobile={false} />
+          <TimeFilter value={timeFilter} onChange={setTimeFilter} isMobile={false} projectId={selectedProject} />
         </div>
       </div>
 
