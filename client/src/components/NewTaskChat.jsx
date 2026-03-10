@@ -5,6 +5,7 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { AlertTriangle, Lightbulb, MessageSquare, Paperclip } from 'lucide-react';
 import TaskMentionDropdown from "./TaskMentionDropdown";
+import TaskMentionText, { parseTaskMentions } from "./TaskMentionPill";
 
 function formatTime(date) {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -21,12 +22,7 @@ function timeAgo(iso) {
 
 function renderText(text) {
   if (!text) return null;
-  return text.split("\n").map((line, i) => (
-    <span key={i}>
-      {i > 0 && <br />}
-      {line}
-    </span>
-  ));
+  return <TaskMentionText text={text} />;
 }
 
 const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
@@ -297,6 +293,12 @@ function HistoryView({ conversations, activeConvoId, onSelect, onDelete, onClose
 }
 
 const markdownComponents = {
+  text: ({ children }) => {
+    if (typeof children === "string" && children.includes("@[")) {
+      return <>{parseTaskMentions(children)}</>;
+    }
+    return children;
+  },
   a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
   p: ({ node, ...props }) => <p {...props} style={{ margin: "0 0 8px 0" }} />,
   ul: ({ node, ...props }) => <ul {...props} style={{ margin: "4px 0", paddingLeft: 20 }} />,
