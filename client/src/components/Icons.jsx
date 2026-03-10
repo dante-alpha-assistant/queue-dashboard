@@ -632,6 +632,8 @@ const blockerIconPaths = {
   ),
 };
 
+
+/* ── Action/Status Icons (from Task Card PR) ── */
 export function BlockerIcon({ type, size = 14, color = "currentColor" }) {
   const paths = blockerIconPaths[type] || blockerIconPaths.ambiguous_requirement;
   return (

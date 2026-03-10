@@ -9,6 +9,8 @@ import {
   PriorityDot, TaskTypeIcon, AgentAvatar, BlockerIcon,
   RetryIcon, DeployIcon, AssignIcon, KeyIcon, ChatIcon,
   PauseIcon, QAIcon, WaitingIcon, FolderIcon, BlockedIcon, UserIcon,
+  BlockerIcon, RetryIcon, DeployIcon, AssignIcon, ChatIcon,
+  QAIcon, WaitingIcon, BlockedIcon, UserIcon,
 } from './Icons';
 
 const BLOCKER_TYPE_STYLES = {
