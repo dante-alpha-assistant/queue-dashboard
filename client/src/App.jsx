@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect , useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import SpeedLoader from "./components/SpeedLoader";
 import { useNavigate, useLocation } from "react-router-dom";
 import useQueue from "./hooks/useQueue";
@@ -76,6 +76,20 @@ export default function App() {
   const [view, setView] = useState("board");
 
   const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef(null);
+
+  // Cmd+K / Ctrl+K to focus search
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
+
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
   const handleSseStatusChange = useCallback((data) => { if (data.taskId && data.status) applyStatusChange(data.taskId, data.status); }, [applyStatusChange]);
   const { progress: taskProgress, monitor: taskMonitor, connected: sseConnected } = useTaskEvents({ onStatusChange: handleSseStatusChange });
@@ -462,6 +476,7 @@ export default function App() {
           <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
             <Search size={15} style={{ position: "absolute", left: 10, color: "var(--md-on-surface-variant)", pointerEvents: "none" }} />
             <input
+              ref={searchInputRef}
               type="text"
               placeholder="Search tasks..."
               value={searchQuery}
