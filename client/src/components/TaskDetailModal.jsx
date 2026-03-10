@@ -1398,7 +1398,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
       {activeTab === 'deployment' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* Deployment Status */}
-          {hasDeploymentStatus && (
+          {['deployed', 'deploying', 'deploy_failed'].includes(task.status) && (
             <div style={{
               padding: '14px 16px', borderRadius: 10,
               background: task.status === 'deployed' ? '#00838F0A' : task.status === 'deploy_failed' ? '#BA1A1A0A' : '#E8A3170A',
