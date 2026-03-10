@@ -155,7 +155,7 @@ export default function TaskComments({ taskId }) {
             border: '1px solid var(--md-surface-variant, #E7E0EC)',
             background: 'var(--md-surface, #FFFBFE)',
             color: 'var(--md-on-surface, #1C1B1F)',
-            fontSize: 13, fontFamily: "'Roboto', system-ui, sans-serif",
+            fontSize: 13, fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
             outline: 'none', resize: 'vertical', minHeight: 44, maxHeight: 120,
             transition: 'border-color 0.15s',
           }}
@@ -170,7 +170,7 @@ export default function TaskComments({ taskId }) {
             background: body.trim() && !posting ? 'var(--md-primary, #6750A4)' : 'var(--md-surface-variant, #E7E0EC)',
             color: body.trim() && !posting ? '#fff' : 'var(--md-outline, #79747E)',
             fontSize: 13, fontWeight: 600, cursor: body.trim() && !posting ? 'pointer' : 'default',
-            fontFamily: "'Roboto', system-ui, sans-serif",
+            fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
             transition: 'all 0.15s', minHeight: 38, whiteSpace: 'nowrap',
           }}
         >

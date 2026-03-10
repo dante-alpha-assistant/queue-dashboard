@@ -33,7 +33,7 @@ function InputField({ input, value, onChange }) {
     width: '100%', padding: '8px 12px', fontSize: 13, borderRadius: 8,
     border: '1px solid var(--md-surface-variant, #E7E0EC)',
     background: 'var(--md-surface, #FFFBFE)',
-    fontFamily: "'Roboto', system-ui, sans-serif", outline: 'none',
+    fontFamily: "'Inter', system-ui, -apple-system, sans-serif", outline: 'none',
     boxSizing: 'border-box',
     transition: 'border-color 0.15s',
   };
@@ -261,7 +261,7 @@ export default function HumanInterventionForm({ task, onStatusChange, onClose })
                 width: '100%', padding: '8px 12px', fontSize: 13, borderRadius: 8,
                 border: '1px solid var(--md-surface-variant, #E7E0EC)',
                 background: 'var(--md-surface, #FFFBFE)',
-                fontFamily: "'Roboto', system-ui, sans-serif", outline: 'none',
+                fontFamily: "'Inter', system-ui, -apple-system, sans-serif", outline: 'none',
                 boxSizing: 'border-box', resize: 'vertical',
                 transition: 'border-color 0.15s',
               }}
@@ -292,7 +292,7 @@ export default function HumanInterventionForm({ task, onStatusChange, onClose })
               fontWeight: 600, fontSize: 13, cursor: submitting || !isValid() ? 'not-allowed' : 'pointer',
               background: submitting || !isValid() ? 'var(--md-outline-variant, #CAC4D0)' : '#1B5E20',
               color: '#fff', transition: 'all 0.15s',
-              fontFamily: "'Roboto', system-ui, sans-serif",
+              fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
               display: 'flex', alignItems: 'center', gap: 6,
               opacity: submitting || !isValid() ? 0.6 : 1,
             }}

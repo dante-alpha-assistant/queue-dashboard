@@ -50,7 +50,7 @@ export default function AgentPicker({ onSelect, onCancel, style }) {
       border: "1px solid var(--md-surface-variant, #E7E0EC)",
       borderRadius: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
       minWidth: 280, maxWidth: 340, maxHeight: 360, overflow: "auto",
-      fontFamily: "'Roboto', system-ui, sans-serif",
+      fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
       ...style,
     }} onClick={(e) => e.stopPropagation()}>
       <div style={{

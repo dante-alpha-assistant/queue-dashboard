@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -9,48 +9,200 @@
   --md-on-primary: #FFFFFF;
   --md-secondary-container: #E8DEF8;
   --md-on-secondary-container: #1D192B;
-  --md-background: #FFFBFE;
-  --md-on-background: #1C1B1F;
-  --md-surface: #FFFBFE;
-  --md-surface-container: #F3EDF7;
-  --md-surface-variant: #E7E0EC;
-  --md-on-surface-variant: #49454F;
+  --md-background: #FAFAFA;
+  --md-on-background: #09090B;
+  --md-surface: #FFFFFF;
+  --md-surface-container: #F4F4F5;
+  --md-surface-variant: #E4E4E7;
+  --md-on-surface-variant: #52525B;
   --md-primary-container: #EADDFF;
   --md-on-primary-container: #21005D;
   --md-outline: #79747E;
-  --md-outline-variant: #CAC4D0;
+  --md-outline-variant: #D4D4D8;
   --md-surface-dim: #DED8E1;
-  --md-surface-bright: #FFFBFE;
-  --md-surface-container-low: #F7F2FA;
-  --md-surface-container-high: #ECE6F0;
-  --md-surface-container-highest: #E6E0E9;
-  --md-error: #BA1A1A;
-  --md-error-container: #FFDAD6;
-  --md-on-error-container: #410002;
+  --md-surface-bright: #FFFFFF;
+  --md-surface-container-low: #F4F4F5;
+  --md-surface-container-high: #E4E4E7;
+  --md-surface-container-highest: #D4D4D8;
+  --md-error: #DC2626;
+  --md-error-container: #FEE2E2;
+  --md-on-error-container: #7F1D1D;
   --md-tertiary: #7D5260;
   --md-tertiary-container: #FFD8E4;
   --md-on-tertiary-container: #31111D;
   --md-warning-container: #FFF3E0;
   --md-on-warning-container: #E65100;
-  --md-success: #2E7D32;
-  --md-success-container: #E8F5E9;
-  --md-on-success-container: #1B5E20;
+  --md-success: #16A34A;
+  --md-success-container: #DCFCE7;
+  --md-on-success-container: #166534;
+
+  --header-bg: rgba(250, 250, 250, 0.8);
+  --header-border: #E4E4E7;
+  --nav-hover: rgba(0, 0, 0, 0.04);
+  --nav-active-bg: #F4F4F5;
+  --search-bg: #F4F4F5;
+  --search-border: #E4E4E7;
+  --kbd-bg: #E4E4E7;
+  --kbd-color: #71717A;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --md-primary: #D0BCFF;
+    --md-on-primary: #381E72;
+    --md-secondary-container: #4A4458;
+    --md-on-secondary-container: #E8DEF8;
+    --md-background: #09090B;
+    --md-on-background: #FAFAFA;
+    --md-surface: #18181B;
+    --md-surface-container: #27272A;
+    --md-surface-variant: #3F3F46;
+    --md-on-surface-variant: #A1A1AA;
+    --md-primary-container: #4F378B;
+    --md-on-primary-container: #EADDFF;
+    --md-outline: #71717A;
+    --md-outline-variant: #3F3F46;
+    --md-surface-dim: #27272A;
+    --md-surface-bright: #3F3F46;
+    --md-surface-container-low: #27272A;
+    --md-surface-container-high: #3F3F46;
+    --md-surface-container-highest: #52525B;
+    --md-error: #F87171;
+    --md-error-container: #7F1D1D;
+    --md-on-error-container: #FEE2E2;
+    --md-tertiary: #EFB8C8;
+    --md-tertiary-container: #633B48;
+    --md-on-tertiary-container: #FFD8E4;
+    --md-warning-container: #431407;
+    --md-on-warning-container: #FB923C;
+    --md-success: #4ADE80;
+    --md-success-container: #166534;
+    --md-on-success-container: #DCFCE7;
+
+    --header-bg: rgba(9, 9, 11, 0.8);
+    --header-border: #27272A;
+    --nav-hover: rgba(255, 255, 255, 0.06);
+    --nav-active-bg: #27272A;
+    --search-bg: #27272A;
+    --search-border: #3F3F46;
+    --kbd-bg: #3F3F46;
+    --kbd-color: #A1A1AA;
+  }
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  font-family: 'Roboto', system-ui, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   font-size: 14px;
   line-height: 1.5;
   color: var(--md-on-background);
   background-color: var(--md-background);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--md-on-surface-variant); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: var(--md-outline); border-radius: 3px; opacity: 0.5; }
+
+/* Header styles */
+.header-glass {
+  background: var(--header-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--header-border);
+}
+
+.nav-tab {
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'Inter', system-ui, sans-serif;
+  color: var(--md-on-surface-variant);
+  transition: all 150ms ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.nav-tab:hover {
+  background: var(--nav-hover);
+  color: var(--md-on-background);
+}
+
+.nav-tab.active {
+  background: var(--nav-active-bg);
+  color: var(--md-on-background);
+  font-weight: 600;
+}
+
+.search-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--search-border);
+  background: var(--search-bg);
+  font-size: 13px;
+  font-family: 'Inter', system-ui, sans-serif;
+  outline: none;
+  color: var(--md-on-background);
+  transition: all 150ms ease;
+  width: 220px;
+}
+
+.search-pill:focus {
+  border-color: var(--md-primary);
+  box-shadow: 0 0 0 2px rgba(103, 80, 164, 0.15);
+}
+
+.search-pill::placeholder {
+  color: var(--md-on-surface-variant);
+}
+
+.kbd {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--kbd-bg);
+  color: var(--kbd-color);
+  line-height: 1.4;
+}
+
+/* Filter chip styles */
+.filter-chip {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--md-surface-variant);
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  text-transform: capitalize;
+  font-family: 'Inter', system-ui, sans-serif;
+  transition: all 150ms ease;
+}
+
+.filter-chip:hover {
+  background: var(--nav-hover);
+}
+
+.filter-chip.active {
+  border-color: var(--md-primary);
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
 
 /* Mobile responsive utilities */
 @media (max-width: 639px) {

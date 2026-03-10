@@ -193,7 +193,7 @@ function Badge({ label, color, bg, style: extraStyle }) {
       background: bg || `${color}14`, color: color,
       textTransform: "uppercase", letterSpacing: "0.04em",
       lineHeight: 1.2, whiteSpace: "nowrap",
-      fontFamily: "'Roboto', system-ui, sans-serif",
+      fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
       display: "inline-block",
       ...extraStyle,
     }}>{label}</span>
@@ -211,7 +211,7 @@ function BlockerBadge({ task }) {
       background: style.bg, color: style.color,
       textTransform: "uppercase", letterSpacing: "0.04em",
       lineHeight: 1.2, whiteSpace: "nowrap",
-      fontFamily: "'Roboto', system-ui, sans-serif",
+      fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
       display: "inline-flex", alignItems: "center", gap: 4,
     }}>
       <BlockerTypeIcon type={blockerType} size={12} color={style.color} />
@@ -263,7 +263,7 @@ function BlockedQuickActions({ task, onStatusChange }) {
   const btnStyle = {
     fontSize: 11, border: "none", padding: "6px 12px", borderRadius: 100,
     cursor: "pointer", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4,
-    transition: "all 150ms ease", fontFamily: "'Roboto', system-ui, sans-serif",
+    transition: "all 150ms ease", fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
   };
 
   const handleUnblock = async (humanInput) => {
@@ -314,7 +314,7 @@ function BlockedQuickActions({ task, onStatusChange }) {
               flex: 1, fontSize: 12, padding: "6px 10px", borderRadius: 8,
               border: "1px solid var(--md-surface-variant, #E7E0EC)",
               background: "var(--md-surface, #FFFBFE)",
-              fontFamily: "'Roboto', system-ui, sans-serif",
+              fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
               outline: "none",
             }}
           />
@@ -386,7 +386,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
   const btnBase = {
     fontSize: 12, border: "none", padding: isMobile ? "8px 18px" : "7px 16px",
     borderRadius: 100, cursor: "pointer", fontWeight: 600,
-    fontFamily: "'Roboto', system-ui, sans-serif",
+    fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
     minHeight: isMobile ? 44 : 34, letterSpacing: "0.02em",
     transition: "all 150ms ease",
     display: "inline-flex", alignItems: "center", gap: 6,
@@ -529,7 +529,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
                   padding: "8px 12px", border: "none", background: "transparent",
                   borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 500,
                   color: "var(--md-on-surface, #1C1B1F)",
-                  fontFamily: "'Roboto', system-ui, sans-serif",
+                  fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
                 }}
                 onMouseEnter={(e) => e.currentTarget.style.background = "var(--md-surface-container-low, #F7F2FA)"}
                 onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
@@ -546,7 +546,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
                 display: "block", width: "100%", padding: "6px 12px", border: "none",
                 background: "transparent", borderRadius: 8, cursor: "pointer",
                 fontSize: 11, color: "var(--md-outline, #79747E)", textAlign: "center",
-                marginTop: 4, fontFamily: "'Roboto', system-ui, sans-serif",
+                marginTop: 4, fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
               }}
             >
               Cancel
@@ -711,7 +711,7 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
             background: `${typeColor}14`, color: typeColor,
             textTransform: "uppercase", letterSpacing: "0.04em",
             lineHeight: 1.2, whiteSpace: "nowrap",
-            fontFamily: "'Roboto', system-ui, sans-serif",
+            fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
             display: "inline-flex", alignItems: "center", gap: 4,
           }}>
             <TaskTypeIcon type={task.type} size={11} color={typeColor} />
@@ -723,7 +723,7 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
               background: priority.bg, color: priority.color,
               textTransform: "uppercase", letterSpacing: "0.04em",
               lineHeight: 1.2, whiteSpace: "nowrap",
-              fontFamily: "'Roboto', system-ui, sans-serif",
+              fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
               display: "inline-flex", alignItems: "center", gap: 4,
             }}>
               <PriorityDot priority={task.priority} size={8} />
@@ -737,7 +737,7 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
               background: "#E6510020", color: "#E65100",
               display: "inline-flex", alignItems: "center", gap: 4,
               textTransform: "uppercase", letterSpacing: "0.04em", lineHeight: 1.2,
-              fontFamily: "'Roboto', system-ui, sans-serif",
+              fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
             }}>
               <PauseIcon size={11} color="#E65100" /> Paused
             </span>
@@ -749,7 +749,7 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
                   background: "#2E7D3220", color: "#2E7D32",
                   display: "inline-flex", alignItems: "center", gap: 4,
                   textTransform: "uppercase", letterSpacing: "0.04em", lineHeight: 1.2,
-                  fontFamily: "'Roboto', system-ui, sans-serif",
+                  fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
                 }}>
                   <SearchCheckIcon size={11} color="#2E7D32" /> QA: {task.qa_agent}
                 </span>
@@ -769,7 +769,7 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
           fontWeight: 600, fontSize: 15, lineHeight: 1.45,
           color: "var(--md-on-surface, #1C1B1F)",
           marginBottom: 8,
-          fontFamily: "'Roboto', system-ui, sans-serif",
+          fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
         }}>
           {task.title}
         </div>
@@ -822,7 +822,7 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
           <span style={{
             fontSize: 11, color: "var(--md-outline, #79747E)",
             whiteSpace: "nowrap", flexShrink: 0,
-            fontFamily: "'Roboto', system-ui, sans-serif",
+            fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
           }}>{formatTime(task.created_at)}</span>
         </div>
 

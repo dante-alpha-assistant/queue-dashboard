@@ -53,7 +53,7 @@ export default function DispatchModal({ onClose, dispatch, projects = [], isMobi
     width: "100%", padding: "12px 16px",
     border: "1px solid var(--md-surface-variant)", background: "var(--md-background)",
     color: "var(--md-on-background)", fontSize: 14, borderRadius: 12,
-    fontFamily: "'Roboto', system-ui, sans-serif", outline: "none",
+    fontFamily: "'Inter', system-ui, -apple-system, sans-serif", outline: "none",
     boxSizing: "border-box",
     minHeight: isMobile ? 48 : "auto",
   };
@@ -84,14 +84,14 @@ export default function DispatchModal({ onClose, dispatch, projects = [], isMobi
             <button onClick={onClose} style={{
               background: "none", border: "none", fontSize: 16, cursor: "pointer",
               color: "var(--md-primary)", fontWeight: 500, padding: 8, minHeight: 44,
-              fontFamily: "'Roboto', system-ui, sans-serif",
+              fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
             }}>Cancel</button>
             <span style={{ fontWeight: 700, fontSize: 18 }}>New Task</span>
             <button onClick={submit} disabled={!title.trim() || sending} style={{
               background: "none", border: "none", fontSize: 16, cursor: "pointer",
               color: title.trim() ? "var(--md-primary)" : "var(--md-on-surface-variant)",
               fontWeight: 600, padding: 8, minHeight: 44,
-              fontFamily: "'Roboto', system-ui, sans-serif",
+              fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
             }}>{sending ? "..." : "Create"}</button>
           </div>
         )}
@@ -149,13 +149,13 @@ export default function DispatchModal({ onClose, dispatch, projects = [], isMobi
             <button onClick={onClose} style={{
               flex: 1, background: "transparent", border: "1px solid var(--md-surface-variant)",
               color: "var(--md-on-background)", padding: 12, borderRadius: 20,
-              cursor: "pointer", fontWeight: 500, fontSize: 14, fontFamily: "'Roboto', system-ui, sans-serif",
+              cursor: "pointer", fontWeight: 500, fontSize: 14, fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
             }}>Cancel</button>
             <button onClick={submit} disabled={!title.trim() || sending} style={{
               flex: 1, background: title.trim() ? "var(--md-primary)" : "var(--md-surface-variant)",
               color: title.trim() ? "var(--md-on-primary)" : "var(--md-on-surface-variant)",
               border: "none", padding: 12, borderRadius: 20, fontWeight: 500, fontSize: 14,
-              cursor: title.trim() ? "pointer" : "default", fontFamily: "'Roboto', system-ui, sans-serif",
+              cursor: title.trim() ? "pointer" : "default", fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
             }}>{sending ? "Creating..." : agent ? "Create & Assign" : "Create Task"}</button>
           </div>
         )}
