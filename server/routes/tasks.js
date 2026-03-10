@@ -416,10 +416,10 @@ router.post("/deploy/batch", async (req, res) => {
     if (!tasks || tasks.length === 0) return res.status(404).json({ error: "No tasks found" });
 
     // Check for tasks already deploying (duplicate guard)
-    const alreadyDeploying = tasks.filter(t => t.status === "deploying");
+    const alreadyDeploying = tasks.filter(t => t.status === "deploying" || t.status === "deployed");
     if (alreadyDeploying.length > 0) {
       return res.status(409).json({
-        error: "Some tasks are already deploying",
+        error: "Some tasks are already deploying or deployed",
         deploying: alreadyDeploying.map(t => ({ id: t.id, title: t.title })),
       });
     }

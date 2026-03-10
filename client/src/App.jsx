@@ -391,7 +391,7 @@ export default function App() {
   }
 
   // TABLET + DESKTOP LAYOUT
-  return (
+  return (<>
     <div style={{
       display: "flex", flexDirection: "column", height: "100vh",
       background: "var(--md-background)", fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
@@ -581,5 +581,5 @@ export default function App() {
       )}
     </div>
       {showBatchDeploy && <BatchDeployModal tasks={completed} onDeploy={() => { setShowBatchDeploy(false); }} onClose={() => setShowBatchDeploy(false)} />}
-  );
+  </>);
 }
