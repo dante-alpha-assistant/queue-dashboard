@@ -630,6 +630,11 @@ function ActionBar({ task, onStatusChange, isMobile }) {
   );
 }
 
+/* ── Processing Statuses (show full-card overlay) ─────────── */
+const PROCESSING_STATUSES = {
+  deploying: { label: "Deploying…", color: "#F57C00" },
+};
+
 /* ── Task Card ────────────────────────────────────────────── */
 export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, progress, monitor, transitioning }) {
   const agent = task.assigned_agent?.toLowerCase();
@@ -638,6 +643,8 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
   const isActive = ACTIVE_STATUSES.has(task.status);
   const priority = PRIORITY_MAP[task.priority];
   const typeColor = TYPE_COLORS[task.type] || "#79747E";
+  const processing = PROCESSING_STATUSES[task.status] || null;
+  const isBlocked = transitioning || !!processing;
 
   // Blocked > 1 hour pulse
   const blockedMs = task.status === "blocked" && task.updated_at
@@ -652,21 +659,21 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
   const isError = !resultText && !!errorText;
 
   return (
-    <div onClick={() => !transitioning && onCardClick?.(task)} style={{
+    <div onClick={() => !isBlocked && onCardClick?.(task)} style={{
       background: "var(--md-surface, #FFFBFE)",
       borderRadius: 16,
       border: "1px solid var(--md-surface-variant, #E7E0EC)",
       borderLeft: `4px solid ${statusColor}`,
       marginBottom: 12,
       transition: "box-shadow 200ms ease, transform 100ms ease, opacity 200ms ease",
-      cursor: transitioning ? "not-allowed" : "pointer",
+      cursor: isBlocked ? "not-allowed" : "pointer",
       overflow: "hidden",
       fontFamily: "'Roboto', system-ui, -apple-system, sans-serif",
-      opacity: transitioning ? 0.7 : task.paused ? 0.6 : (task.status === "qa_testing" && !task.assigned_agent ? 0.65 : 1),
+      opacity: isBlocked ? 0.7 : task.paused ? 0.6 : (task.status === "qa_testing" && !task.assigned_agent ? 0.65 : 1),
       position: "relative",
-      pointerEvents: transitioning ? "none" : "auto",
+      pointerEvents: isBlocked ? "none" : "auto",
     }}
-    onMouseEnter={(e) => { if (!transitioning) e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)"; }}
+    onMouseEnter={(e) => { if (!isBlocked) e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)"; }}
     onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}
     >
       {/* Blocked > 1hr pulse dot */}
@@ -678,20 +685,31 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
           animation: "blocked-pulse 2s ease-in-out infinite",
         }} />
       )}
-      {/* Transition loading overlay */}
-      {transitioning && (
+      {/* Processing / transition overlay */}
+      {isBlocked && (
         <div style={{
           position: "absolute", inset: 0, zIndex: 10,
-          background: "rgba(255,251,254,0.6)",
-          display: "flex", alignItems: "center", justifyContent: "center",
+          background: "rgba(255,251,254,0.65)",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
           borderRadius: 16,
-          backdropFilter: "blur(1px)",
+          backdropFilter: "blur(2px)",
+          gap: 10,
         }}>
           <div style={{
-            width: 28, height: 28, border: "3px solid var(--md-surface-variant, #E7E0EC)",
-            borderTopColor: statusColor, borderRadius: "50%",
+            width: 28, height: 28,
+            border: `3px solid var(--md-surface-variant, #E7E0EC)`,
+            borderTopColor: processing?.color || statusColor,
+            borderRadius: "50%",
             animation: "spin 0.8s linear infinite",
           }} />
+          {processing?.label && (
+            <span style={{
+              fontSize: 13, fontWeight: 600,
+              color: processing.color,
+              fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+              letterSpacing: "0.02em",
+            }}>{processing.label}</span>
+          )}
         </div>
       )}
       {/* ── Header: badges + duration ───────────────────── */}
