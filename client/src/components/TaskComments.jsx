@@ -186,15 +186,29 @@ export default function TaskComments({ taskId }) {
         {comments.map(c => {
           const icon = AUTHOR_ICONS[c.author] || (c.author_type === 'agent' ? "🤖" : "👤");
           const typeColor = AUTHOR_TYPE_COLORS[c.author_type] || '#79747E';
+          const isReply = !!c.reply_to;
+          const parentComment = isReply ? comments.find(p => p.id === c.reply_to) : null;
           return (
             <div key={c.id} style={{
               display: 'flex', gap: 10, padding: '8px 12px',
               background: c.author_type === 'system' ? 'var(--md-surface-container-low, #F7F2FA)' : 'transparent',
               borderRadius: 8,
               borderLeft: `3px solid ${typeColor}20`,
+              marginLeft: isReply ? 24 : 0,
             }}>
               <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{icon}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
+                {isReply && (
+                  <div style={{ fontSize: 10, color: 'var(--md-outline, #79747E)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span>↩️</span>
+                    <span>Replying to <strong>{parentComment?.author || 'comment'}</strong></span>
+                    {parentComment && (
+                      <span style={{ opacity: 0.6, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        — {parentComment.body.slice(0, 60)}{parentComment.body.length > 60 ? '…' : ''}
+                      </span>
+                    )}
+                  </div>
+                )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: typeColor }}>{c.author}</span>
                   <span style={{

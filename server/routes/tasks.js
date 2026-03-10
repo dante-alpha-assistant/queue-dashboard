@@ -734,7 +734,7 @@ const AGENT_TOKENS = {
 // Send webhook to mentioned agents with full task context
 // Uses the standard OpenClaw /hooks/agent format: { message, name, sessionKey, wakeMode }
 async function notifyMentionedAgents(taskId, comment, mentions) {
-  // Fetch full task
+  // Fetch full task (all fields)
   const { data: task } = await supabase
     .from("agent_tasks")
     .select("*")
@@ -745,7 +745,15 @@ async function notifyMentionedAgents(taskId, comment, mentions) {
   // Fetch all comments for context
   const { data: allComments } = await supabase
     .from("task_comments")
-    .select("author, author_type, body, created_at")
+    .select("id, author, author_type, body, created_at, reply_to, mentions")
+    .eq("task_id", taskId)
+    .order("created_at", { ascending: true })
+    .limit(50);
+
+  // Fetch activity log for full history
+  const { data: activityLog } = await supabase
+    .from("task_activity_log")
+    .select("field, old_value, new_value, changed_by, created_at")
     .eq("task_id", taskId)
     .order("created_at", { ascending: true })
     .limit(50);
@@ -762,42 +770,77 @@ async function notifyMentionedAgents(taskId, comment, mentions) {
   // Build comment thread text
   const commentThread = (allComments || []).map(c => {
     const time = new Date(c.created_at).toISOString().replace("T", " ").slice(0, 16);
-    return `**${c.author}** (${c.author_type}) — ${time}:\n> ${c.body.replace(/\n/g, "\n> ")}`;
+    const replyTag = c.reply_to ? ` (reply to ${c.reply_to})` : "";
+    return `**${c.author}** (${c.author_type}) — ${time}${replyTag}:\n> ${c.body.replace(/\n/g, "\n> ")}`;
   }).join("\n\n");
+
+  // Build activity log text
+  const activityText = (activityLog || []).map(a => {
+    const time = new Date(a.created_at).toISOString().replace("T", " ").slice(0, 16);
+    return `- ${time} | **${a.changed_by || "system"}** changed \`${a.field}\`: ${a.old_value || "(empty)"} → ${a.new_value || "(empty)"}`;
+  }).join("\n");
 
   // Build the readable message for the agent (standard OpenClaw webhook format)
   const prUrls = Array.isArray(task.pull_request_url) ? task.pull_request_url.join(", ") : (task.pull_request_url || "none");
-  const message = `## 💬 Task Comment — @mention from ${comment.author}
 
-**Task:** ${task.title}
-**Status:** ${task.status} | **Type:** ${task.type} | **Priority:** ${task.priority}
-**Task ID:** ${taskId}
-**PR:** ${prUrls}
-**Task URL:** ${DASHBOARD_URL}/task/${taskId}
+  // Build comprehensive task details
+  const taskDetails = [
+    `**Task:** ${task.title}`,
+    `**Task ID:** ${taskId}`,
+    `**Status:** ${task.status} | **Type:** ${task.type} | **Priority:** ${task.priority}`,
+    task.stage ? `**Stage:** ${task.stage}` : null,
+    `**PR:** ${prUrls}`,
+    task.repository_url ? `**Repository:** ${task.repository_url}` : null,
+    task.deployment_url ? `**Deployment URL:** ${task.deployment_url}` : null,
+    task.assigned_agent ? `**Assigned Agent:** ${task.assigned_agent}` : null,
+    task.qa_agent ? `**QA Agent:** ${task.qa_agent}` : null,
+    task.blocked_reason ? `**⚠️ Blocked Reason:** ${task.blocked_reason}` : null,
+    `**Task URL:** ${DASHBOARD_URL}/task/${taskId}`,
+  ].filter(Boolean).join("\n");
+
+  const message = `## 💬 Task Comment — You were @mentioned by ${comment.author}
+
+You have been mentioned in a task comment. Read the full context below, understand what is being asked, and reply with a helpful response.
 
 ---
 
-### Comment from ${comment.author}:
+### Task Details
+${taskDetails}
+
+---
+
+### 💬 Comment from ${comment.author}:
 ${comment.body}
 
 ---
 
 ### Full Comment Thread:
-${commentThread}
+${commentThread || "(no previous comments)"}
 
 ---
 
 ### Task Description:
 ${task.description || "(no description)"}
 
+${task.acceptance_criteria ? `### Acceptance Criteria:\n${task.acceptance_criteria}\n` : ""}
 ${task.result ? `### Previous Result:\n${typeof task.result === "object" ? JSON.stringify(task.result, null, 2) : task.result}\n` : ""}
+${task.error ? `### Error:\n${task.error}\n` : ""}
 ${task.qa_result ? `### QA Result:\n${typeof task.qa_result === "object" ? JSON.stringify(task.qa_result, null, 2) : task.qa_result}\n` : ""}
+${activityText ? `### Activity Log:\n${activityText}\n` : ""}
 ---
 
-**Reply callback:** To reply, POST to: \`${callbackUrl}\`
-\`\`\`json
-{ "body": "your reply text", "author": "${mentions[0]}", "comment_id": "${comment.id}" }
-\`\`\``;
+## ⚡ MANDATORY: Reply to this comment
+
+You MUST reply to this comment. Use the following curl command to post your reply:
+
+\`\`\`bash
+curl -s -X POST "${callbackUrl}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"body": "YOUR_REPLY_HERE", "author": "YOUR_AGENT_ID", "comment_id": "${comment.id}"}'
+\`\`\`
+
+Replace YOUR_REPLY_HERE with your actual response and YOUR_AGENT_ID with your agent ID.
+Do NOT skip this step — the user is waiting for your reply in the task comment thread.`;
 
   for (const agent of (agents || [])) {
     if (!agent.endpoint_url || agent.status === "disabled") continue;
@@ -808,13 +851,17 @@ ${task.qa_result ? `### QA Result:\n${typeof task.qa_result === "object" ? JSON.
     const headers = { "Content-Type": "application/json" };
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
+    // Build per-agent message with their specific ID in the reply template
+    const agentMessage = message
+      .replace(/YOUR_AGENT_ID/g, agent.id);
+
     try {
       const resp = await fetch(webhookUrl, {
         method: "POST",
         headers,
         body: JSON.stringify({
-          message,
-          name: "Task Comment",
+          message: agentMessage,
+          name: "Task Comment Mention",
           sessionKey: `hook:comment:${taskId}:${comment.id}`,
           wakeMode: "now",
         }),
