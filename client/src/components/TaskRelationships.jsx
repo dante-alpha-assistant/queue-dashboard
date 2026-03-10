@@ -283,12 +283,15 @@ export default function TaskRelationships({ taskId, onNavigateToTask }) {
     blocks: [],      // incoming depends_on: X depends on this task (this blocks X)
     related_to: [],
     subtask_of: [],
-    deployed_by: [],
+    deployed_by: [],  // outgoing deployed_by: this task is deployed by X
+    deploys: [],      // incoming deployed_by: X is deployed by this task (this deploys X)
   };
 
   for (const rel of relationships) {
-    if (rel.type === 'deployed_by') {
+    if (rel.type === 'deployed_by' && rel.direction === 'outgoing') {
       groups.deployed_by.push(rel);
+    } else if (rel.type === 'deployed_by' && rel.direction === 'incoming') {
+      groups.deploys.push(rel);
     } else if (rel.type === 'depends_on' && rel.direction === 'outgoing') {
       groups.depends_on.push(rel);
     } else if (rel.type === 'depends_on' && rel.direction === 'incoming') {
@@ -337,6 +340,8 @@ export default function TaskRelationships({ taskId, onNavigateToTask }) {
     { key: 'depends_on', label: 'Depends on', icon: "⬆️" },
     { key: 'blocks', label: 'Blocks', icon: '⬇️' },
     { key: 'subtask_of', label: 'Subtask of', icon: "📎" },
+    { key: 'deployed_by', label: 'Deployed by', icon: '🚀' },
+    { key: 'deploys', label: 'Deploys', icon: '🚀' },
     { key: 'related_to', label: 'Related to', icon: '↔️' },
   ];
 
