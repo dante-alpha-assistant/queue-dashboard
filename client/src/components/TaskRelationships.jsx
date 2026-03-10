@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { ArrowUp, CheckCircle2, Clock, Link, Paperclip, Search } from 'lucide-react';
 const CircleDot = ({ size = 14, color = "currentColor", ...p }) => <svg width={size} height={size} viewBox="0 0 24 24" fill={color} stroke="none" {...p}><circle cx="12" cy="12" r="8" /></svg>;
 
 /* ── Status color mapping ─────────────────────────────────── */
