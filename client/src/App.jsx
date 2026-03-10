@@ -328,7 +328,7 @@ export default function App() {
                   position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)",
                   width: 32, height: 3, borderRadius: 2, background: "var(--md-primary)",
                 }} />}
-                <span style={{ fontSize: 18 }}>{tab.icon}</span>
+                <span style={{ fontSize: 18 }}>{typeof tab.icon === "function" || (tab.icon && tab.icon.$$typeof) ? <tab.icon size={18} /> : tab.icon}</span>
                 <span style={{ fontSize: 10, fontWeight: isActive ? 600 : 400 }}>{tab.label}</span>
               </button>
             );

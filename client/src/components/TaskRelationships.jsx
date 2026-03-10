@@ -1,16 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowUp, CheckCircle2, Clock, Link, Paperclip, Search } from 'lucide-react';
 const CircleDot = ({ size = 14, color = "currentColor", ...p }) => <svg width={size} height={size} viewBox="0 0 24 24" fill={color} stroke="none" {...p}><circle cx="12" cy="12" r="8" /></svg>;
 
 /* ── Status color mapping ─────────────────────────────────── */
 const STATUS_INDICATOR = {
-  completed: { icon: CheckCircle2, color: '#1B5E20', bg: '#1B5E2014' },
-  deployed:  { icon: CheckCircle2, color: '#00838F', bg: '#00838F14' },
-  in_progress: { icon: Clock, color: '#E8A317', bg: '#E8A31714' },
-  running:   { icon: Clock, color: '#E8A317', bg: '#E8A31714' },
-  qa_testing: { icon: Clock, color: '#5E35B1', bg: '#5E35B114' },
-  blocked:   { icon: CircleDot, color: '#BA1A1A', bg: '#BA1A1A14' },
-  failed:    { icon: CircleDot, color: '#BA1A1A', bg: '#BA1A1A14' },
+  completed: { icon: '✅', color: '#1B5E20', bg: '#1B5E2014' },
+  deployed:  { icon: '✅', color: '#00838F', bg: '#00838F14' },
+  in_progress: { icon: '🔄', color: '#E8A317', bg: '#E8A31714' },
+  running:   { icon: '🔄', color: '#E8A317', bg: '#E8A31714' },
+  qa_testing: { icon: '🔍', color: '#5E35B1', bg: '#5E35B114' },
+  blocked:   { icon: '🔴', color: '#BA1A1A', bg: '#BA1A1A14' },
+  failed:    { icon: '🔴', color: '#BA1A1A', bg: '#BA1A1A14' },
   todo:      { icon: '⚪', color: '#79747E', bg: '#79747E14' },
   assigned:  { icon: '⚪', color: '#6750A4', bg: '#6750A414' },
 };

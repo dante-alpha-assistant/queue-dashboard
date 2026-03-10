@@ -1719,7 +1719,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8 }}>
             <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
               <StatusBadge status={task.status} />
-              {task.paused && <Badge label="Paused" icon={Pause} color="#E65100" bg="#E6510020" />}
+              {task.paused && <Badge label="Paused" color="#E65100" bg="#E6510020" />}
               <Badge label={task.type} color={typeColor} />
               {isActive && !isMobile && !useWideLayout && <DurationTicker task={task} />}
             </div>
