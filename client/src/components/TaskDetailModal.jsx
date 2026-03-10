@@ -930,7 +930,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
       setDeploySuccess(task.status === 'deployed');
       if (task.status === 'deploy_failed') {
         setDeployError('Deploy failed');
-        setTimeout(() => setDeployError(null), 5000);
+        // Error persists until dismissed
       }
     }
   }, [task.status, stopDeployPolling]);
@@ -1008,7 +1008,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
               setDeploySuccess(st === 'deployed');
               if (st === 'deploy_failed') {
                 setDeployError('Deploy failed');
-                setTimeout(() => setDeployError(null), 5000);
+                // Error persists until dismissed
               }
             }
           }
@@ -1019,13 +1019,13 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
         stopDeployPolling();
         setDeploying(false);
         setDeployError('Deploy may still be in progress. Refresh to check status.');
-        setTimeout(() => setDeployError(null), 8000);
+        // Error persists until dismissed
       }, 30000);
     } catch (e) {
       stopDeployPolling();
       setDeploying(false);
       setDeployError(e.message || "Deploy failed");
-      setTimeout(() => setDeployError(null), 5000);
+      // Error persists until dismissed
     }
   };
 
@@ -1061,7 +1061,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
       setTimeout(() => handleClose(), 1500);
     } catch (e) {
       setRebaseError(e.message || "Rebase failed");
-      setTimeout(() => setRebaseError(null), 5000);
+      // Error persists until dismissed
     } finally {
       setRebasing(false);
     }
@@ -1076,7 +1076,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
       setTimeout(() => setSaveSuccess(false), 1200);
     } catch (err) {
       setSaveError(err.message || 'Failed to save');
-      setTimeout(() => setSaveError(null), 4000);
+      // Error persists until dismissed
     } finally {
       setFieldSaving(false);
     }
@@ -1704,6 +1704,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
             maxWidth: '80%',
           }}>
             ⚠️ {deployError}
+            <button onClick={() => setDeployError(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#fff", fontSize: 16, padding: "0 4px", lineHeight: 1, fontWeight: 700 }} title="Dismiss">×</button>
           </div>
         )}
 
@@ -1812,11 +1813,11 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
           borderTop: '1px solid var(--md-surface-variant, #E7E0EC)',
           display: 'flex', gap: 6, alignItems: 'center',
         }}>
-          {saveError && <span style={{ color: '#D32F2F', fontSize: 12, wordBreak: 'break-word' }}><AlertTriangle size={14} /> {saveError}</span>}
+          {saveError && <span style={{ color: '#D32F2F', fontSize: 12, wordBreak: 'break-word' }}><AlertTriangle size={14} /> {saveError} <button onClick={() => setSaveError(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#D32F2F", fontSize: 16, padding: "0 2px", lineHeight: 1 }} title="Dismiss">×</button></span>}
           {mergeConflict && <span style={{ color: '#E65100', fontSize: 12, fontWeight: 600 }}><AlertTriangle size={14} /> PR has merge conflicts</span>}
-          {deployError && <span style={{ color: '#D32F2F', fontSize: 12, wordBreak: 'break-word' }}><AlertTriangle size={14} /> {deployError}</span>}
-          {rebaseError && <span style={{ color: '#D32F2F', fontSize: 12, wordBreak: 'break-word' }}><AlertTriangle size={14} /> {rebaseError}</span>}
-          {deprecateError && <span style={{color:"#D32F2F",fontSize:13}}>{deprecateError}</span>}
+          {deployError && <span style={{ color: '#D32F2F', fontSize: 12, wordBreak: 'break-word' }}><AlertTriangle size={14} /> {deployError} <button onClick={() => setDeployError(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#D32F2F", fontSize: 16, padding: "0 2px", lineHeight: 1 }} title="Dismiss">×</button></span>}
+          {rebaseError && <span style={{ color: '#D32F2F', fontSize: 12, wordBreak: 'break-word' }}><AlertTriangle size={14} /> {rebaseError} <button onClick={() => setRebaseError(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#D32F2F", fontSize: 16, padding: "0 2px", lineHeight: 1 }} title="Dismiss">×</button></span>}
+          {deprecateError && <span style={{color:"#D32F2F",fontSize:13}}>{deprecateError} <button onClick={() => setDeprecateError(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#D32F2F", fontSize: 16, padding: "0 2px", lineHeight: 1 }} title="Dismiss">×</button></span>}
           <div style={{ flex: 1 }} />
           {!isMobile && task.created_at && (
             <span style={{ fontSize: 10, color: 'var(--md-outline, #79747E)', fontFamily: "'Roboto Mono', monospace" }}>
