@@ -112,7 +112,12 @@ export const neoChatRouter = Router();
 const NEO_GATEWAY = process.env.NEO_GATEWAY_URL || "http://neo.agents.svc.cluster.local:18789";
 const NEO_TOKEN = process.env.NEO_GATEWAY_TOKEN || "neo-gw-tok-2026";
 
-// Vision: images are uploaded to Supabase storage and passed as HTTP URLs through OpenClaw gateway
+// Vision support: OpenClaw gateway doesn't support image_url parts in chatCompletions.
+// When images are present, we call the LLM provider directly (same model neo-chat-worker uses).
+// CHAT_LLM_KEY must be set (e.g. OPENROUTER_API_KEY) for vision to work.
+const CHAT_LLM_URL = process.env.CHAT_LLM_URL || 'https://openrouter.ai/api/v1/chat/completions';
+const CHAT_LLM_KEY = process.env.CHAT_LLM_KEY || process.env.OPENROUTER_API_KEY || '';
+const CHAT_LLM_MODEL = process.env.CHAT_LLM_MODEL || 'anthropic/claude-sonnet-4';
 
 const SYSTEM_PROMPT = `You are Neo, an AI engineering assistant embedded in the tasks.dante.id dashboard.
 The user is describing work they need done. Your job is to:
@@ -417,11 +422,13 @@ neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
       }),
     ];
 
-    // Helper to call LLM via OpenClaw gateway
-    // Images are passed as HTTP URLs (uploaded to Supabase) — OpenClaw handles vision natively
+    // Helper to call LLM — uses direct API for vision (with images), OpenClaw gateway for text-only
     async function callNeo(msgs, stream = true) {
-      // Replace base64 data URLs with a text note (gateway can't handle them)
-      // HTTP URLs are kept as-is — OpenClaw fetches them natively
+      const hasImages = msgs.some(m =>
+        Array.isArray(m.content) && m.content.some(p => p.type === 'image_url')
+      );
+
+      // For vision: upload any remaining base64 images to get HTTP URLs
       const sanitized = await Promise.all(msgs.map(async (m) => {
         if (!Array.isArray(m.content)) return m;
         const parts = await Promise.all(m.content.map(async (part) => {
@@ -464,6 +471,32 @@ neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
       const timeout = setTimeout(() => controller.abort(), 120_000);
 
       try {
+        if (hasImages && CHAT_LLM_KEY) {
+          // Direct LLM call for vision — same model, just bypassing gateway
+          return await fetch(CHAT_LLM_URL, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${CHAT_LLM_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: CHAT_LLM_MODEL,
+              messages: sanitized,
+              tools: CHAT_TOOLS,
+              stream,
+              max_tokens: 4096,
+            }),
+            signal: controller.signal,
+          });
+        }
+
+        // Text-only: use OpenClaw gateway
+        // Strip any remaining image parts (shouldn't happen but just in case)
+        const textMsgs = sanitized.map(m => {
+          if (!Array.isArray(m.content)) return m;
+          const text = m.content.filter(p => p.type === 'text').map(p => p.text).join('\n');
+          return { ...m, content: text || m.content };
+        });
         return await fetch(`${NEO_GATEWAY}/v1/chat/completions`, {
           method: 'POST',
           headers: {
@@ -473,7 +506,7 @@ neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
           },
           body: JSON.stringify({
             model: 'openclaw:main',
-            messages: sanitized,
+            messages: textMsgs,
             tools: CHAT_TOOLS,
             stream,
             user: `conversation-${conversationId}`,
