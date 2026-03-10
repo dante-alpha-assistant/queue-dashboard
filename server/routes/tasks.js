@@ -655,7 +655,7 @@ router.get("/tasks/:id/comments", async (req, res) => {
 
 router.post("/tasks/:id/comments", async (req, res) => {
   try {
-    const { body, author, author_type } = req.body;
+    const { body, author, author_type, mentions } = req.body;
     if (!body || !body.trim()) return res.status(400).json({ error: "body is required" });
     const { data, error } = await supabase
       .from("task_comments")
@@ -664,6 +664,40 @@ router.post("/tasks/:id/comments", async (req, res) => {
         author: author || "dante",
         author_type: author_type || "human",
         body: body.trim(),
+        mentions: mentions && mentions.length > 0 ? mentions : null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+
+    // If agents were mentioned, send webhooks with full task context
+    if (mentions && mentions.length > 0) {
+      notifyMentionedAgents(req.params.id, data, mentions).catch(e => {
+        console.error(`[MENTION] Failed to notify agents for task ${req.params.id}:`, e.message);
+      });
+    }
+
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Agent reply callback — agents post replies back to task comments
+router.post("/tasks/:id/comments/reply", async (req, res) => {
+  try {
+    const { body, author, comment_id } = req.body;
+    if (!body || !body.trim()) return res.status(400).json({ error: "body is required" });
+    if (!author) return res.status(400).json({ error: "author (agent id) is required" });
+
+    const { data, error } = await supabase
+      .from("task_comments")
+      .insert({
+        task_id: req.params.id,
+        author,
+        author_type: "agent",
+        body: body.trim(),
+        reply_to: comment_id || null,
       })
       .select()
       .single();
@@ -673,6 +707,78 @@ router.post("/tasks/:id/comments", async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// Send webhook to mentioned agents with full task context
+async function notifyMentionedAgents(taskId, comment, mentions) {
+  // Fetch full task
+  const { data: task } = await supabase
+    .from("agent_tasks")
+    .select("*")
+    .eq("id", taskId)
+    .single();
+  if (!task) return;
+
+  // Fetch all comments for context
+  const { data: allComments } = await supabase
+    .from("task_comments")
+    .select("author, author_type, body, created_at")
+    .eq("task_id", taskId)
+    .order("created_at", { ascending: true })
+    .limit(50);
+
+  // Fetch agent cards for endpoint URLs
+  const { data: agents } = await supabase
+    .from("agent_cards")
+    .select("id, name, endpoint_url, status")
+    .in("id", mentions);
+
+  const DASHBOARD_URL = process.env.DASHBOARD_URL || "https://tasks.dante.id";
+  const callbackUrl = `${DASHBOARD_URL}/api/tasks/${taskId}/comments/reply`;
+
+  // Build comment thread text
+  const commentThread = (allComments || []).map(c => {
+    const time = new Date(c.created_at).toISOString().replace("T", " ").slice(0, 16);
+    return `**${c.author}** (${c.author_type}) — ${time}:\n> ${c.body.replace(/\n/g, "\n> ")}`;
+  }).join("\n\n");
+
+  for (const agent of (agents || [])) {
+    if (!agent.endpoint_url || agent.status === "disabled") continue;
+
+    const webhookUrl = `${agent.endpoint_url}/hooks/agent`;
+    const payload = {
+      type: "task_mention",
+      task_id: taskId,
+      comment_id: comment.id,
+      comment_body: comment.body,
+      comment_author: comment.author,
+      callback_url: callbackUrl,
+      task: {
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        type: task.type,
+        priority: task.priority,
+        result: task.result,
+        qa_result: task.qa_result,
+        pull_request_url: task.pull_request_url,
+        assigned_agent: task.assigned_agent,
+      },
+      comment_thread: commentThread,
+    };
+
+    try {
+      const resp = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      console.log(`[MENTION] Notified ${agent.id} for task ${taskId}: HTTP ${resp.status}`);
+    } catch (e) {
+      console.error(`[MENTION] Failed to notify ${agent.id}: ${e.message}`);
+    }
+  }
+}
 
 // Activity log for a task (Jira-style field change history)
 router.get("/tasks/:id/activity", async (req, res) => {
