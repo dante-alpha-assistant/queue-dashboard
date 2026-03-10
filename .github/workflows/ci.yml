@@ -1,0 +1,89 @@
+name: CI — Validate, Test, Build, Push
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  validate:
+    name: 🔍 Validate (syntax + conflict markers + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check for merge conflict markers
+        run: |
+          echo "Scanning for conflict markers..."
+          if grep -rn '<<<<<<< \|>>>>>>> \|=======$' server/ client/src/ --include="*.js" --include="*.jsx" --include="*.ts" --include="*.tsx" 2>/dev/null; then
+            echo "❌ MERGE CONFLICT MARKERS FOUND — refusing to build"
+            exit 1
+          fi
+          echo "✅ No conflict markers"
+
+      - name: Syntax check — server files
+        run: |
+          echo "Running node --check on all server .js files..."
+          ERRORS=0
+          for f in $(find server -name "*.js" -type f); do
+            if ! node --check "$f" 2>/dev/null; then
+              echo "❌ Syntax error in $f"
+              ERRORS=$((ERRORS + 1))
+            fi
+          done
+          if [ $ERRORS -gt 0 ]; then
+            echo "❌ $ERRORS server file(s) have syntax errors"
+            exit 1
+          fi
+          echo "✅ All server files pass syntax check"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build client
+        run: cd client && npm ci && npm run build
+
+  test:
+    name: 🧪 Test
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm test
+
+  docker:
+    name: 🐳 Build & Push Docker Image
+    needs: [validate, test]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            COMMIT_SHA=${{ github.sha }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
