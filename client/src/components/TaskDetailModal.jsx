@@ -1108,10 +1108,8 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const tabs = [{ key: 'details', label: 'Details' }];
   tabs.push({ key: 'comments', label: 'Comments' });
   tabs.push({ key: 'activity', label: 'Activity' });
-  tabs.push({ key: 'deployment', label: 'Deployment', Icon: Rocket });
+  tabs.push({ key: 'deployment', label: 'Deployment' });
   if (hasCosts) tabs.push({ key: 'costs', label: '💰 Costs' });
-  if (hasDeployment) tabs.push({ key: 'deployment', label: 'Deployment' });
-  if (hasCosts) tabs.push({ key: 'costs', label: 'Costs' });
   tabs.push({ key: 'metadata', label: 'Metadata' });
   if (hasQA) tabs.push({ key: 'qa', label: 'QA' });
   if (hasFilteredMetadata) tabs.push({ key: 'meta', label: 'Meta' });
