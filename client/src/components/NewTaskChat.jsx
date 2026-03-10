@@ -754,8 +754,8 @@ export default function NewTaskChat({ isMobile }) {
         )}
         {!loadingMessages && messages.length === 0 && !activeConvoId && (
           <div style={{ textAlign: "center", marginTop: 48, color: "var(--md-on-surface-variant)" }}>
-            <NeoAvatar size={48} />
-            <div style={{ fontSize: 15, fontWeight: 600, marginTop: 12, marginBottom: 6, color: "var(--md-on-surface)" }}>Hey! I'm Neo.</div>
+            <div style={{ fontSize: 32, marginBottom: 4 }}>✨</div>
+            <div style={{ fontSize: 15, fontWeight: 600, marginTop: 8, marginBottom: 6, color: "var(--md-on-surface)" }}>Hey! I'm Neo.</div>
             <div style={{ fontSize: 13, lineHeight: 1.6, maxWidth: 280, margin: "0 auto", color: "var(--md-on-surface-variant)" }}>
               Tell me what you need and I'll create a task for it. You can describe features, bugs, ops work — anything.
             </div>
