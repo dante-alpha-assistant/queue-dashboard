@@ -344,7 +344,7 @@ export default function App() {
             return (
               <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{
                 display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-                background: "none", border: "none", cursor: "pointer",
+                background: "none", border: "1px solid rgba(255,255,255,0.15)", cursor: "pointer",
                 padding: "6px 12px", minWidth: 48, minHeight: 44,
                 color: isActive ? "var(--md-primary)" : "var(--md-on-surface-variant)",
                 position: "relative",
@@ -479,7 +479,7 @@ export default function App() {
             {searchQuery ? (
               <button
                 onClick={() => setSearchQuery("")}
-                style={{ position: "absolute", right: 8, background: "none", border: "none", cursor: "pointer", color: "var(--md-on-surface-variant)", fontSize: 13, padding: 0, display: "flex" }}
+                style={{ position: "absolute", right: 8, background: "none", border: "1px solid rgba(255,255,255,0.15)", cursor: "pointer", color: "var(--md-on-surface-variant)", fontSize: 13, padding: 0, display: "flex" }}
               ><XCircle size={14} /></button>
             ) : (
               <span style={{ position: "absolute", right: 10, display: "flex", gap: 2, pointerEvents: "none" }}>
@@ -522,10 +522,10 @@ export default function App() {
             <button
               onClick={() => setShowBatchDeploy(true)}
               style={{
-                fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 6,
-                background: "#1B5E20", color: "#fff",
-                border: "none", cursor: "pointer",
-                textTransform: "uppercase", letterSpacing: "0.5px",
+                fontSize: 11, fontWeight: 600, padding: "4px 12px", borderRadius: 14,
+                background: "linear-gradient(135deg, #2E7D32, #1B5E20)", color: "#fff",
+                border: "1px solid rgba(255,255,255,0.15)", cursor: "pointer",
+                textTransform: "uppercase", letterSpacing: "0.6px", boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "all 0.15s ease",
               }}
             >
               Deploy All ({filterByType(completed).filter(t => Array.isArray(t.pull_request_url) ? t.pull_request_url[0] : t.pull_request_url).length})
