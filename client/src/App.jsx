@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect , useMemo } from "react";
+import { useState, useCallback, useEffect } from "react";
 import SpeedLoader from "./components/SpeedLoader";
 import { useNavigate, useLocation } from "react-router-dom";
 import useQueue from "./hooks/useQueue";
@@ -178,25 +178,20 @@ export default function App() {
   const allTasksRaw = tasks;
   const allTasks = filterTasksByTime(allTasksRaw, timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
 
-  // Compute time-period counts from actual fetched tasks (ensures badge matches visible cards)
-  const timePeriodCounts = useMemo(() => {
-    const applyFilters = (tasks) => {
-      let filtered = tasks;
-      if (typeFilter !== "all") filtered = filtered.filter(t => t.type === typeFilter);
-      if (stageFilter !== "all") filtered = filtered.filter(t => t.stage === stageFilter);
-      if (searchQuery.trim()) filtered = filtered.filter(t => t.title?.toLowerCase().includes(searchQuery.toLowerCase()));
-      return filtered;
-    };
-    const base = applyFilters(allTasksRaw);
+  // Compute time-period counts from actual fetched tasks (plain computation, no useMemo)
+  const timePeriodCounts = (() => {
+    let filtered = allTasksRaw;
+    if (typeFilter !== "all") filtered = filtered.filter(t => t.type === typeFilter);
+    if (stageFilter !== "all") filtered = filtered.filter(t => t.stage === stageFilter);
+    if (searchQuery.trim()) filtered = filtered.filter(t => t.title?.toLowerCase().includes(searchQuery.toLowerCase()));
     return {
-      today: filterTasksByTime(base, "today").length,
-      last_24h: filterTasksByTime(base, "24h").length,
-      last_7d: filterTasksByTime(base, "7d").length,
-      last_30d: filterTasksByTime(base, "30d").length,
-      all: base.length,
+      today: filterTasksByTime(filtered, "today").length,
+      last_24h: filterTasksByTime(filtered, "24h").length,
+      last_7d: filterTasksByTime(filtered, "7d").length,
+      last_30d: filterTasksByTime(filtered, "30d").length,
+      all: filtered.length,
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, typeFilter, stageFilter, searchQuery]);
+  })();
   const activeTypes = ["all", ...new Set(allTasks.map(t => t.type).filter(Boolean))];
   const activeStages = ["all", ...new Set(allTasks.map(t => t.stage).filter(Boolean))];
   const filterTasks = (tasks) => {
@@ -214,8 +209,6 @@ export default function App() {
     switch (activeTab) {
       case "todo": return filterByType(todo);
       case "active": return [...filterByType(assigned), ...filterByType(inProgress)];
-      case "blocked": return [...filterByType(blocked)].sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at));
-      case "qa": return filterByType(qa);
       case "blocked": return filterByType(blocked);
       case "qa": return filterByType(qa).sort((a, b) => {
             const aAssigned = !!a.assigned_agent;
