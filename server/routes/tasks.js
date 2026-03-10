@@ -538,7 +538,8 @@ router.post("/deploy/batch", async (req, res) => {
       created_by: "system",
     }));
 
-    await supabase.from("task_relationships").insert(relationships);
+    const { error: relErr } = await supabase.from("task_relationships").insert(relationships);
+    if (relErr) console.error("[BATCH_DEPLOY] Relationship insert error:", relErr.message);
 
     // Set all deployable tasks to "deploying"
     const { error: updateErr } = await supabase
