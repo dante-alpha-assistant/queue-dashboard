@@ -35,17 +35,27 @@ export default function TaskComments({ taskId }) {
   const fetchComments = async () => {
     try {
       const resp = await fetch(`/api/tasks/${taskId}/comments`);
-      if (!resp.ok) throw new Error('Failed to load comments');
+      if (!resp.ok) {
+        const errBody = await resp.json().catch(() => ({}));
+        throw new Error(errBody.error || `Server error (${resp.status})`);
+      }
       const data = await resp.json();
       setComments([...data].reverse());
+      setError(null); // Clear any previous errors on success
     } catch (e) {
-      setError(e.message);
+      // Only show error if we have no cached comments (don't disrupt view on transient poll failures)
+      if (comments.length === 0) {
+        setError(e.message);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    setLoading(true);
+    setError(null);
+    setComments([]);
     fetchComments();
     // Poll every 10s for new comments
     const interval = setInterval(fetchComments, 10000);
@@ -177,7 +187,19 @@ export default function TaskComments({ taskId }) {
           {posting ? <Clock size={14} /> : <MessageSquare size={14} />} Send
         </button>
       </form>
-      {error && <div style={{ fontSize: 12, color: '#BA1A1A' }}><AlertTriangle size={14} /> {error}</div>}
+      {error && (
+        <div style={{ fontSize: 12, color: '#BA1A1A', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <AlertTriangle size={14} /> {error}
+          <button
+            onClick={() => { setError(null); setLoading(true); fetchComments(); }}
+            style={{
+              marginLeft: 8, padding: '2px 10px', borderRadius: 100, border: '1px solid #BA1A1A',
+              background: 'transparent', color: '#BA1A1A', fontSize: 11, cursor: 'pointer',
+              fontFamily: "'Inter', system-ui, sans-serif",
+            }}
+          >Retry</button>
+        </div>
+      )}
     </div>
   );
 }
