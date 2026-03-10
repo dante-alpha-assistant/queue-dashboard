@@ -29,6 +29,8 @@ function renderText(text) {
 
 const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+const MAX_IMAGE_DIMENSION = 1536; // Max width/height for resizing (keeps quality, reduces payload)
+const JPEG_QUALITY = 0.85;
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -36,6 +38,50 @@ function fileToBase64(file) {
     reader.onload = () => resolve(reader.result);
     reader.onerror = reject;
     reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Compress/resize an image file to a reasonable size for vision API.
+ * Returns a base64 data URL (JPEG for photos, PNG for small images).
+ */
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    // GIFs: skip compression to preserve animation
+    if (file.type === "image/gif") {
+      return fileToBase64(file).then(resolve, reject);
+    }
+
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+
+      // Only resize if larger than max dimension
+      if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
+        const scale = Math.min(MAX_IMAGE_DIMENSION / width, MAX_IMAGE_DIMENSION / height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // Use JPEG for photos (smaller), PNG if image has transparency
+      const outputType = file.type === "image/png" ? "image/png" : "image/jpeg";
+      const quality = outputType === "image/jpeg" ? JPEG_QUALITY : undefined;
+      resolve(canvas.toDataURL(outputType, quality));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      // Fallback to raw base64 if canvas fails
+      fileToBase64(file).then(resolve, reject);
+    };
+    img.src = url;
   });
 }
 
@@ -420,7 +466,7 @@ export default function NewTaskChat({ isMobile }) {
         continue;
       }
       try {
-        const dataUrl = await fileToBase64(file);
+        const dataUrl = await compressImage(file);
         newImages.push({ dataUrl, name: file.name });
       } catch (e) {
         errors.push(`${file.name}: failed to read`);
