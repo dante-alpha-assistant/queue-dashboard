@@ -1,6 +1,64 @@
 import { Router } from "express";
 import supabase from "../supabase.js";
 
+const ATTACHMENT_BUCKET = 'task-attachments';
+
+// Upload images (data URLs or HTTP URLs) to Supabase storage and attach to a task
+async function attachImagesToTask(taskId, imageUrls) {
+  if (!imageUrls || !imageUrls.length) return [];
+  const attached = [];
+  for (const imgUrl of imageUrls) {
+    try {
+      let buffer, contentType, ext;
+      if (imgUrl.startsWith('data:')) {
+        const match = imgUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+        if (!match) continue;
+        contentType = match[1];
+        ext = contentType.split('/')[1] || 'png';
+        buffer = Buffer.from(match[2], 'base64');
+      } else if (imgUrl.startsWith('http')) {
+        const resp = await fetch(imgUrl);
+        if (!resp.ok) continue;
+        contentType = resp.headers.get('content-type') || 'image/png';
+        ext = contentType.split('/')[1]?.split(';')[0] || 'png';
+        buffer = Buffer.from(await resp.arrayBuffer());
+      } else {
+        continue;
+      }
+      const filename = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const storagePath = `${taskId}/${filename}`;
+      const { error: uploadErr } = await supabase.storage
+        .from(ATTACHMENT_BUCKET)
+        .upload(storagePath, buffer, { contentType, upsert: false });
+      if (uploadErr) { console.error('[CHAT-ATTACH] Upload error:', uploadErr.message); continue; }
+      const { data: urlData } = supabase.storage.from(ATTACHMENT_BUCKET).getPublicUrl(storagePath);
+      attached.push({
+        url: urlData?.publicUrl,
+        filename,
+        type: contentType,
+        storage_path: storagePath,
+        uploaded_at: new Date().toISOString(),
+        source: 'chat',
+      });
+    } catch (e) {
+      console.error('[CHAT-ATTACH] Error attaching image:', e.message);
+    }
+  }
+  if (attached.length > 0) {
+    try {
+      const { data: task } = await supabase.from('agent_tasks').select('metadata').eq('id', taskId).single();
+      const metadata = task?.metadata || {};
+      const existing = metadata.attachments || [];
+      await supabase.from('agent_tasks').update({
+        metadata: { ...metadata, attachments: [...existing, ...attached] },
+      }).eq('id', taskId);
+    } catch (e) {
+      console.error('[CHAT-ATTACH] Metadata update error:', e.message);
+    }
+  }
+  return attached;
+}
+
 export const neoChatRouter = Router();
 
 // Neo's OpenClaw gateway (in-cluster) — used for text-only chat
@@ -48,7 +106,7 @@ const CHAT_TOOLS = [
 ];
 
 // Execute a tool call locally and return the result
-async function executeToolCall(name, args) {
+async function executeToolCall(name, args, conversationImages = []) {
   if (name === "create_task") {
     try {
       const { data, error } = await supabase
@@ -64,11 +122,18 @@ async function executeToolCall(name, args) {
         .select()
         .single();
       if (error) return JSON.stringify({ error: error.message });
+      // Attach conversation images to the newly created task
+      let attachedCount = 0;
+      if (conversationImages.length > 0) {
+        const attached = await attachImagesToTask(data.id, conversationImages);
+        attachedCount = attached.length;
+      }
       return JSON.stringify({
         success: true,
         task_id: data.id,
         title: data.title,
         url: `https://tasks.dante.id/?task=${data.id}`,
+        attachments: attachedCount,
       });
     } catch (e) {
       return JSON.stringify({ error: e.message });
@@ -353,11 +418,22 @@ neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
         })),
       };
 
+      // Collect all images from the conversation for attachment
+      const conversationImages = [];
+      if (images && images.length) conversationImages.push(...images);
+      if (history) {
+        for (const m of history) {
+          if (m.role === 'user' && m.metadata?.images?.length) {
+            conversationImages.push(...m.metadata.images);
+          }
+        }
+      }
+
       const toolResultMsgs = [];
       for (const tc of toolCallList) {
         let args = {};
         try { args = JSON.parse(tc.arguments); } catch {}
-        const result = await executeToolCall(tc.name, args);
+        const result = await executeToolCall(tc.name, args, conversationImages);
         toolResultMsgs.push({
           role: "tool",
           tool_call_id: tc.id || `call_0`,
