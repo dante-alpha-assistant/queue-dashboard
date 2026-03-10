@@ -68,7 +68,7 @@ async function executeToolCall(name, args) {
         success: true,
         task_id: data.id,
         title: data.title,
-        url: `https://tasks.dante.id/?task=${data.id}`,
+        url: `https://tasks.dante.id/task/${data.id}`,
       });
     } catch (e) {
       return JSON.stringify({ error: e.message });
@@ -227,39 +227,87 @@ neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
       const hasImages = msgs.some(m =>
         Array.isArray(m.content) && m.content.some(p => p.type === "image_url")
       );
-      if (hasImages && CHAT_LLM_KEY) {
-        // Direct LLM call — preserves image_url parts for vision
-        return fetch(CHAT_LLM_URL, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${CHAT_LLM_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: CHAT_LLM_MODEL,
-            messages: msgs,
-            tools: CHAT_TOOLS,
-            stream,
-            max_tokens: 4096,
-          }),
+
+      // Strip base64 images that exceed ~4MB per image to avoid fetch failures
+      const sanitizedMsgs = msgs.map(m => {
+        if (!Array.isArray(m.content)) return m;
+        const filteredParts = m.content.filter(p => {
+          if (p.type === "image_url" && p.image_url?.url?.startsWith("data:")) {
+            // base64 data URLs: ~1.37x the raw size; reject if > 4MB encoded
+            if (p.image_url.url.length > 4 * 1024 * 1024) {
+              console.warn("Dropping oversized image from chat message (>4MB base64)");
+              return false;
+            }
+          }
+          return true;
+        });
+        return { ...m, content: filteredParts.length ? filteredParts : m.content };
+      });
+
+      const hasFilteredImages = sanitizedMsgs.some(m =>
+        Array.isArray(m.content) && m.content.some(p => p.type === "image_url")
+      );
+
+      // Abort controller with 120s timeout to prevent hanging requests
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 120_000);
+
+      try {
+        let resp;
+        if (hasFilteredImages && CHAT_LLM_KEY) {
+          // Direct LLM call — preserves image_url parts for vision
+          resp = await fetch(CHAT_LLM_URL, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${CHAT_LLM_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: CHAT_LLM_MODEL,
+              messages: sanitizedMsgs,
+              tools: CHAT_TOOLS,
+              stream,
+              max_tokens: 4096,
+            }),
+            signal: controller.signal,
+          });
+        } else {
+          // Text-only (or no LLM key): use OpenClaw gateway
+          // Strip image_url parts since gateway doesn't support them
+          const textOnlyMsgs = sanitizedMsgs.map(m => {
+            if (!Array.isArray(m.content)) return m;
+            const textParts = m.content.filter(p => p.type === "text");
+            const text = textParts.map(p => p.text).join("\n");
+            return { ...m, content: text || "(image attached — vision not available via gateway)" };
+          });
+          resp = await fetch(`${NEO_GATEWAY}/v1/chat/completions`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${NEO_TOKEN}`,
+              "Content-Type": "application/json",
+              "x-openclaw-agent-id": "main",
+            },
+            body: JSON.stringify({
+              model: "openclaw:main",
+              messages: textOnlyMsgs,
+              tools: CHAT_TOOLS,
+              stream,
+              user: `conversation-${conversationId}`,
+            }),
+            signal: controller.signal,
+          });
+        }
+        clearTimeout(timeout);
+        return resp;
+      } catch (fetchErr) {
+        clearTimeout(timeout);
+        console.error("callNeo fetch error:", fetchErr.message);
+        // Return a synthetic Response so callers get a proper error instead of throwing
+        return new Response(JSON.stringify({ error: `Failed to reach AI service: ${fetchErr.message}` }), {
+          status: 502,
+          headers: { "Content-Type": "application/json" },
         });
       }
-      // Text-only: use OpenClaw gateway
-      return fetch(`${NEO_GATEWAY}/v1/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${NEO_TOKEN}`,
-          "Content-Type": "application/json",
-          "x-openclaw-agent-id": "main",
-        },
-        body: JSON.stringify({
-          model: "openclaw:main",
-          messages: msgs,
-          tools: CHAT_TOOLS,
-          stream,
-          user: `conversation-${conversationId}`,
-        }),
-      });
     }
 
     const response = await callNeo(fullMessages);
