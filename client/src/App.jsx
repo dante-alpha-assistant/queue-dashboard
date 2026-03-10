@@ -91,6 +91,19 @@ export default function App() {
     }
   }, [deepLinkId, loading, todo, assigned, inProgress, blocked, qa, completed, deploying, deployed, deployFailed, failed]);
 
+  // Fetch full task data when selected (list uses light columns without description/result/qa_result)
+  useEffect(() => {
+    if (!selectedTask || selectedTask._notFound || selectedTask._full) return;
+    let cancelled = false;
+    fetch(`/api/tasks/${selectedTask.id}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(full => {
+        if (!cancelled && full) setSelectedTask(prev => prev?.id === full.id ? { ...full, _full: true } : prev);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [selectedTask?.id, selectedTask?._full]);
+
   // Update URL when task is selected/deselected
   const handleSelectTask = useCallback((task) => {
     setSelectedTask(task);
