@@ -23,7 +23,12 @@ You have vision capabilities — users can share screenshots and images with you
 When a user shares a screenshot, analyze what's shown (task cards, error messages, UI issues, etc.) and respond with context-aware analysis. Reference specific details you see in the image.
 
 Be conversational, helpful, and concise. You're talking to Dante or a team member.
-If the user just wants to chat, that's fine too — you're a full agent.`;
+If the user just wants to chat, that's fine too — you're a full agent.
+
+IMPORTANT: After creating a task, ALWAYS include the clickable URL in your response.
+The create_task tool returns a task_id (UUID). Use it to build the link.
+Format: Created task: [task title](https://tasks.dante.id/task/{uuid})
+Always use this exact URL pattern so the user can click through to review the task.`;
 
 const CHAT_TOOLS = [
   {
@@ -66,7 +71,7 @@ async function executeToolCall(name, args) {
         success: true,
         task_id: data.id,
         title: data.title,
-        url: `https://tasks.dante.id/?task=${data.id}`,
+        url: `https://tasks.dante.id/task/${data.id}`,
       });
     } catch (e) {
       return JSON.stringify({ error: e.message });
@@ -220,44 +225,101 @@ neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
       }),
     ];
 
+    // Strip oversized base64 images (>4MB) to prevent payload failures
+    function stripOversizedImages(msgs) {
+      return msgs.map(m => {
+        if (!Array.isArray(m.content)) return m;
+        const filtered = m.content.map(part => {
+          if (part.type === "image_url" && part.image_url?.url?.startsWith("data:")) {
+            // Base64 data URLs: rough size = length * 0.75
+            const sizeBytes = part.image_url.url.length * 0.75;
+            if (sizeBytes > 4 * 1024 * 1024) {
+              console.warn(`Stripping oversized base64 image (~${Math.round(sizeBytes / 1024 / 1024)}MB) from chat message`);
+              return { type: "text", text: "[Image removed: too large (>4MB). Please resize and try again.]" };
+            }
+          }
+          return part;
+        });
+        return { ...m, content: filtered };
+      });
+    }
+
+    // Strip image_url parts entirely (for gateway fallback that doesn't support vision)
+    function stripImageParts(msgs) {
+      return msgs.map(m => {
+        if (!Array.isArray(m.content)) return m;
+        const hasImages = m.content.some(p => p.type === "image_url");
+        if (!hasImages) return m;
+        const textParts = m.content.filter(p => p.type === "text");
+        const text = textParts.map(p => p.text).join("\n") || "";
+        return { ...m, content: text + "\n[Note: User attached an image but vision is not available via this endpoint.]" };
+      });
+    }
+
     // Helper to call LLM — uses direct API for vision, OpenClaw gateway for text-only
+    // Returns a Response or a synthetic error Response on failure
     async function callNeo(msgs, stream = true) {
       const hasImages = msgs.some(m =>
         Array.isArray(m.content) && m.content.some(p => p.type === "image_url")
       );
-      if (hasImages && CHAT_LLM_KEY) {
-        // Direct LLM call — preserves image_url parts for vision
-        return fetch(CHAT_LLM_URL, {
+
+      // 120s timeout to prevent hanging requests
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 120_000);
+
+      try {
+        if (hasImages && CHAT_LLM_KEY) {
+          // Direct LLM call — preserves image_url parts for vision
+          const sanitized = stripOversizedImages(msgs);
+          return await fetch(CHAT_LLM_URL, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${CHAT_LLM_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: CHAT_LLM_MODEL,
+              messages: sanitized,
+              tools: CHAT_TOOLS,
+              stream,
+              max_tokens: 4096,
+            }),
+            signal: controller.signal,
+          });
+        }
+
+        // Text-only or no LLM key: use OpenClaw gateway (strip images if present)
+        const gatewayMsgs = hasImages ? stripImageParts(msgs) : msgs;
+        return await fetch(`${NEO_GATEWAY}/v1/chat/completions`, {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${CHAT_LLM_KEY}`,
+            "Authorization": `Bearer ${NEO_TOKEN}`,
             "Content-Type": "application/json",
+            "x-openclaw-agent-id": "main",
           },
           body: JSON.stringify({
-            model: CHAT_LLM_MODEL,
-            messages: msgs,
+            model: "openclaw:main",
+            messages: gatewayMsgs,
             tools: CHAT_TOOLS,
             stream,
-            max_tokens: 4096,
+            user: `conversation-${conversationId}`,
           }),
+          signal: controller.signal,
         });
+      } catch (err) {
+        const isTimeout = err.name === "AbortError";
+        const message = isTimeout
+          ? "Request timed out after 120 seconds. Please try again with a shorter message or smaller image."
+          : `Neo is temporarily unavailable. Please try again. (${err.message})`;
+        console.error(`callNeo ${isTimeout ? "timeout" : "fetch error"}:`, err.message);
+        // Return a synthetic 502 Response so callers don't throw
+        return new Response(JSON.stringify({ error: message }), {
+          status: 502,
+          headers: { "Content-Type": "application/json" },
+        });
+      } finally {
+        clearTimeout(timeout);
       }
-      // Text-only: use OpenClaw gateway
-      return fetch(`${NEO_GATEWAY}/v1/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${NEO_TOKEN}`,
-          "Content-Type": "application/json",
-          "x-openclaw-agent-id": "main",
-        },
-        body: JSON.stringify({
-          model: "openclaw:main",
-          messages: msgs,
-          tools: CHAT_TOOLS,
-          stream,
-          user: `conversation-${conversationId}`,
-        }),
-      });
     }
 
     const response = await callNeo(fullMessages);
@@ -365,7 +427,13 @@ neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
 
       // Call Neo again with tool results to get the final response
       const followUpMsgs = [...fullMessages, assistantMsg, ...toolResultMsgs];
-      const followUpResp = await callNeo(followUpMsgs);
+      let followUpResp;
+      try {
+        followUpResp = await callNeo(followUpMsgs);
+      } catch (e) {
+        console.error("Follow-up callNeo failed:", e.message);
+        followUpResp = { ok: false };
+      }
 
       if (followUpResp.ok) {
         // Clear the "creating task..." indicator by sending a replacement
