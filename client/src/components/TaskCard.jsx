@@ -33,7 +33,7 @@ const STATUS_BG = {
   deploying: "#F57C0014", deploy_failed: "#C6282814",
 };
 const PRIORITY_MAP = {
-  urgent: { color: "#D32F2F", bg: "#D32F2F14", label: "Urgent", icon: Circle },
+  urgent: { color: "#D32F2F", bg: "#D32F2F14", label: "Urgent", icon: "🔴" },
   high: { color: "#E65100", bg: "#E6510014", label: "High", icon: "🟠" },
   normal: null,
   low: { color: "#757575", bg: "#75757514", label: "Low", icon: "⚪" },

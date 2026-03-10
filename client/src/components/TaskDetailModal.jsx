@@ -49,7 +49,7 @@ const STATUS_CONFIG = {
 const TRANSITIONAL_STATUSES = new Set(['deploying', 'saving']);
 
 const PRIORITY_CONFIG = {
-  urgent: { bg: "#D32F2F14", color: "#D32F2F", label: "Urgent", icon: Circle },
+  urgent: { bg: "#D32F2F14", color: "#D32F2F", label: "Urgent", icon: "🔴" },
   high:   { bg: "#E6510014", color: "#E65100", label: "High", icon: "🟠" },
   normal: null,
   low:    { bg: "#75757514", color: "#757575", label: "Low", icon: "⚪" },
