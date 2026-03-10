@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { AlertTriangle, BarChart3, CheckCircle2, ClipboardList, Clock, FileText, Lightbulb, Link, Package, Pencil, RefreshCw, Timer, Wrench, XCircle, Pause, Rocket } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';

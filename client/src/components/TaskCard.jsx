@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import AgentPicker from "./AgentPicker";
+import { ProgressBadge } from "./ProgressFeed";
 import {
   PriorityDot, TaskTypeIcon, BlockerTypeIcon, AgentAvatar,
   RefreshIcon, UserPlusIcon, RocketIcon, KeyIcon, MessageSquareIcon,
   FolderIcon, SearchCheckIcon, PauseIcon, SlashIcon,
   KubernetesIcon, GitMergeIcon,
   BlockerIcon, RetryIcon, DeployIcon, AssignIcon, ChatIcon,
-  QAIcon, WaitingIcon, BlockedIcon, UserIcon,
+  QAIcon, WaitingIcon, BlockedIcon, UserIcon, AlertTriangleIcon,
 } from './Icons';
 
 const BLOCKER_TYPE_STYLES = {
@@ -602,7 +604,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
         <BlockedQuickActions task={task} onStatusChange={onStatusChange} />
         {assignError && (
           <span style={{ fontSize: 12, color: "#BA1A1A", fontWeight: 500, marginTop: 6, display: "block" }}>
-            <AlertTriangle size={14} /> {assignError}
+            <AlertTriangleIcon size={14} /> {assignError}
           </span>
         )}
       </div>
@@ -620,7 +622,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
     }}>
       {(assignError || deployError) && (
         <span style={{ fontSize: 12, color: "#BA1A1A", fontWeight: 500, marginRight: "auto" }}>
-          <AlertTriangle size={14} /> {assignError || deployError}
+          <AlertTriangleIcon size={14} /> {assignError || deployError}
         </span>
       )}
       {actions}
