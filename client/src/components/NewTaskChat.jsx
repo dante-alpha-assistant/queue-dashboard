@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import ImageModal from "./ImageModal";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -105,8 +106,8 @@ function renderContent(content) {
     if (part.type === "text") return <span key={i}>{renderText(part.text)}</span>;
     if (part.type === "image_url") {
       return (
-        <img key={i} src={part.image_url?.url} alt="uploaded"
-          style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8, marginTop: 4, marginBottom: 4, display: "block" }} />
+        <img key={i} src={part.image_url?.url} alt="uploaded" onClick={() => window.__openImageModal?.(part.image_url?.url)}
+          style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8, marginTop: 4, marginBottom: 4, display: "block", cursor: "zoom-in" }} />
       );
     }
     return null;
@@ -331,8 +332,8 @@ function renderMarkdownContent(content) {
     if (part.type === "text") return <span key={i}>{renderMarkdownText(part.text)}</span>;
     if (part.type === "image_url") {
       return (
-        <img key={i} src={part.image_url?.url} alt="uploaded"
-          style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8, marginTop: 4, marginBottom: 4, display: "block" }}
+        <img key={i} src={part.image_url?.url} alt="uploaded" onClick={() => window.__openImageModal?.(part.image_url?.url)}
+          style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8, marginTop: 4, marginBottom: 4, display: "block", cursor: "zoom-in" }}
         />
       );
     }
@@ -352,6 +353,8 @@ export default function NewTaskChat({ isMobile }) {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [pendingImages, setPendingImages] = useState([]);
+  const [modalImage, setModalImage] = useState(null);
+  useEffect(() => { window.__openImageModal = setModalImage; return () => { delete window.__openImageModal; }; }, []);
   const [dragging, setDragging] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -1074,5 +1077,6 @@ export default function NewTaskChat({ isMobile }) {
       </div>
       </>}
     </div>
+      {modalImage && <ImageModal src={modalImage} onClose={() => setModalImage(null)} />}
   );
 }
