@@ -139,7 +139,6 @@ async function executeToolCall(name, args, conversationImages = []) {
         title: data.title,
         url: `https://tasks.dante.id/task/${data.id}`,
         attachments: attachedCount,
->>>>>>> c8cbd1c (fix: instruct chat agent to reply with task URL after creation)
       });
     } catch (e) {
       return JSON.stringify({ error: e.message });
