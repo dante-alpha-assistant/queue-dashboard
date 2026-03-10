@@ -41,6 +41,17 @@ const BOTTOM_TABS = [
 ];
 
 export default function App() {
+  const [timeFilter, setTimeFilter] = useState({ range: "today", customFrom: "", customTo: "" });
+
+  // Compute server-side time filter params
+  const timeQueryParams = useMemo(() => {
+    const { from, to } = getRange(timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
+    const params = {};
+    if (from) params.since = from.toISOString();
+    if (to) params.until = to.toISOString();
+    return params;
+  }, [timeFilter.range, timeFilter.customFrom, timeFilter.customTo]);
+
   const {
     stats, todo, assigned, inProgress, qa, completed, deployed, blocked, failed, deploying, deployFailed,
     loading, transitioning, updateTask, applyStatusChange,
@@ -62,16 +73,7 @@ export default function App() {
   const [stageFilter, setStageFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("todo");
   const [view, setView] = useState("board");
-  const [timeFilter, setTimeFilter] = useState({ range: "today", customFrom: "", customTo: "" });
 
-  // Compute server-side time filter params
-  const timeQueryParams = useMemo(() => {
-    const { from, to } = getRange(timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
-    const params = {};
-    if (from) params.since = from.toISOString();
-    if (to) params.until = to.toISOString();
-    return params;
-  }, [timeFilter.range, timeFilter.customFrom, timeFilter.customTo]);
   const [searchQuery, setSearchQuery] = useState("");
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
   const handleSseStatusChange = useCallback((data) => { if (data.taskId && data.status) applyStatusChange(data.taskId, data.status); }, [applyStatusChange]);
