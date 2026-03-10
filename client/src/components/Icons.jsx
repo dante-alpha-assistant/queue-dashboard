@@ -355,7 +355,7 @@ export function AgentAvatar({ agent, size = 28, style }) {
         color: color,
         fontSize: size * 0.45,
         fontWeight: 700,
-        fontFamily: "'Roboto', system-ui, sans-serif",
+        fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
         flexShrink: 0,
         ...style,
       }}
@@ -565,7 +565,7 @@ export function AgentAvatar({ agent, size = 28 }) {
         fill={color}
         fontSize={size * 0.45}
         fontWeight="700"
-        fontFamily="'Roboto', system-ui, sans-serif"
+        fontFamily="'Inter', system-ui, -apple-system, sans-serif"
       >{letter}</text>
     </svg>
   );

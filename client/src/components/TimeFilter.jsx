@@ -128,7 +128,7 @@ export default function TimeFilter({ allTasks, value, onChange, isMobile }) {
             border: isActive ? "2px solid var(--md-primary)" : "1px solid var(--md-surface-variant)",
             background: isActive ? "var(--md-primary-container)" : "var(--md-surface)",
             color: isActive ? "var(--md-on-primary-container)" : "var(--md-on-surface-variant)",
-            cursor: "pointer", fontFamily: "'Roboto', system-ui, sans-serif",
+            cursor: "pointer", fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
             transition: "all 150ms", display: "flex", alignItems: "center", gap: 4,
           }}>
             {p.label}
@@ -148,19 +148,19 @@ export default function TimeFilter({ allTasks, value, onChange, isMobile }) {
           <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} style={{
             padding: "4px 8px", borderRadius: 8, border: "1px solid var(--md-surface-variant)",
             background: "var(--md-surface)", color: "var(--md-on-background)", fontSize: 12,
-            fontFamily: "'Roboto', system-ui, sans-serif", outline: "none",
+            fontFamily: "'Inter', system-ui, -apple-system, sans-serif", outline: "none",
           }} />
           <span style={{ fontSize: 12, color: "var(--md-on-surface-variant)" }}>→</span>
           <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} style={{
             padding: "4px 8px", borderRadius: 8, border: "1px solid var(--md-surface-variant)",
             background: "var(--md-surface)", color: "var(--md-on-background)", fontSize: 12,
-            fontFamily: "'Roboto', system-ui, sans-serif", outline: "none",
+            fontFamily: "'Inter', system-ui, -apple-system, sans-serif", outline: "none",
           }} />
           <button onClick={applyCustom} style={{
             padding: "4px 12px", borderRadius: 8, border: "none",
             background: "var(--md-primary)", color: "var(--md-on-primary)",
             fontSize: 12, fontWeight: 600, cursor: "pointer",
-            fontFamily: "'Roboto', system-ui, sans-serif",
+            fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
           }}>Apply</button>
         </div>
       )}

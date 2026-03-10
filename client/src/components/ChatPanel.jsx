@@ -168,16 +168,16 @@ export default function ChatPanel({ isMobile, open: controlledOpen, onClose }) {
                 <span style={{
                   fontSize: 12, fontWeight: 600,
                   color: isUser ? "var(--md-primary)" : "#386A20",
-                  fontFamily: "'Roboto', system-ui, sans-serif",
+                  fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
                   letterSpacing: "0.02em",
                 }}>{msg.name}</span>
-                <span style={{ fontSize: 11, color: "var(--md-on-surface-variant)", fontFamily: "'Roboto', system-ui, sans-serif", letterSpacing: "0.01em" }}>{timeAgo(msg.timestamp)}</span>
+                <span style={{ fontSize: 11, color: "var(--md-on-surface-variant)", fontFamily: "'Inter', system-ui, -apple-system, sans-serif", letterSpacing: "0.01em" }}>{timeAgo(msg.timestamp)}</span>
               </div>
               <div style={{
                 fontSize: 14, lineHeight: 1.55, paddingLeft: 24,
                 wordBreak: "break-word",
                 color: "var(--md-on-background)",
-                fontFamily: "'Roboto', system-ui, sans-serif",
+                fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
                 letterSpacing: "0.01em",
                 ...(isUser ? { whiteSpace: "pre-wrap" } : {}),
               }}
@@ -189,10 +189,10 @@ export default function ChatPanel({ isMobile, open: controlledOpen, onClose }) {
                     rehypePlugins={[rehypeHighlight]}
                     components={{
                       a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" style={{ color: "var(--md-primary)", textDecoration: "none" }} />,
-                      p: ({ node, ...props }) => <p {...props} style={{ margin: "0 0 8px 0", fontFamily: "'Roboto', system-ui, sans-serif" }} />,
-                      h1: ({ node, ...props }) => <h1 {...props} style={{ fontSize: 20, fontWeight: 600, margin: "12px 0 6px 0", fontFamily: "'Roboto', system-ui, sans-serif" }} />,
-                      h2: ({ node, ...props }) => <h2 {...props} style={{ fontSize: 17, fontWeight: 600, margin: "10px 0 4px 0", fontFamily: "'Roboto', system-ui, sans-serif" }} />,
-                      h3: ({ node, ...props }) => <h3 {...props} style={{ fontSize: 15, fontWeight: 600, margin: "8px 0 4px 0", fontFamily: "'Roboto', system-ui, sans-serif" }} />,
+                      p: ({ node, ...props }) => <p {...props} style={{ margin: "0 0 8px 0", fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }} />,
+                      h1: ({ node, ...props }) => <h1 {...props} style={{ fontSize: 20, fontWeight: 600, margin: "12px 0 6px 0", fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }} />,
+                      h2: ({ node, ...props }) => <h2 {...props} style={{ fontSize: 17, fontWeight: 600, margin: "10px 0 4px 0", fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }} />,
+                      h3: ({ node, ...props }) => <h3 {...props} style={{ fontSize: 15, fontWeight: 600, margin: "8px 0 4px 0", fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }} />,
                       strong: ({ node, ...props }) => <strong {...props} style={{ fontWeight: 600 }} />,
                       em: ({ node, ...props }) => <em {...props} />,
                       blockquote: ({ node, ...props }) => <blockquote {...props} style={{ borderLeft: "3px solid var(--md-primary)", paddingLeft: 12, margin: "6px 0", color: "var(--md-on-surface-variant)" }} />,
@@ -250,7 +250,7 @@ export default function ChatPanel({ isMobile, open: controlledOpen, onClose }) {
             border: "1px solid var(--md-surface-variant)",
             color: "var(--md-on-background)", padding: "10px 14px", fontSize: 14,
             resize: "none", outline: "none", borderRadius: 12,
-            fontFamily: "'Roboto', system-ui, sans-serif",
+            fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
             lineHeight: 1.5, letterSpacing: "0.01em",
             minHeight: isMobile ? 44 : "auto",
           }}
@@ -265,7 +265,7 @@ export default function ChatPanel({ isMobile, open: controlledOpen, onClose }) {
             color: input.trim() ? "var(--md-on-primary)" : "var(--md-on-surface-variant)",
             border: "none", padding: "10px 16px", borderRadius: 20,
             fontWeight: 500, fontSize: 13, cursor: input.trim() ? "pointer" : "default",
-            fontFamily: "'Roboto', system-ui, sans-serif",
+            fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
             minHeight: isMobile ? 44 : "auto",
           }}
         >Send</button>

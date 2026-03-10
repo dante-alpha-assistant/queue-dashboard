@@ -118,20 +118,26 @@ export default function App() {
 
   if (view === "pingboard" || view === "health") {
     return (
-      <div style={{ fontFamily: "'Roboto', system-ui, sans-serif" }}>
-        <div style={{
+      <div style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
+        <div className="header-glass" style={{
           position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
-          background: "var(--md-background)", borderBottom: "1px solid var(--md-surface-variant)",
-          display: "flex", gap: 0, padding: "0 16px",
+          display: "flex", alignItems: "center", gap: 2, padding: "0 16px", height: 48,
         }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginRight: 16 }}>
+            <div style={{
+              width: 28, height: 28, background: "var(--md-primary)", color: "var(--md-on-primary)",
+              borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center",
+              fontWeight: 700, fontSize: 15,
+            }}>d</div>
+            <span style={{ fontWeight: 600, fontSize: 14, letterSpacing: "-0.02em", color: "var(--md-on-background)" }}>
+              tasks<span style={{ color: "var(--md-primary)", fontWeight: 700 }}>.</span>dante<span style={{ color: "var(--md-primary)", fontWeight: 700 }}>.</span>id
+            </span>
+          </div>
           {VIEW_TABS.map(t => (
-            <button key={t.key} onClick={() => setView(t.key)} style={{
-              padding: "10px 20px", background: "none", border: "none",
-              borderBottom: view === t.key ? "2px solid var(--md-primary)" : "2px solid transparent",
-              color: view === t.key ? "var(--md-primary)" : "var(--md-on-surface-variant)",
-              cursor: "pointer", fontSize: 13, fontWeight: 600,
-              fontFamily: "'Roboto', system-ui, sans-serif",
-            }}>{t.label}</button>
+            <button key={t.key} onClick={() => setView(t.key)} className={`nav-tab ${view === t.key ? "active" : ""}`}>
+              <t.Icon size={15} strokeWidth={view === t.key ? 2.2 : 1.8} />
+              {t.label}
+            </button>
           ))}
         </div>
         <div style={{ paddingTop: 42 }}>
@@ -204,30 +210,26 @@ export default function App() {
     return (
       <div style={{
         display: "flex", flexDirection: "column", height: "100vh",
-        background: "var(--md-background)", fontFamily: "'Roboto', system-ui, sans-serif",
+        background: "var(--md-background)", fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
       }}>
         {/* Simplified header */}
-        <div style={{ padding: "12px 16px", background: "var(--md-background)", borderBottom: "1px solid var(--md-surface-variant)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div className="header-glass" style={{ padding: "10px 14px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{
-              width: 32, height: 32, background: "var(--md-primary)", color: "var(--md-on-primary)",
-              borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
-              fontWeight: 700, fontSize: 16,
+              width: 28, height: 28, background: "var(--md-primary)", color: "var(--md-on-primary)",
+              borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center",
+              fontWeight: 700, fontSize: 14,
             }}>d</div>
-            <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: "-0.02em" }}>
-              tasks<span style={{ color: "var(--md-primary)" }}>.</span>dante<span style={{ color: "var(--md-primary)" }}>.</span>id
+            <span style={{ fontWeight: 600, fontSize: 15, letterSpacing: "-0.02em" }}>
+              tasks<span style={{ color: "var(--md-primary)", fontWeight: 700 }}>.</span>dante<span style={{ color: "var(--md-primary)", fontWeight: 700 }}>.</span>id
             </span>
-            <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
-              <button onClick={() => setView("pingboard")} style={{
-                padding: "4px 10px", borderRadius: 6,
-                background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)",
-                color: "var(--md-on-surface-variant)", cursor: "pointer", fontSize: 11, fontWeight: 600,
-              }}><Bot size={14} /></button>
-              <button onClick={() => setView("health")} style={{
-                padding: "4px 10px", borderRadius: 6,
-                background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)",
-                color: "var(--md-on-surface-variant)", cursor: "pointer", fontSize: 11, fontWeight: 600,
-              }}><HeartPulse size={16} /></button>
+            <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+              <button onClick={() => setView("pingboard")} className="nav-tab" style={{ padding: "4px 8px" }}>
+                <Bot size={16} strokeWidth={1.8} />
+              </button>
+              <button onClick={() => setView("health")} className="nav-tab" style={{ padding: "4px 8px" }}>
+                <HeartPulse size={16} strokeWidth={1.8} />
+              </button>
             </div>
           </div>
         </div>
@@ -237,7 +239,7 @@ export default function App() {
           <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)} style={{
             width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--md-surface-variant)",
             background: "var(--md-surface)", color: "var(--md-on-background)", fontSize: 13,
-            fontWeight: 500, fontFamily: "'Roboto', system-ui, sans-serif", outline: "none",
+            fontWeight: 500, fontFamily: "'Inter', system-ui, -apple-system, sans-serif", outline: "none",
             marginBottom: 8, minHeight: 44,
           }}>
             <option value="">All Projects</option>
@@ -245,29 +247,13 @@ export default function App() {
           </select>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {activeTypes.map(type => (
-              <button key={type} onClick={() => setTypeFilter(type)} style={{
-                padding: "6px 14px", borderRadius: 16, fontSize: 12, fontWeight: 500,
-                minHeight: 36,
-                border: typeFilter === type ? "2px solid var(--md-primary)" : "1px solid var(--md-surface-variant)",
-                background: typeFilter === type ? "var(--md-primary-container)" : "var(--md-surface)",
-                color: typeFilter === type ? "var(--md-on-primary-container)" : "var(--md-on-surface-variant)",
-                cursor: "pointer", textTransform: "capitalize",
-                fontFamily: "'Roboto', system-ui, sans-serif",
-              }}>{type}</button>
+              <button key={type} onClick={() => setTypeFilter(type)} className={`filter-chip ${typeFilter === type ? "active" : ""}`} style={{ minHeight: 36, padding: "6px 14px" }}>{type}</button>
             ))}
           </div>
           {activeStages.length > 1 && (
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
               {activeStages.map(stage => (
-                <button key={stage} onClick={() => setStageFilter(stage)} style={{
-                  padding: "6px 14px", borderRadius: 16, fontSize: 12, fontWeight: 500,
-                  minHeight: 36,
-                  border: stageFilter === stage ? "2px solid var(--md-primary)" : "1px solid var(--md-surface-variant)",
-                  background: stageFilter === stage ? "var(--md-primary-container)" : "var(--md-surface)",
-                  color: stageFilter === stage ? "var(--md-on-primary-container)" : "var(--md-on-surface-variant)",
-                  cursor: "pointer", textTransform: "capitalize",
-                  fontFamily: "'Roboto', system-ui, sans-serif",
-                }}>{stage === "all" ? "all stages" : stage}</button>
+                <button key={stage} onClick={() => setStageFilter(stage)} className={`filter-chip ${stageFilter === stage ? "active" : ""}`} style={{ minHeight: 36, padding: "6px 14px" }}>{stage === "all" ? "all stages" : stage}</button>
               ))}
             </div>
           )}
@@ -373,51 +359,44 @@ export default function App() {
   return (
     <div style={{
       display: "flex", flexDirection: "column", height: "100vh",
-      background: "var(--md-background)", fontFamily: "'Roboto', system-ui, sans-serif",
+      background: "var(--md-background)", fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
     }}>
-      <div style={{ padding: "16px 24px 0", background: "var(--md-background)" }}>
+      <div className="header-glass" style={{ padding: "10px 20px 0", position: "sticky", top: 0, zIndex: 100 }}>
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          marginBottom: 16,
+          marginBottom: 0, height: 48,
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div style={{
-              width: 36, height: 36, background: "var(--md-primary)", color: "var(--md-on-primary)",
-              borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center",
-              fontWeight: 700, fontSize: 20,
+              width: 30, height: 30, background: "var(--md-primary)", color: "var(--md-on-primary)",
+              borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
+              fontWeight: 700, fontSize: 16,
             }}>d</div>
-            <div>
-              <span style={{ fontWeight: 700, fontSize: 20, letterSpacing: "-0.02em" }}>
-                tasks<span style={{ color: "var(--md-primary)" }}>.</span>dante<span style={{ color: "var(--md-primary)" }}>.</span>id
-              </span>
-            </div>
-            <button onClick={() => setView("pingboard")} style={{
-              marginLeft: 16, padding: "6px 14px", borderRadius: 8,
-              background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)",
-              color: "var(--md-on-surface-variant)", cursor: "pointer", fontSize: 12, fontWeight: 600,
-              fontFamily: "'Roboto', system-ui, sans-serif",
-            }}><Bot size={14} /> Pingboard</button>
-            <button onClick={() => setView("health")} style={{
-              padding: "6px 14px", borderRadius: 8,
-              background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)",
-              color: "var(--md-on-surface-variant)", cursor: "pointer", fontSize: 12, fontWeight: 600,
-              fontFamily: "'Roboto', system-ui, sans-serif",
-            }}><HeartPulse size={14} /> Health</button>
-            <span style={{ fontSize: 10, color: 'var(--md-on-surface-variant)', opacity: 0.6, fontFamily: 'monospace', marginLeft: 8, background: 'var(--md-surface-variant)', padding: '2px 6px', borderRadius: 4 }}>{__COMMIT_HASH__}</span>
+            <span style={{ fontWeight: 600, fontSize: 15, letterSpacing: "-0.02em", marginRight: 8 }}>
+              tasks<span style={{ color: "var(--md-primary)", fontWeight: 700 }}>.</span>dante<span style={{ color: "var(--md-primary)", fontWeight: 700 }}>.</span>id
+            </span>
+            <div style={{ width: 1, height: 20, background: "var(--md-surface-variant)", margin: "0 4px" }} />
+            {VIEW_TABS.map(t => (
+              <button key={t.key} onClick={() => setView(t.key)} className={`nav-tab ${view === t.key ? "active" : ""}`}>
+                <t.Icon size={15} strokeWidth={view === t.key ? 2.2 : 1.8} />
+                {t.label}
+              </button>
+            ))}
+            <span style={{ fontSize: 10, color: 'var(--md-on-surface-variant)', opacity: 0.5, fontFamily: "'JetBrains Mono', monospace", marginLeft: 8, background: 'var(--md-surface-container)', padding: '2px 6px', borderRadius: 4 }}>{__COMMIT_HASH__}</span>
           </div>
           <StatsBar stats={stats} isTablet={isTablet} />
         </div>
 
         <div style={{
           display: "flex", alignItems: "center", gap: 12, flexWrap: isTablet ? "wrap" : "nowrap",
-          paddingBottom: 16, borderBottom: "1px solid var(--md-surface-variant)",
+          paddingBottom: 10, borderBottom: "1px solid var(--header-border)",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Project</span>
             <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)} style={{
               padding: "6px 12px", borderRadius: 8, border: "1px solid var(--md-surface-variant)",
               background: "var(--md-surface)", color: "var(--md-on-background)", fontSize: 13,
-              fontWeight: 500, fontFamily: "'Roboto', system-ui, sans-serif", outline: "none",
+              fontWeight: 500, fontFamily: "'Inter', system-ui, -apple-system, sans-serif", outline: "none",
               cursor: "pointer", minWidth: 160,
             }}>
               <option value="">All</option>
@@ -429,14 +408,7 @@ export default function App() {
             <span style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Type</span>
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
               {activeTypes.map(type => (
-                <button key={type} onClick={() => setTypeFilter(type)} style={{
-                  padding: "4px 12px", borderRadius: 16, fontSize: 12, fontWeight: 500,
-                  border: typeFilter === type ? "2px solid var(--md-primary)" : "1px solid var(--md-surface-variant)",
-                  background: typeFilter === type ? "var(--md-primary-container)" : "var(--md-surface)",
-                  color: typeFilter === type ? "var(--md-on-primary-container)" : "var(--md-on-surface-variant)",
-                  cursor: "pointer", textTransform: "capitalize",
-                  fontFamily: "'Roboto', system-ui, sans-serif", transition: "all 150ms",
-                }}>{type}</button>
+                <button key={type} onClick={() => setTypeFilter(type)} className={`filter-chip ${typeFilter === type ? "active" : ""}`}>{type}</button>
               ))}
             </div>
           </div>
@@ -446,36 +418,31 @@ export default function App() {
               <span style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Stage</span>
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                 {activeStages.map(stage => (
-                  <button key={stage} onClick={() => setStageFilter(stage)} style={{
-                    padding: "4px 12px", borderRadius: 16, fontSize: 12, fontWeight: 500,
-                    border: stageFilter === stage ? "2px solid var(--md-primary)" : "1px solid var(--md-surface-variant)",
-                    background: stageFilter === stage ? "var(--md-primary-container)" : "var(--md-surface)",
-                    color: stageFilter === stage ? "var(--md-on-primary-container)" : "var(--md-on-surface-variant)",
-                    cursor: "pointer", textTransform: "capitalize",
-                    fontFamily: "'Roboto', system-ui, sans-serif", transition: "all 150ms",
-                  }}>{stage === "all" ? "all stages" : stage}</button>
+                  <button key={stage} onClick={() => setStageFilter(stage)} className={`filter-chip ${stageFilter === stage ? "active" : ""}`}>{stage === "all" ? "all stages" : stage}</button>
                 ))}
               </div>
             </div>
           </>)}
           <div style={{ width: 1, height: 24, background: "var(--md-surface-variant)" }} />
           <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+            <Search size={15} style={{ position: "absolute", left: 10, color: "var(--md-on-surface-variant)", pointerEvents: "none" }} />
             <input
               type="text"
               placeholder="Search tasks..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              style={{
-                padding: "8px 32px 8px 12px", borderRadius: 20, border: "1px solid var(--md-surface-variant)",
-                background: "var(--md-surface)", fontSize: 13, fontFamily: "'Roboto', system-ui, sans-serif",
-                outline: "none", width: 200, color: "var(--md-on-surface)",
-              }}
+              className="search-pill"
+              style={{ paddingLeft: 32, paddingRight: searchQuery ? 28 : 52 }}
             />
-            {searchQuery && (
+            {searchQuery ? (
               <button
                 onClick={() => setSearchQuery("")}
-                style={{ position: "absolute", right: 8, background: "none", border: "none", cursor: "pointer", color: "var(--md-on-surface-variant)", fontSize: 14, padding: 0 }}
-              >✕</button>
+                style={{ position: "absolute", right: 8, background: "none", border: "none", cursor: "pointer", color: "var(--md-on-surface-variant)", fontSize: 13, padding: 0, display: "flex" }}
+              ><XCircle size={14} /></button>
+            ) : (
+              <span style={{ position: "absolute", right: 10, display: "flex", gap: 2, pointerEvents: "none" }}>
+                <span className="kbd">⌘</span><span className="kbd">K</span>
+              </span>
             )}
           </div>
           <TimeFilter allTasks={allTasksRaw} value={timeFilter} onChange={setTimeFilter} isMobile={false} />

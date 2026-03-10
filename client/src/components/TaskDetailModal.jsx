@@ -171,7 +171,7 @@ function ensureModalStyles() {
 
     .tdm-json-toggle { cursor: pointer; user-select: none; opacity: 0.5; font-size: 10px; display: inline-block; width: 14px; text-align: center; margin-right: 2px; transition: transform 0.15s, opacity 0.15s; }
     .tdm-json-toggle:hover { opacity: 1; }
-    .tdm-copy-btn { position: absolute; top: 8px; right: 8px; background: var(--md-surface-container-low, #F7F2FA); border: 1px solid var(--md-surface-variant, #E7E0EC); border-radius: 8px; padding: 4px 10px; font-size: 11px; cursor: pointer; opacity: 0; transition: opacity 0.15s; font-family: 'Roboto', system-ui, sans-serif; }
+    .tdm-copy-btn { position: absolute; top: 8px; right: 8px; background: var(--md-surface-container-low, #F7F2FA); border: 1px solid var(--md-surface-variant, #E7E0EC); border-radius: 8px; padding: 4px 10px; font-size: 11px; cursor: pointer; opacity: 0; transition: opacity 0.15s; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
     .tdm-copy-btn:hover { opacity: 1 !important; }
     div:hover > .tdm-copy-btn { opacity: 0.7; }
 
@@ -191,7 +191,7 @@ function ensureModalStyles() {
 
     .tdm-action-btn {
       border: none; padding: 8px 18px; border-radius: 100px; font-weight: 600; font-size: 13px;
-      cursor: pointer; transition: all 0.15s; font-family: 'Roboto', system-ui, sans-serif;
+      cursor: pointer; transition: all 0.15s; font-family: 'Inter', system-ui, -apple-system, sans-serif;
       letter-spacing: 0.02em; display: inline-flex; align-items: center; gap: 6px;
     }
     .tdm-action-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
@@ -201,7 +201,7 @@ function ensureModalStyles() {
       padding: 6px 14px; font-size: 12px; font-weight: 500; border: none;
       background: transparent; cursor: pointer; color: var(--md-outline, #79747E);
       border-radius: 100px; transition: all 0.15s;
-      font-family: 'Roboto', system-ui, sans-serif; letter-spacing: 0.02em;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif; letter-spacing: 0.02em;
       position: relative;
     }
     .tdm-pill-tab:hover { color: var(--md-on-surface, #1C1B1F); background: var(--md-surface-container-low, #F7F2FA); }
@@ -435,7 +435,7 @@ function Badge({ label, color, bg, style: extra }) {
       background: bg || `${color}14`, color,
       textTransform: "uppercase", letterSpacing: "0.04em",
       lineHeight: 1.2, whiteSpace: "nowrap",
-      fontFamily: "'Roboto', system-ui, sans-serif",
+      fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
       display: "inline-block", ...extra,
     }}>{label}</span>
   );

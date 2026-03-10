@@ -590,7 +590,7 @@ function PipelineView() {
             padding: "4px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600, border: "none",
             background: days === d ? "var(--md-primary)" : "var(--md-surface-container)",
             color: days === d ? "var(--md-on-primary)" : "var(--md-on-surface-variant)",
-            cursor: "pointer", fontFamily: "'Roboto', system-ui, sans-serif",
+            cursor: "pointer", fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
           }}>
             {d}d
           </button>
@@ -1131,7 +1131,7 @@ export default function Pingboard() {
   return (
     <div style={{
       minHeight: "100vh", background: "var(--md-background)",
-      fontFamily: "'Roboto', system-ui, sans-serif", color: "var(--md-on-background)",
+      fontFamily: "'Inter', system-ui, -apple-system, sans-serif", color: "var(--md-on-background)",
     }}>
       <div style={{ maxWidth: 1400, margin: "0 auto", padding: 24 }}>
         {/* Header */}
@@ -1157,7 +1157,7 @@ export default function Pingboard() {
               padding: "6px 14px", borderRadius: 10, fontSize: 12, fontWeight: 600,
               border: "1px solid var(--md-surface-variant)",
               background: "var(--md-surface)", color: "var(--md-on-surface-variant)",
-              cursor: "pointer", fontFamily: "'Roboto', system-ui, sans-serif",
+              cursor: "pointer", fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
               transition: "all 150ms",
             }}
             onMouseEnter={e => { e.currentTarget.style.background = "var(--md-primary-container)"; e.currentTarget.style.color = "var(--md-on-primary-container)"; }}
@@ -1183,7 +1183,7 @@ export default function Pingboard() {
                   background: viewMode === mode.key ? "var(--md-primary)" : "transparent",
                   color: viewMode === mode.key ? "var(--md-on-primary)" : "var(--md-on-surface-variant)",
                   cursor: "pointer",
-                  fontFamily: "'Roboto', system-ui, sans-serif",
+                  fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
                   transition: "all 150ms",
                 }}
               >
@@ -1211,7 +1211,7 @@ export default function Pingboard() {
                   background: isActive ? "var(--md-primary-container)" : "var(--md-surface)",
                   color: isActive ? "var(--md-on-primary-container)" : "var(--md-on-surface-variant)",
                   cursor: "pointer", textTransform: "capitalize",
-                  fontFamily: "'Roboto', system-ui, sans-serif", transition: "all 150ms",
+                  fontFamily: "'Inter', system-ui, -apple-system, sans-serif", transition: "all 150ms",
                 }}
               >
                 {s === "all" ? "All" : s}{" "}
@@ -1232,7 +1232,7 @@ export default function Pingboard() {
               border: "1px solid var(--md-surface-variant)",
               background: "var(--md-surface)",
               color: "var(--md-on-background)",
-              fontFamily: "'Roboto', system-ui, sans-serif",
+              fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
               outline: "none",
               width: 240,
             }}
@@ -1244,7 +1244,7 @@ export default function Pingboard() {
                 onClick={() => setViewMode(v.key)}
                 style={{
                   padding: "7px 14px", fontSize: 12, fontWeight: 600, border: "none",
-                  cursor: "pointer", fontFamily: "'Roboto', system-ui, sans-serif",
+                  cursor: "pointer", fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
                   background: viewMode === v.key ? "var(--md-primary)" : "var(--md-surface)",
                   color: viewMode === v.key ? "var(--md-on-primary)" : "var(--md-on-surface-variant)",
                   transition: "all 150ms",

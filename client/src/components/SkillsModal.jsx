@@ -43,7 +43,7 @@ function MatrixView({ skills, agents }) {
     <div style={{ overflowX: "auto" }}>
       <table style={{
         borderCollapse: "collapse", width: "100%", fontSize: 13,
-        fontFamily: "'Roboto', system-ui, sans-serif",
+        fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
       }}>
         <thead>
           <tr>
@@ -350,7 +350,7 @@ export default function SkillsModal({ open, onClose }) {
                 border: "none", cursor: "pointer",
                 background: tab === t.key ? "var(--md-primary)" : "var(--md-surface)",
                 color: tab === t.key ? "var(--md-on-primary)" : "var(--md-on-surface-variant)",
-                fontFamily: "'Roboto', system-ui, sans-serif",
+                fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
                 transition: "all 150ms",
               }}
             >

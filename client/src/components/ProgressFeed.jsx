@@ -35,7 +35,7 @@ export function ProgressBadge({ progress, monitor }) {
         border: "1px solid #6750A418",
         fontSize: 12,
         color: "var(--md-on-surface-variant, #49454F)",
-        fontFamily: "'Roboto', system-ui, sans-serif",
+        fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
         display: "flex",
         flexDirection: "column",
         gap: 6,

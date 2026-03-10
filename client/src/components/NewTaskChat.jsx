@@ -642,7 +642,7 @@ export default function NewTaskChat({ isMobile }) {
           border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", zIndex: 1000,
           color: "#fff", display: "flex", alignItems: "center", gap: 8,
           boxShadow: "0 4px 16px rgba(103, 80, 164, 0.4)", transition: "transform 150ms, box-shadow 150ms",
-          fontFamily: "'Roboto', system-ui, sans-serif",
+          fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
         }}
         onMouseEnter={e => { e.target.style.transform = "scale(1.05)"; e.target.style.boxShadow = "0 6px 20px rgba(103, 80, 164, 0.5)"; }}
         onMouseLeave={e => { e.target.style.transform = "scale(1)"; e.target.style.boxShadow = "0 4px 16px rgba(103, 80, 164, 0.4)"; }}
@@ -763,7 +763,7 @@ export default function NewTaskChat({ isMobile }) {
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 20, maxWidth: 260, margin: "20px auto 0" }}>
               {["Add dark mode toggle to settings", "Deploy the latest build to staging", "Research best auth libraries for Next.js"].map((suggestion, i) => (
                 <button key={i} onClick={() => setInput(suggestion)}
-                  style={{ padding: "8px 14px", borderRadius: 16, fontSize: 12, border: "1px solid var(--md-surface-variant)", background: "var(--md-surface)", color: "var(--md-on-surface)", cursor: "pointer", textAlign: "left", fontFamily: "'Roboto', system-ui, sans-serif", transition: "background 150ms" }}
+                  style={{ padding: "8px 14px", borderRadius: 16, fontSize: 12, border: "1px solid var(--md-surface-variant)", background: "var(--md-surface)", color: "var(--md-on-surface)", cursor: "pointer", textAlign: "left", fontFamily: "'Inter', system-ui, -apple-system, sans-serif", transition: "background 150ms" }}
                   onMouseEnter={e => e.target.style.background = "var(--md-surface-container)"}
                   onMouseLeave={e => e.target.style.background = "var(--md-surface)"}
                 ><Lightbulb size={14} /> {suggestion}</button>
@@ -896,7 +896,7 @@ export default function NewTaskChat({ isMobile }) {
             border: "1px solid var(--md-surface-variant)",
             color: "var(--md-on-background)", padding: "9px 14px", fontSize: 13,
             resize: "none", outline: "none", borderRadius: 20,
-            fontFamily: "'Roboto', system-ui, sans-serif",
+            fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
             minHeight: isMobile ? 44 : 36,
             boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
             transition: "border-color 150ms, box-shadow 150ms",
@@ -911,7 +911,7 @@ export default function NewTaskChat({ isMobile }) {
             border: "none", width: 36, height: 36, borderRadius: "50%",
             fontWeight: 600, fontSize: 15,
             cursor: hasInput && !streaming ? "pointer" : "default",
-            fontFamily: "'Roboto', system-ui, sans-serif",
+            fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
             flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
             boxShadow: hasInput && !streaming ? "0 2px 8px rgba(103,80,164,0.3)" : "none",
             transition: "background 150ms, box-shadow 150ms",
