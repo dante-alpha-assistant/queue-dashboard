@@ -13,7 +13,7 @@ import TaskDetailModal from "./components/TaskDetailModal";
 import BatchDeployModal from "./components/BatchDeployModal";
 import Pingboard from "./pages/Pingboard";
 import HealthDashboard from "./pages/HealthDashboard";
-import TimeFilter, { filterTasksByTime, getRange } from "./components/TimeFilter";
+import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
 import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Rocket, Search, XCircle, Zap } from 'lucide-react';
 
 const MOBILE_TABS = [
@@ -44,20 +44,13 @@ const BOTTOM_TABS = [
 export default function App() {
   const [timeFilter, setTimeFilter] = useState({ range: "today", customFrom: "", customTo: "" });
 
-  // Compute server-side time filter params
-  const timeQueryParams = useMemo(() => {
-    const { from, to } = getRange(timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
-    const params = {};
-    if (from) params.since = from.toISOString();
-    if (to) params.until = to.toISOString();
-    return params;
-  }, [timeFilter.range, timeFilter.customFrom, timeFilter.customTo]);
-
+  // Fetch all tasks (no server-side time filter) — time filtering is done client-side
+  // to ensure count badges always match visible cards
   const {
     stats, todo, assigned, inProgress, qa, completed, deployed, blocked, failed, deploying, deployFailed,
     loading, transitioning, updateTask, applyStatusChange,
     projects, selectedProject, setSelectedProject,
-  } = useQueue(timeQueryParams);
+  } = useQueue();
 
 
 
@@ -184,6 +177,26 @@ export default function App() {
 
   const allTasksRaw = [...todo, ...assigned, ...inProgress, ...blocked, ...qa, ...completed, ...deploying, ...deployed, ...deployFailed, ...failed];
   const allTasks = filterTasksByTime(allTasksRaw, timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
+
+  // Compute time-period counts from actual fetched tasks (ensures badge matches visible cards)
+  const timePeriodCounts = useMemo(() => {
+    const applyFilters = (tasks) => {
+      let filtered = tasks;
+      if (typeFilter !== "all") filtered = filtered.filter(t => t.type === typeFilter);
+      if (stageFilter !== "all") filtered = filtered.filter(t => t.stage === stageFilter);
+      if (searchQuery.trim()) filtered = filtered.filter(t => t.title?.toLowerCase().includes(searchQuery.toLowerCase()));
+      return filtered;
+    };
+    const base = applyFilters(allTasksRaw);
+    return {
+      today: filterTasksByTime(base, "today").length,
+      last_24h: filterTasksByTime(base, "24h").length,
+      last_7d: filterTasksByTime(base, "7d").length,
+      last_30d: filterTasksByTime(base, "30d").length,
+      all: base.length,
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todo, assigned, inProgress, blocked, qa, completed, deploying, deployed, deployFailed, failed, typeFilter, stageFilter, searchQuery]);
   const activeTypes = ["all", ...new Set(allTasks.map(t => t.type).filter(Boolean))];
   const activeStages = ["all", ...new Set(allTasks.map(t => t.stage).filter(Boolean))];
   const filterTasks = (tasks) => {
@@ -293,7 +306,7 @@ export default function App() {
             </div>
           )}
           <div style={{ marginTop: 6 }}>
-            <TimeFilter value={timeFilter} onChange={setTimeFilter} isMobile={true} projectId={selectedProject} />
+            <TimeFilter value={timeFilter} onChange={setTimeFilter} isMobile={true} projectId={selectedProject} counts={timePeriodCounts} />
           </div>
         </div>
 
@@ -480,7 +493,7 @@ export default function App() {
               </span>
             )}
           </div>
-          <TimeFilter value={timeFilter} onChange={setTimeFilter} isMobile={false} projectId={selectedProject} />
+          <TimeFilter value={timeFilter} onChange={setTimeFilter} isMobile={false} projectId={selectedProject} counts={timePeriodCounts} />
         </div>
       </div>
 
