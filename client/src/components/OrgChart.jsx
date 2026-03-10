@@ -8,6 +8,16 @@ const STATUS_COLORS = {
   disabled: "#BA1A1A",
 };
 
+const TIER_CONFIG = {
+  leader: { width: 220, avatarSize: 56, fontSize: 15, padding: "18px 22px", borderWidth: 2 },
+  manager: { width: 190, avatarSize: 48, fontSize: 13, padding: "14px 18px", borderWidth: 2 },
+  worker: { width: 160, avatarSize: 38, fontSize: 12, padding: "10px 14px", borderWidth: 1 },
+};
+
+function getTierConfig(tier) {
+  return TIER_CONFIG[tier] || TIER_CONFIG.worker;
+}
+
 function NodeAvatar({ node, size = 40 }) {
   const initials = (node.name || "?")
     .split("-")
@@ -46,36 +56,75 @@ function NodeAvatar({ node, size = 40 }) {
   );
 }
 
-function OrgNode({ node, onSelect, selectedId, collapsed, toggleCollapse }) {
+function OrgNode({ node, onSelect, selectedId, collapsed, toggleCollapse, isMobile }) {
   const hasChildren = node.children && node.children.length > 0;
   const isCollapsed = collapsed[node.id];
   const isSelected = selectedId === node.id;
   const load = node.current_load || 0;
   const statusColor = STATUS_COLORS[node.status] || "#79747E";
+  const tier = node.tier || "worker";
+  const tc = getTierConfig(tier);
+  const childrenRef = useRef(null);
+  const [hBarStyle, setHBarStyle] = useState(null);
+
+  // Calculate horizontal connector bar after render
+  useEffect(() => {
+    if (!hasChildren || isCollapsed || !childrenRef.current || isMobile) {
+      setHBarStyle(null);
+      return;
+    }
+    const measure = () => {
+      const cols = childrenRef.current.querySelectorAll(':scope > .org-child-col');
+      if (cols.length < 2) { setHBarStyle(null); return; }
+      const containerRect = childrenRef.current.getBoundingClientRect();
+      const firstRect = cols[0].getBoundingClientRect();
+      const lastRect = cols[cols.length - 1].getBoundingClientRect();
+      const left = firstRect.left + firstRect.width / 2 - containerRect.left;
+      const right = lastRect.left + lastRect.width / 2 - containerRect.left;
+      setHBarStyle({ left, width: right - left });
+    };
+    // Measure after a frame so children have rendered
+    const raf = requestAnimationFrame(measure);
+    return () => cancelAnimationFrame(raf);
+  }, [hasChildren, isCollapsed, isMobile, node.children?.length]);
+
+  const tierGlow = tier === "leader"
+    ? "0 0 20px rgba(99,102,241,0.15)"
+    : tier === "manager"
+      ? "0 0 12px rgba(139,92,246,0.1)"
+      : "none";
 
   return (
-    <li style={{
+    <div style={{
       display: "flex", flexDirection: "column", alignItems: "center",
-      position: "relative", padding: "0 8px", listStyle: "none",
+      position: "relative",
     }}>
+      {/* Card */}
       <div
         data-card="true"
         onClick={() => onSelect(node)}
         style={{
-          background: "var(--md-surface-container)", borderRadius: 14,
-          padding: "14px 18px", cursor: "pointer",
-          border: isSelected ? "2px solid var(--md-primary)" : "1px solid var(--md-surface-variant)",
-          minWidth: 160, maxWidth: 200, textAlign: "center", position: "relative",
-          transition: "all 150ms",
-          boxShadow: isSelected ? "0 4px 16px rgba(0,0,0,0.12)" : "0 1px 4px rgba(0,0,0,0.06)",
+          background: "var(--md-surface-container)", borderRadius: tier === "leader" ? 18 : 14,
+          padding: tc.padding, cursor: "pointer",
+          border: isSelected
+            ? "2px solid var(--md-primary)"
+            : tc.borderWidth + "px solid var(--md-surface-variant)",
+          width: tc.width, textAlign: "center", position: "relative",
+          transition: "all 150ms ease",
+          boxShadow: isSelected
+            ? "0 6px 24px rgba(0,0,0,0.15), " + tierGlow
+            : "0 1px 4px rgba(0,0,0,0.06), " + tierGlow,
           zIndex: 1,
         }}
       >
+        {/* Status dot */}
         <div style={{
           position: "absolute", top: 10, right: 10,
-          width: 10, height: 10, borderRadius: "50%",
+          width: tier === "leader" ? 12 : 10, height: tier === "leader" ? 12 : 10,
+          borderRadius: "50%",
           background: statusColor, border: "2px solid var(--md-surface-container)",
         }} />
+        {/* Load badge */}
         {load > 0 && (
           <div style={{
             position: "absolute", top: 8, left: 10,
@@ -83,21 +132,34 @@ function OrgNode({ node, onSelect, selectedId, collapsed, toggleCollapse }) {
             background: "var(--md-primary-container)", color: "var(--md-on-primary-container)",
           }}>{load}</div>
         )}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-          <NodeAvatar node={node} size={44} />
-          <div style={{ fontWeight: 700, fontSize: 13, color: "var(--md-on-background)", lineHeight: 1.2 }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: tier === "leader" ? 8 : 6 }}>
+          <NodeAvatar node={node} size={tc.avatarSize} />
+          <div style={{
+            fontWeight: 700, fontSize: tc.fontSize,
+            color: "var(--md-on-background)", lineHeight: 1.2,
+          }}>
             {node.name}
           </div>
+          {tier !== "worker" && (
+            <div style={{
+              fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.8px",
+              color: tier === "leader" ? "#6366f1" : "#8b5cf6",
+              opacity: 0.8,
+            }}>
+              {tier}
+            </div>
+          )}
           {(node.role || node.description) && (
             <div style={{
               fontSize: 10, color: "var(--md-on-surface-variant)",
-              lineHeight: 1.3, maxWidth: 170, overflow: "hidden", textOverflow: "ellipsis",
+              lineHeight: 1.3, maxWidth: tc.width - 30, overflow: "hidden", textOverflow: "ellipsis",
               display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
             }}>
               {node.role || node.description}
             </div>
           )}
         </div>
+        {/* Expand/collapse */}
         {hasChildren && (
           <button
             onClick={(e) => { e.stopPropagation(); toggleCollapse(node.id); }}
@@ -114,42 +176,63 @@ function OrgNode({ node, onSelect, selectedId, collapsed, toggleCollapse }) {
         )}
       </div>
 
+      {/* Children tree */}
       {hasChildren && !isCollapsed && (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 28, position: "relative" }}>
-          {/* Vertical line from parent to horizontal bar */}
+        <div style={{
+          display: "flex", flexDirection: "column", alignItems: "center",
+          paddingTop: 28, position: "relative",
+        }}>
+          {/* Vertical line from parent to children row */}
           <div style={{
             position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)",
-            width: 2, height: 28, background: "var(--md-surface-variant)",
+            width: 2, height: 28, background: "var(--md-outline, #79747E)", opacity: 0.4,
           }} />
-          <ul style={{
-            display: "flex", justifyContent: "center", margin: 0, padding: 0,
-            listStyle: "none", position: "relative",
-          }}>
-            {/* Horizontal connector line */}
-            {node.children.length > 1 && (
+
+          <div
+            ref={childrenRef}
+            style={{
+              display: "flex",
+              flexDirection: isMobile ? "column" : "row",
+              justifyContent: "center",
+              alignItems: isMobile ? "center" : "flex-start",
+              position: "relative",
+            }}
+          >
+            {/* Horizontal connector bar */}
+            {!isMobile && hBarStyle && node.children.length > 1 && (
               <div style={{
                 position: "absolute", top: 0,
-                height: 2, background: "var(--md-surface-variant)",
-                left: "calc(50% / " + node.children.length + " + 8px)",
-                right: "calc(50% / " + node.children.length + " + 8px)",
+                height: 2, background: "var(--md-outline, #79747E)", opacity: 0.4,
+                left: hBarStyle.left, width: hBarStyle.width,
               }} />
             )}
+
             {node.children.map((child) => (
-              <div key={child.id} style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center" }}>
-                {/* Vertical line from horizontal bar to child */}
+              <div
+                key={child.id}
+                className="org-child-col"
+                style={{
+                  display: "flex", flexDirection: "column", alignItems: "center",
+                  position: "relative",
+                  padding: isMobile ? 0 : "0 6px",
+                }}
+              >
+                {/* Vertical line from bar to child */}
                 <div style={{
-                  width: 2, height: 20, background: "var(--md-surface-variant)", marginBottom: 0,
+                  width: 2, height: isMobile ? 16 : 20,
+                  background: "var(--md-outline, #79747E)", opacity: 0.4,
                 }} />
                 <OrgNode
                   node={child} onSelect={onSelect} selectedId={selectedId}
                   collapsed={collapsed} toggleCollapse={toggleCollapse}
+                  isMobile={isMobile}
                 />
               </div>
             ))}
-          </ul>
+          </div>
         </div>
       )}
-    </li>
+    </div>
   );
 }
 
@@ -196,8 +279,8 @@ function DetailPanel({ agent, onClose }) {
             <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--md-on-surface-variant)", opacity: 0.7, marginBottom: 4 }}>Tier</div>
             <span style={{
               fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 8,
-              background: agent.tier === "core" ? "rgba(46,125,50,0.1)" : agent.tier === "specialist" ? "rgba(230,81,0,0.1)" : "rgba(121,116,126,0.1)",
-              color: agent.tier === "core" ? "#2E7D32" : agent.tier === "specialist" ? "#E65100" : "#79747E",
+              background: agent.tier === "leader" ? "rgba(99,102,241,0.1)" : agent.tier === "manager" ? "rgba(139,92,246,0.1)" : "rgba(121,116,126,0.1)",
+              color: agent.tier === "leader" ? "#6366f1" : agent.tier === "manager" ? "#8b5cf6" : "#79747E",
               textTransform: "uppercase",
             }}>{agent.tier}</span>
           </div>
@@ -267,7 +350,15 @@ export default function OrgChart() {
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [isMobile, setIsMobile] = useState(false);
   const containerRef = useRef(null);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   const fetchHierarchy = useCallback(async () => {
     try {
@@ -313,6 +404,21 @@ export default function OrgChart() {
 
   const resetView = useCallback(() => { setScale(1); setTranslate({ x: 0, y: 0 }); }, []);
 
+  const handleTouchStart = useCallback((e) => {
+    if (e.target.closest("button") || e.target.closest("[data-card]")) return;
+    const touch = e.touches[0];
+    setDragging(true);
+    setDragStart({ x: touch.clientX - translate.x, y: touch.clientY - translate.y });
+  }, [translate]);
+
+  const handleTouchMove = useCallback((e) => {
+    if (!dragging) return;
+    const touch = e.touches[0];
+    setTranslate({ x: touch.clientX - dragStart.x, y: touch.clientY - dragStart.y });
+  }, [dragging, dragStart]);
+
+  const handleTouchEnd = useCallback(() => { setDragging(false); }, []);
+
   if (loading) {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: 400, color: "var(--md-on-surface-variant)" }}>
@@ -351,6 +457,9 @@ export default function OrgChart() {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         style={{
           overflow: "hidden", minHeight: "calc(100vh - 220px)",
           cursor: dragging ? "grabbing" : "grab",
@@ -365,15 +474,14 @@ export default function OrgChart() {
           display: "flex", justifyContent: "center",
           padding: "40px 20px 60px",
         }}>
-          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", justifyContent: "center" }}>
-            <OrgNode
-              node={tree}
-              onSelect={(n) => setSelectedAgent(selectedAgent?.id === n.id ? null : n)}
-              selectedId={selectedAgent?.id}
-              collapsed={collapsed}
-              toggleCollapse={toggleCollapse}
-            />
-          </ul>
+          <OrgNode
+            node={tree}
+            onSelect={(n) => setSelectedAgent(selectedAgent?.id === n.id ? null : n)}
+            selectedId={selectedAgent?.id}
+            collapsed={collapsed}
+            toggleCollapse={toggleCollapse}
+            isMobile={isMobile}
+          />
         </div>
       </div>
 
