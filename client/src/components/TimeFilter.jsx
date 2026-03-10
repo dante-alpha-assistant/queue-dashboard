@@ -12,7 +12,7 @@ const PRESETS = [
   { key: "custom", label: "Custom" },
 ];
 
-function getRange(key, customFrom, customTo) {
+export function getRange(key, customFrom, customTo) {
   const now = new Date();
   switch (key) {
     case "today": {

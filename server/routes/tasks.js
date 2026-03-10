@@ -59,12 +59,18 @@ router.get("/stats", async (req, res) => {
   }
 });
 
-// All tasks
+// All tasks (optimized with server-side filtering)
 router.get("/tasks", async (req, res) => {
   try {
+    // Light mode: exclude heavy columns (description, result, qa_result, metadata) for list view
+    const isLight = req.query.columns === "light";
+    const selectCols = isLight
+      ? "id,title,status,type,priority,assigned_agent,created_at,updated_at,error,deploy_target,pull_request_url,deployment_url,started_at,completed_at,paused,blocked_reason,stage,repository_url,project_id,repository_id,project:agent_projects(id,name,slug),repository:agent_repositories(id,name,url,provider)"
+      : "*, project:agent_projects(id, name, slug), repository:agent_repositories(id, name, url, provider)";
+
     let query = supabase
       .from("agent_tasks")
-      .select("*, project:agent_projects(id, name, slug), repository:agent_repositories(id, name, url, provider)")
+      .select(selectCols)
       .order("created_at", { ascending: false });
     if (req.query.project_id) query = query.eq("project_id", req.query.project_id);
     if (req.query.repository_id) query = query.eq("repository_id", req.query.repository_id);
@@ -333,6 +339,9 @@ router.post("/deploy/:id", async (req, res) => {
 
     if (fetchErr || !task) {
       return res.status(404).json({ ok: false, error: "Task not found" });
+    }
+    if (task.status === "deployed") {
+      return res.json({ ok: true, message: "Task already deployed" });
     }
     if (task.status !== "completed" && task.status !== "deploying") {
       return res.status(400).json({ ok: false, error: `Task status is '${task.status}', must be 'completed' to deploy` });

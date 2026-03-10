@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect , useMemo } from "react";
 import SpeedLoader from "./components/SpeedLoader";
 import { useNavigate, useLocation } from "react-router-dom";
 import useQueue from "./hooks/useQueue";
@@ -12,7 +12,7 @@ import NewTaskChat from "./components/NewTaskChat";
 import TaskDetailModal from "./components/TaskDetailModal";
 import Pingboard from "./pages/Pingboard";
 import HealthDashboard from "./pages/HealthDashboard";
-import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
+import TimeFilter, { filterTasksByTime, getRange } from "./components/TimeFilter";
 import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Rocket, Search, XCircle, Zap } from 'lucide-react';
 
 const MOBILE_TABS = [
@@ -45,7 +45,7 @@ export default function App() {
     stats, todo, assigned, inProgress, qa, completed, deployed, blocked, failed, deploying, deployFailed,
     loading, transitioning, updateTask, applyStatusChange,
     projects, selectedProject, setSelectedProject,
-  } = useQueue();
+  } = useQueue(timeQueryParams);
 
 
 
@@ -63,6 +63,15 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("todo");
   const [view, setView] = useState("board");
   const [timeFilter, setTimeFilter] = useState({ range: "today", customFrom: "", customTo: "" });
+
+  // Compute server-side time filter params
+  const timeQueryParams = useMemo(() => {
+    const { from, to } = getRange(timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
+    const params = {};
+    if (from) params.since = from.toISOString();
+    if (to) params.until = to.toISOString();
+    return params;
+  }, [timeFilter.range, timeFilter.customFrom, timeFilter.customTo]);
   const [searchQuery, setSearchQuery] = useState("");
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
   const handleSseStatusChange = useCallback((data) => { if (data.taskId && data.status) applyStatusChange(data.taskId, data.status); }, [applyStatusChange]);

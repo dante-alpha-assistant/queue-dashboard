@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-export default function useQueue() {
+// Lightweight columns for list view — exclude heavy JSON blobs
+const LIST_COLUMNS = "id,title,status,type,priority,assigned_agent,created_at,updated_at,error,deploy_target,pull_request_url,deployment_url,started_at,completed_at,paused,blocked_reason,stage,repository_url,project_id,repository_id,project:agent_projects(id,name,slug),repository:agent_repositories(id,name,url,provider)";
+
+export default function useQueue({ since, until } = {}) {
   const [stats, setStats] = useState({ todo: 0, assigned: 0, in_progress: 0, qa: 0, completed: 0, failed: 0 });
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -11,14 +14,21 @@ export default function useQueue() {
 
   const fetchAll = useCallback(async () => {
     try {
-      const params = selectedProject ? `?project_id=${selectedProject}` : "";
+      const params = new URLSearchParams();
+      if (selectedProject) params.set("project_id", selectedProject);
+      if (since) params.set("since", since);
+      if (until) params.set("until", until);
+      params.set("columns", "light");
+      const qs = params.toString() ? `?${params}` : "";
+
       const [sRes, tRes, pRes] = await Promise.all([
-        fetch(`/api/stats${params}`),
-        fetch(`/api/tasks${params}`),
+        fetch(`/api/stats${selectedProject ? `?project_id=${selectedProject}` : ""}`),
+        fetch(`/api/tasks${qs}`),
         fetch("/api/projects"),
       ]);
       setStats(await sRes.json());
-      setTasks(await tRes.json());
+      const newTasks = await tRes.json();
+      if (Array.isArray(newTasks)) setTasks(newTasks);
       setProjects(await pRes.json());
       if (initialLoad.current) {
         setLoading(false);
@@ -27,11 +37,11 @@ export default function useQueue() {
     } catch (e) {
       console.error("Poll error:", e);
     }
-  }, [selectedProject]);
+  }, [selectedProject, since, until]);
 
   useEffect(() => {
     fetchAll();
-    const id = setInterval(fetchAll, 3000);
+    const id = setInterval(fetchAll, 10000); // 10s instead of 3s
     return () => clearInterval(id);
   }, [fetchAll]);
 
@@ -77,13 +87,10 @@ export default function useQueue() {
     await fetchAll();
   }, [fetchAll]);
 
-  // Called by SSE task:status events to immediately update task status in local state
-  // so column grouping re-runs without waiting for the next poll cycle.
   const applyStatusChange = useCallback((taskId, newStatus) => {
     setTasks(prev => prev.map(t =>
       t.id === taskId ? { ...t, status: newStatus, updated_at: new Date().toISOString() } : t
     ));
-    // Also trigger a full refetch to get complete data (assigned_agent, result, etc.)
     fetchAll();
   }, [fetchAll]);
 
