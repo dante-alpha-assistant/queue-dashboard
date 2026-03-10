@@ -4,8 +4,8 @@ import remarkGfm from 'remark-gfm';
 import { AlertTriangle, Bot, Brain, Clock, Glasses, Hammer, MessageSquare, Settings, User, Waves, Wrench, Zap } from 'lucide-react';
 
 const AUTHOR_ICONS = {
-  dante: User, neo: Glasses, mu: Wrench, beta: Zap, alpha: Brain, flow: Waves, ifra: Hammer,
-  'neo-worker': Glasses, 'beta-worker': Zap, 'ifra-worker': Hammer, system: Settings,
+  dante: "👤", neo: "👓", mu: "🔧", beta: "⚡", alpha: "🧠", flow: "🌊", ifra: "🔨",
+  'neo-worker': "👓", 'beta-worker': "⚡", 'ifra-worker': "🔨", system: "⚙️",
 };
 const AUTHOR_TYPE_COLORS = {
   human: '#6750A4',
@@ -101,7 +101,7 @@ export default function TaskComments({ taskId }) {
           </div>
         )}
         {comments.map(c => {
-          const IconComp = AUTHOR_ICONS[c.author] || (c.author_type === 'agent' ? Bot : User);
+          const icon = AUTHOR_ICONS[c.author] || (c.author_type === 'agent' ? "🤖" : "👤");
           const typeColor = AUTHOR_TYPE_COLORS[c.author_type] || '#79747E';
           return (
             <div key={c.id} style={{
