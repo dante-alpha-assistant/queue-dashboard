@@ -8,6 +8,7 @@ import { neoChatRouter } from "./routes/neo-chat.js";
 import { agentsRouter } from "./routes/agents.js";
 import { healthRouter } from "./routes/health.js";
 import { skillsRouter } from "./routes/skills.js";
+import { attachmentsRouter, ensureAttachmentsBucket } from "./routes/attachments.js";
 
 const app = express();
 app.use(cors());
@@ -18,6 +19,7 @@ app.use("/api/neo-chat", neoChatRouter);
 app.use("/api/agents", agentsRouter);
 app.use("/api/health", healthRouter);
 app.use("/api/skills", skillsRouter);
+app.use("/api", attachmentsRouter);
 
 // Serve static frontend in production
 import { serveStatic } from "./static.js";
@@ -26,6 +28,7 @@ serveStatic(app);
 const PORT = process.env.PORT || 9092;
 
 // Run pending database migrations on startup
+ensureAttachmentsBucket().catch(e => console.error('[BOOT] Bucket init failed:', e.message));
 runMigrations(supabase).then(r => {
   if (r.applied?.length) console.log('[BOOT] Migrations applied:', r.applied.join(', '));
   if (r.error) console.error('[BOOT] Migration error:', r.error);
