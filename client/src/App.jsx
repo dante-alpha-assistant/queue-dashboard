@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import SpeedLoader from "./components/SpeedLoader";
 import { useNavigate, useLocation } from "react-router-dom";
 import useQueue from "./hooks/useQueue";
@@ -73,14 +73,21 @@ export default function App() {
   const handleSseStatusChange = useCallback((data) => { if (data.taskId && data.status) applyStatusChange(data.taskId, data.status); }, [applyStatusChange]);
   const { progress: taskProgress, monitor: taskMonitor, connected: sseConnected } = useTaskEvents({ onStatusChange: handleSseStatusChange });
 
-  // Resolve deep link once tasks are loaded
+  // Resolve deep link once tasks are loaded (runs only once per deepLinkId)
+  const deepLinkResolved = useRef(false);
   useEffect(() => {
     if (!deepLinkId || loading) return;
+    // Only resolve the deep link once — subsequent task-array updates from
+    // realtime/SSE must NOT overwrite the selected task (which would clear
+    // the _full flag and trigger an infinite fetch-render loop).
+    if (deepLinkResolved.current) return;
     const allLoaded = [...todo, ...assigned, ...inProgress, ...blocked, ...qa, ...completed, ...deploying, ...deployed, ...deployFailed, ...failed];
     const found = allLoaded.find(t => t.id === deepLinkId);
     if (found) {
+      deepLinkResolved.current = true;
       setSelectedTask(found);
-    } else {
+    } else if (!loading) {
+      deepLinkResolved.current = true;
       setSelectedTask({ _notFound: true, id: deepLinkId });
     }
   }, [deepLinkId, loading, todo, assigned, inProgress, blocked, qa, completed, deploying, deployed, deployFailed, failed]);
@@ -109,6 +116,7 @@ export default function App() {
   const handleCloseTask = useCallback(() => {
     setSelectedTask(null);
     setDeepLinkId(null);
+    deepLinkResolved.current = false;
     navigate("/", { replace: true });
   }, [navigate]);
 
