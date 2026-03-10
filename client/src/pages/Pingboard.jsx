@@ -61,7 +61,6 @@ if (typeof document !== "undefined" && !document.getElementById(styleId)) {
   document.head.appendChild(style);
 }
 import OrgChart from "../components/OrgChart";
-import SkillsModal from "../components/SkillsModal";
 import { AlertTriangle, BarChart3, Bot, Building2, CheckCircle2, Circle, ClipboardList, FlaskConical, Puzzle, Rocket, Search, Timer, Wrench, XCircle } from 'lucide-react';
 
 const STATUS_COLORS = {

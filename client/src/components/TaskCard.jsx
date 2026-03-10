@@ -1,14 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import AgentPicker from './AgentPicker';
-import { ProgressBadge } from './ProgressFeed';
 import {
   PriorityDot, TaskTypeIcon, BlockerTypeIcon, AgentAvatar,
   RefreshIcon, UserPlusIcon, RocketIcon, KeyIcon, MessageSquareIcon,
   FolderIcon, SearchCheckIcon, PauseIcon, SlashIcon,
   KubernetesIcon, GitMergeIcon,
-  PriorityDot, TaskTypeIcon, AgentAvatar, BlockerIcon,
-  RetryIcon, DeployIcon, AssignIcon, KeyIcon, ChatIcon,
-  PauseIcon, QAIcon, WaitingIcon, FolderIcon, BlockedIcon, UserIcon,
   BlockerIcon, RetryIcon, DeployIcon, AssignIcon, ChatIcon,
   QAIcon, WaitingIcon, BlockedIcon, UserIcon,
 } from './Icons';

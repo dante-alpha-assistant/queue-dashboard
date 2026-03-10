@@ -966,24 +966,6 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   // Cleanup deploy polling on unmount
   useEffect(() => () => stopDeployPolling(), [stopDeployPolling]);
 
-  const deployPollRef = useRef(null);
-  const deployTimeoutRef = useRef(null);
-
-  // Cleanup deploy polling/timeout on unmount
-  useEffect(() => {
-    return () => {
-      clearInterval(deployPollRef.current);
-      clearTimeout(deployTimeoutRef.current);
-    };
-  }, []);
-
-  const stopDeployPolling = useCallback(() => {
-    clearInterval(deployPollRef.current);
-    clearTimeout(deployTimeoutRef.current);
-    deployPollRef.current = null;
-    deployTimeoutRef.current = null;
-  }, []);
-
   const handleDeploy = async () => {
     if (!deployConfirm) {
       setDeployConfirm(true);
