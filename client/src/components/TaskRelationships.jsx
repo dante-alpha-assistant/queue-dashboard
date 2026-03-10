@@ -24,6 +24,7 @@ const RELATIONSHIP_TYPES = [
   { value: 'blocks', label: 'Blocks' },
   { value: 'related_to', label: 'Related to' },
   { value: 'subtask_of', label: 'Subtask of' },
+  { value: 'deployed_by', label: 'Deployed by' },
 ];
 
 /* ── Relationship Chip ────────────────────────────────────── */
@@ -282,10 +283,13 @@ export default function TaskRelationships({ taskId, onNavigateToTask }) {
     blocks: [],      // incoming depends_on: X depends on this task (this blocks X)
     related_to: [],
     subtask_of: [],
+    deployed_by: [],
   };
 
   for (const rel of relationships) {
-    if (rel.type === 'depends_on' && rel.direction === 'outgoing') {
+    if (rel.type === 'deployed_by') {
+      grouped.deployed_by.push(rel);
+    } else if (rel.type === 'depends_on' && rel.direction === 'outgoing') {
       groups.depends_on.push(rel);
     } else if (rel.type === 'depends_on' && rel.direction === 'incoming') {
       groups.blocks.push(rel);
