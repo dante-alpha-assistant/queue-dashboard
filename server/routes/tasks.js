@@ -503,24 +503,12 @@ router.post("/deploy/batch", async (req, res) => {
   }
 });
 
+// Single task deploy — creates a deploy task for the agent (no direct merging)
 router.post("/deploy/:id", async (req, res) => {
-  const GH_TOKEN = process.env.GH_TOKEN;
-  const VERCEL_TOKEN = process.env.VERCEL_TOKEN;
-  const VERCEL_TEAM_ID = process.env.VERCEL_TEAM_ID;
-  const RAILWAY_TOKEN = process.env.RAILWAY_TOKEN;
-  const ARGOCD_URL = process.env.ARGOCD_URL || "http://argocd-server.argocd.svc.cluster.local";
-  const ARGOCD_USERNAME = process.env.ARGOCD_USERNAME;
-  const ARGOCD_PASSWORD = process.env.ARGOCD_PASSWORD;
-  const ARGOCD_TOKEN_ENV = process.env.ARGOCD_TOKEN;
-  const ARGOCD_APP = process.env.ARGOCD_APP || "dev";
-  const SYNC_TIMEOUT = 120_000;
-  const SYNC_POLL_INTERVAL = 5_000;
-
   try {
-    // 1. Fetch task and verify it's completed
     const { data: task, error: fetchErr } = await supabase
       .from("agent_tasks")
-      .select("*")
+      .select("id, title, status, pull_request_url, repository_url, deploy_target, type")
       .eq("id", req.params.id)
       .single();
 
@@ -530,409 +518,65 @@ router.post("/deploy/:id", async (req, res) => {
     if (task.status === "deployed") {
       return res.json({ ok: true, message: "Task already deployed" });
     }
-    if (task.status !== "completed" && task.status !== "deploying") {
+    if (task.status === "deploying") {
+      return res.status(409).json({ ok: false, error: "Task is already deploying" });
+    }
+    if (task.status !== "completed") {
       return res.status(400).json({ ok: false, error: `Task status is '${task.status}', must be 'completed' to deploy` });
     }
 
+    const prUrl = getPrUrl(task);
     const deployTarget = task.deploy_target || "kubernetes";
 
-    // Set status to 'deploying' immediately so UI shows progress
-    await supabase.from('agent_tasks').update({ status: 'deploying' }).eq('id', req.params.id);
-    console.log(`[DEPLOY] Task ${req.params.id} → deploying (target: ${deployTarget})`);
-    console.log(`[DEPLOY] Task ${req.params.id} — deploy_target: ${deployTarget}`);
-
-    // 2. Collect all PR references
-    const prRefs = [];
-    if (task.pull_request_url && Array.isArray(task.pull_request_url)) {
-      for (const url of task.pull_request_url) {
-        const m = url.match(/github\.com\/(.+?)\/pull\/(\d+)/);
-        if (m) prRefs.push({ repo: m[1], number: parseInt(m[2]), url });
-      }
-    }
-    if (prRefs.length === 0 && task.result) {
-      const resultStr = typeof task.result === "string" ? task.result : JSON.stringify(task.result);
-      const prMatch = resultStr.match(/PR\s*#(\d+)/i) || resultStr.match(/#(\d+)\s*merged/i);
-      if (prMatch) {
-        const prNumber = parseInt(prMatch[1]);
-        let repoFullName = null;
-        const repoMatch = resultStr.match(/(dante-alpha-assistant\/[\w-]+)/);
-        if (repoMatch) repoFullName = repoMatch[1];
-        if (repoFullName) prRefs.push({ repo: repoFullName, number: prNumber });
-      }
-    }
-
-    // 3. Merge PRs (shared across all deploy targets)
-    const mergedPRs = [];
-    if (prRefs.length > 0 && !GH_TOKEN) {
-      await supabase.from('agent_tasks').update({ status: 'deploy_failed', error: 'GH_TOKEN not configured', updated_at: new Date().toISOString() }).eq('id', req.params.id);
-      return res.status(500).json({ ok: false, error: "GH_TOKEN not configured — cannot merge PRs." });
-    }
-    for (const pr of prRefs) {
-      if (!GH_TOKEN) continue;
-      const prResp = await fetch(`https://api.github.com/repos/${pr.repo}/pulls/${pr.number}`, {
-        headers: { Authorization: `token ${GH_TOKEN}`, Accept: "application/vnd.github.v3+json" },
-      });
-      if (!prResp.ok) {
-        await supabase.from('agent_tasks').update({ status: 'deploy_failed', error: `Failed to fetch PR #${pr.number}`, updated_at: new Date().toISOString() }).eq('id', req.params.id);
-        return res.status(400).json({ ok: false, error: `Failed to fetch PR #${pr.number} on ${pr.repo}: ${prResp.status}` });
-      }
-      const prData = await prResp.json();
-      if (prData.merged) {
-        mergedPRs.push(`#${pr.number} (${pr.repo}) — already merged`);
-      } else if (prData.state === "closed") {
-        await supabase.from('agent_tasks').update({ status: 'deploy_failed', error: `PR #${pr.number} closed but not merged`, updated_at: new Date().toISOString() }).eq('id', req.params.id);
-        return res.status(400).json({ ok: false, error: `PR #${pr.number} on ${pr.repo} is closed but not merged` });
-      } else {
-        const mergeResp = await fetch(`https://api.github.com/repos/${pr.repo}/pulls/${pr.number}/merge`, {
-          method: "PUT",
-          headers: { Authorization: `token ${GH_TOKEN}`, Accept: "application/vnd.github.v3+json", "Content-Type": "application/json" },
-          body: JSON.stringify({ merge_method: "squash", commit_title: `${task.title} (#${pr.number})` }),
-        });
-        if (!mergeResp.ok) {
-          const mergeErr = await mergeResp.json().catch(() => ({}));
-          await supabase.from('agent_tasks').update({ status: 'deploy_failed', error: `Merge failed: ${mergeErr.message || mergeResp.status}`, updated_at: new Date().toISOString() }).eq('id', req.params.id);
-          return res.status(400).json({ ok: false, error: `Merge failed on PR #${pr.number} (${pr.repo}): ${mergeErr.message || mergeResp.status}` });
-        }
-        mergedPRs.push(`#${pr.number} (${pr.repo}) — merged`);
-        if (prData.head?.ref) {
-          try { await fetch(`https://api.github.com/repos/${pr.repo}/git/refs/heads/${prData.head.ref}`, { method: "DELETE", headers: { Authorization: `token ${GH_TOKEN}` } }); } catch {}
-        }
-      }
-    }
-
-    // 4. Deploy based on target
-    let deployResult = {};
-
+    // For deploy_target "none" — just mark deployed directly
     if (deployTarget === "none") {
-      // No deployment needed — just mark as deployed
-      console.log(`[DEPLOY] Target is 'none' — skipping deployment, marking deployed`);
-      deployResult = { strategy: "none", message: "No deployment needed" };
-
-    } else if (deployTarget === "vercel") {
-      // Vercel deployment
-      console.log(`[DEPLOY] Target is 'vercel' — triggering Vercel deployment`);
-
-      if (!VERCEL_TOKEN) {
-        await supabase.from('agent_tasks').update({ status: 'deploy_failed', error: 'VERCEL_TOKEN not configured', updated_at: new Date().toISOString() }).eq('id', req.params.id);
-        return res.status(500).json({ ok: false, error: "VERCEL_TOKEN not configured — cannot deploy to Vercel." });
-      }
-
-      // Determine the repo to deploy
-      const repoUrl = task.repository_url || (prRefs[0] ? `https://github.com/${prRefs[0].repo}` : null);
-      const repoFullName = repoUrl?.match(/github\.com\/(.+?)(?:\.git)?$/)?.[1];
-
-      if (!repoFullName) {
-        await supabase.from('agent_tasks').update({ status: 'deploy_failed', error: 'No repository URL found', updated_at: new Date().toISOString() }).eq('id', req.params.id);
-        return res.status(400).json({ ok: false, error: "No repository URL found — cannot deploy to Vercel." });
-      }
-
-      const vercelHeaders = {
-        Authorization: `Bearer ${VERCEL_TOKEN}`,
-        "Content-Type": "application/json",
-      };
-      const teamParam = VERCEL_TEAM_ID ? `?teamId=${VERCEL_TEAM_ID}` : "";
-
-      // Check if project already exists in Vercel
-      const projectName = repoFullName.split("/")[1]; // e.g. "hello-world-site"
-      let vercelProject = null;
-
-      try {
-        const projResp = await fetch(`https://api.vercel.com/v9/projects/${projectName}${teamParam}`, {
-          headers: vercelHeaders,
-        });
-        if (projResp.ok) {
-          vercelProject = await projResp.json();
-          console.log(`[DEPLOY] Found existing Vercel project: ${projectName}`);
-        }
-      } catch {}
-
-      // If no project, import the repo
-      if (!vercelProject) {
-        console.log(`[DEPLOY] Creating new Vercel project for ${repoFullName}`);
-        const importResp = await fetch(`https://api.vercel.com/v10/projects${teamParam}`, {
-          method: "POST",
-          headers: vercelHeaders,
-          body: JSON.stringify({
-            name: projectName,
-            framework: null, // auto-detect
-            gitRepository: {
-              type: "github",
-              repo: repoFullName,
-            },
-          }),
-        });
-
-        if (!importResp.ok) {
-          const err = await importResp.json().catch(() => ({}));
-          const rawMsg = err.error?.message || `HTTP ${importResp.status}`;
-          let errMsg = `Vercel project creation failed: ${rawMsg}`;
-          let actionRequired = null;
-
-          // Detect missing GitHub integration and provide actionable guidance
-          if (rawMsg.toLowerCase().includes('github integration') || rawMsg.toLowerCase().includes('install the github')) {
-            errMsg = `Vercel GitHub integration not installed. Cannot link repo '${repoFullName}'.`;
-            actionRequired = 'Install the Vercel GitHub integration at https://vercel.com/integrations/github for the GitHub org/account, then retry.';
-            errMsg += ` Action required: ${actionRequired}`;
-          }
-
-          await supabase.from('agent_tasks').update({ status: 'deploy_failed', error: errMsg, updated_at: new Date().toISOString() }).eq('id', req.params.id);
-          return res.status(400).json({ ok: false, error: errMsg, action_required: actionRequired });
-        }
-        vercelProject = await importResp.json();
-        console.log(`[DEPLOY] Created Vercel project: ${vercelProject.name}`);
-      }
-
-      // Trigger a new deployment
-      const deployResp = await fetch(`https://api.vercel.com/v13/deployments${teamParam}`, {
-        method: "POST",
-        headers: vercelHeaders,
-        body: JSON.stringify({
-          name: projectName,
-          project: vercelProject.id,
-          gitSource: {
-            type: "github",
-            org: repoFullName.split("/")[0],
-            repo: repoFullName.split("/")[1],
-            ref: "main",
-          },
-        }),
-      });
-
-      if (!deployResp.ok) {
-        const err = await deployResp.json().catch(() => ({}));
-        // If deployment fails, still mark as deployed if PRs were merged
-        console.warn(`[DEPLOY] Vercel deployment trigger failed: ${err.error?.message || deployResp.status}`);
-        deployResult = { strategy: "vercel", error: err.error?.message || `HTTP ${deployResp.status}` };
-      } else {
-        const deployment = await deployResp.json();
-        const deploymentUrl = deployment.url ? `https://${deployment.url}` : null;
-        console.log(`[DEPLOY] Vercel deployment triggered: ${deploymentUrl}`);
-        deployResult = {
-          strategy: "vercel",
-          deployment_url: deploymentUrl,
-          project_url: `https://vercel.com/${VERCEL_TEAM_ID || "~"}/${projectName}`,
-          project_name: projectName,
-        };
-      }
-
-    } else if (deployTarget === "railway") {
-      // Railway deployment via GraphQL API
-      console.log(`[DEPLOY] Target is 'railway' — triggering Railway deployment`);
-
-      if (!RAILWAY_TOKEN) {
-        await supabase.from('agent_tasks').update({ status: 'deploy_failed', error: 'RAILWAY_TOKEN not configured', updated_at: new Date().toISOString() }).eq('id', req.params.id);
-        return res.status(500).json({ ok: false, error: "RAILWAY_TOKEN not configured — cannot deploy to Railway." });
-      }
-
-      const repoUrl = task.repository_url || (prRefs[0] ? `https://github.com/${prRefs[0].repo}` : null);
-      const repoFullName = repoUrl?.match(/github\.com\/(.+?)(?:\.git)?$/)?.[1];
-
-      if (!repoFullName) {
-        await supabase.from('agent_tasks').update({ status: 'deploy_failed', error: 'No repository URL found', updated_at: new Date().toISOString() }).eq('id', req.params.id);
-        return res.status(400).json({ ok: false, error: "No repository URL found — cannot deploy to Railway." });
-      }
-
-      const railwayGQL = async (query, variables = {}) => {
-        const resp = await fetch("https://backboard.railway.com/graphql/v2", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${RAILWAY_TOKEN}`,
-          },
-          body: JSON.stringify({ query, variables }),
-        });
-        const json = await resp.json();
-        if (json.errors) throw new Error(json.errors[0].message);
-        return json.data;
-      };
-
-      const projectName = repoFullName.split("/")[1];
-
-      try {
-        // 1. Check if project already exists (search by name)
-        let projectId = null;
-        let environmentId = null;
-        let serviceId = null;
-
-        const projectsData = await railwayGQL(`
-          query { me { projects { edges { node { id name services { edges { node { id name } } } environments { edges { node { id name } } } } } } } }
-        `);
-
-        const existingProject = projectsData.me.projects.edges.find(
-          e => e.node.name.toLowerCase() === projectName.toLowerCase()
-        );
-
-        if (existingProject) {
-          projectId = existingProject.node.id;
-          environmentId = existingProject.node.environments.edges.find(e => e.node.name === "production")?.node.id;
-          serviceId = existingProject.node.services.edges[0]?.node.id;
-          console.log(`[DEPLOY] Found existing Railway project: ${projectName} (${projectId})`);
-        }
-
-        // 2. If no project, create one from GitHub repo
-        if (!projectId) {
-          console.log(`[DEPLOY] Creating new Railway project for ${repoFullName}`);
-          const createData = await railwayGQL(`
-            mutation($input: ProjectCreateInput!) {
-              projectCreate(input: $input) { id environments { edges { node { id name } } } }
-            }
-          `, {
-            input: {
-              name: projectName,
-              repo: { fullRepoName: repoFullName },
-            },
-          });
-          projectId = createData.projectCreate.id;
-          environmentId = createData.projectCreate.environments.edges.find(e => e.node.name === "production")?.node.id;
-          console.log(`[DEPLOY] Created Railway project: ${projectId}`);
-
-          // Wait briefly for service to be created from repo
-          await new Promise(r => setTimeout(r, 3000));
-
-          // Fetch the service created from the repo
-          const svcData = await railwayGQL(`
-            query($projectId: String!) {
-              project(id: $projectId) { services { edges { node { id name } } } }
-            }
-          `, { projectId });
-          serviceId = svcData.project.services.edges[0]?.node.id;
-        }
-
-        // 3. Trigger a redeploy if we have a service
-        let deploymentUrl = null;
-        if (serviceId && environmentId) {
-          // Get latest deployment to redeploy
-          const deploymentsData = await railwayGQL(`
-            query($input: DeploymentListInput!) {
-              deployments(input: $input) { edges { node { id status } } }
-            }
-          `, { input: { serviceId, environmentId } });
-
-          const latestDeployment = deploymentsData.deployments.edges[0]?.node;
-
-          if (latestDeployment) {
-            await railwayGQL(`
-              mutation($id: String!) {
-                deploymentRedeploy(id: $id) { id }
-              }
-            `, { id: latestDeployment.id });
-            console.log(`[DEPLOY] Redeployed Railway service ${serviceId}`);
-          }
-
-          // Get the service domain
-          const domainData = await railwayGQL(`
-            query($projectId: String!, $serviceId: String!, $environmentId: String!) {
-              domains(projectId: $projectId, serviceId: $serviceId, environmentId: $environmentId) { serviceDomains { domain } customDomains { domain } }
-            }
-          `, { projectId, serviceId, environmentId });
-
-          const domain = domainData.domains?.serviceDomains?.[0]?.domain || domainData.domains?.customDomains?.[0]?.domain;
-          if (domain) deploymentUrl = `https://${domain}`;
-        }
-
-        deployResult = {
-          strategy: "railway",
-          project_id: projectId,
-          service_id: serviceId,
-          deployment_url: deploymentUrl,
-          project_url: `https://railway.com/project/${projectId}`,
-          project_name: projectName,
-        };
-      } catch (railwayErr) {
-        console.error(`[DEPLOY] Railway error: ${railwayErr.message}`);
-        await supabase.from('agent_tasks').update({ status: 'deploy_failed', error: `Railway deploy failed: ${railwayErr.message}`, updated_at: new Date().toISOString() }).eq('id', req.params.id);
-        return res.status(500).json({ ok: false, error: `Railway deploy failed: ${railwayErr.message}` });
-      }
-
-    } else {
-      // Default: kubernetes (ArgoCD)
-      let argoToken = ARGOCD_TOKEN_ENV;
-      let syncTriggered = false;
-      let syncSucceeded = false;
-
-      try {
-        if (!argoToken && ARGOCD_USERNAME && ARGOCD_PASSWORD) {
-          const sessResp = await fetch(`${ARGOCD_URL}/api/v1/session`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username: ARGOCD_USERNAME, password: ARGOCD_PASSWORD }),
-          });
-          if (sessResp.ok) {
-            argoToken = (await sessResp.json()).token;
-          }
-        }
-
-        if (argoToken) {
-          const syncResp = await fetch(`${ARGOCD_URL}/api/v1/applications/${ARGOCD_APP}/sync`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${argoToken}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ prune: false, strategy: { hook: {} } }),
-          });
-          syncTriggered = syncResp.ok;
-        }
-      } catch (e) {
-        console.warn(`[DEPLOY] ArgoCD sync trigger failed: ${e.message}`);
-      }
-
-      if (argoToken) {
-        const startTime = Date.now();
-        while (Date.now() - startTime < SYNC_TIMEOUT) {
-          try {
-            const appResp = await fetch(`${ARGOCD_URL}/api/v1/applications/${ARGOCD_APP}`, {
-              headers: { Authorization: `Bearer ${argoToken}` },
-            });
-            if (appResp.ok) {
-              const app = await appResp.json();
-              if (app?.status?.sync?.status === "Synced" || app?.status?.health?.status === "Healthy") {
-                syncSucceeded = true;
-                break;
-              }
-            }
-          } catch {}
-          await new Promise(r => setTimeout(r, SYNC_POLL_INTERVAL));
-        }
-        if (!syncSucceeded) {
-          console.warn(`[DEPLOY] ArgoCD sync timed out — PR merged, marking deployed anyway`);
-        }
-      }
-
-      deployResult = { strategy: "kubernetes", argocd_synced: syncSucceeded, sync_triggered: syncTriggered };
+      await supabase.from("agent_tasks")
+        .update({ status: "deployed", updated_at: new Date().toISOString() })
+        .eq("id", req.params.id);
+      return res.json({ ok: true, message: "No deployment needed — marked deployed" });
     }
 
-    // 5. Update task status to deployed
-    const deploymentUrl = deployResult.deployment_url || null;
-    const { data: updated, error: updateErr } = await supabase
+    // Create a deploy task for the agent
+    const { data: deployTask, error: createErr } = await supabase
       .from("agent_tasks")
-      .update({
-        status: "deployed",
-        deployment_url: deploymentUrl,
-        updated_at: new Date().toISOString(),
+      .insert({
+        title: `Deploy: ${task.title}`,
+        type: "deploy",
+        priority: "urgent",
+        status: "todo",
+        deploy_target: deployTarget,
+        description: `Deploy task ${task.id}:\n- ${task.title}\n- PR: ${prUrl || "none"}\n- Target: ${deployTarget}`,
+        metadata: {
+          batch_tasks: [{ id: task.id, title: task.title, pr_url: prUrl }],
+          repos: prUrl ? { [prUrl.match(/github\.com\/([^/]+\/[^/]+)/)?.[1] || "unknown"]: [{ id: task.id, title: task.title, pr_url: prUrl, pr_number: prUrl.match(/\/pull\/(\d+)/)?.[1] }] } : {},
+          strategy: "sequential_rebase",
+        },
       })
-      .eq("id", req.params.id)
       .select()
       .single();
 
-    if (updateErr) {
-      return res.status(500).json({ ok: false, error: `Failed to update task status: ${updateErr.message}` });
-    }
+    if (createErr) return res.status(500).json({ ok: false, error: createErr.message });
+
+    // Link via deployed_by relationship
+    await supabase.from("task_relationships").insert({
+      source_task_id: task.id,
+      target_task_id: deployTask.id,
+      relationship_type: "deployed_by",
+      created_by: "system",
+    });
+
+    // Set task to deploying
+    await supabase.from("agent_tasks")
+      .update({ status: "deploying", updated_at: new Date().toISOString() })
+      .eq("id", req.params.id);
 
     res.json({
       ok: true,
-      task: updated,
-      details: {
-        deploy_target: deployTarget,
-        prs_merged: mergedPRs,
-        ...deployResult,
-      },
+      deployTask: { id: deployTask.id, title: deployTask.title },
+      message: "Deploy task created — agent will handle merging and deployment",
     });
   } catch (e) {
-    console.error(`[DEPLOY] Error deploying task ${req.params.id}:`, e.message);
-    // Set status to deploy_failed so user can see what happened
-    await supabase.from('agent_tasks').update({ 
-      status: 'deploy_failed', 
-      error: `Deploy failed: ${e.message}`,
-      updated_at: new Date().toISOString()
-    }).eq('id', req.params.id).catch(() => {});
+    console.error(`[DEPLOY] Error creating deploy task for ${req.params.id}:`, e.message);
     res.status(500).json({ ok: false, error: e.message });
   }
 });
