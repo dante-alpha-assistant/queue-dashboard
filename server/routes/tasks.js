@@ -708,7 +708,22 @@ router.post("/tasks/:id/comments/reply", async (req, res) => {
   }
 });
 
+// Agent gateway tokens — same pattern as task-dispatcher
+const AGENT_TOKENS = {
+  neo: process.env.NEO_HOOKS_TOKEN,
+  "neo-worker": process.env.NEO_WORKER_HOOKS_TOKEN,
+  mu: process.env.MU_HOOKS_TOKEN,
+  beta: process.env.BETA_HOOKS_TOKEN,
+  "beta-worker": process.env.BETA_WORKER_HOOKS_TOKEN || "beta-worker-hooks-tok-2026",
+  flow: process.env.FLOW_HOOKS_TOKEN,
+  ifra: process.env.IFRA_HOOKS_TOKEN,
+  "ifra-worker": process.env.IFRA_WORKER_HOOKS_TOKEN,
+  "research-worker": process.env.RESEARCH_WORKER_HOOKS_TOKEN || "research-worker-hooks-tok-2026",
+  "neo-chat-worker": process.env.NEO_CHAT_WORKER_HOOKS_TOKEN,
+};
+
 // Send webhook to mentioned agents with full task context
+// Uses the standard OpenClaw /hooks/agent format: { message, name, sessionKey, wakeMode }
 async function notifyMentionedAgents(taskId, comment, mentions) {
   // Fetch full task
   const { data: task } = await supabase
@@ -741,37 +756,59 @@ async function notifyMentionedAgents(taskId, comment, mentions) {
     return `**${c.author}** (${c.author_type}) — ${time}:\n> ${c.body.replace(/\n/g, "\n> ")}`;
   }).join("\n\n");
 
+  // Build the readable message for the agent (standard OpenClaw webhook format)
+  const prUrls = Array.isArray(task.pull_request_url) ? task.pull_request_url.join(", ") : (task.pull_request_url || "none");
+  const message = `## 💬 Task Comment — @mention from ${comment.author}
+
+**Task:** ${task.title}
+**Status:** ${task.status} | **Type:** ${task.type} | **Priority:** ${task.priority}
+**Task ID:** ${taskId}
+**PR:** ${prUrls}
+**Task URL:** ${DASHBOARD_URL}/task/${taskId}
+
+---
+
+### Comment from ${comment.author}:
+${comment.body}
+
+---
+
+### Full Comment Thread:
+${commentThread}
+
+---
+
+### Task Description:
+${task.description || "(no description)"}
+
+${task.result ? `### Previous Result:\n${typeof task.result === "object" ? JSON.stringify(task.result, null, 2) : task.result}\n` : ""}
+${task.qa_result ? `### QA Result:\n${typeof task.qa_result === "object" ? JSON.stringify(task.qa_result, null, 2) : task.qa_result}\n` : ""}
+---
+
+**Reply callback:** To reply, POST to: \`${callbackUrl}\`
+\`\`\`json
+{ "body": "your reply text", "author": "${mentions[0]}", "comment_id": "${comment.id}" }
+\`\`\``;
+
   for (const agent of (agents || [])) {
     if (!agent.endpoint_url || agent.status === "disabled") continue;
 
     const webhookUrl = `${agent.endpoint_url}/hooks/agent`;
-    const payload = {
-      type: "task_mention",
-      task_id: taskId,
-      comment_id: comment.id,
-      comment_body: comment.body,
-      comment_author: comment.author,
-      callback_url: callbackUrl,
-      task: {
-        id: task.id,
-        title: task.title,
-        description: task.description,
-        status: task.status,
-        type: task.type,
-        priority: task.priority,
-        result: task.result,
-        qa_result: task.qa_result,
-        pull_request_url: task.pull_request_url,
-        assigned_agent: task.assigned_agent,
-      },
-      comment_thread: commentThread,
-    };
+    const token = AGENT_TOKENS[agent.id];
+
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
 
     try {
       const resp = await fetch(webhookUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        headers,
+        body: JSON.stringify({
+          message,
+          name: "Task Comment",
+          sessionKey: `hook:comment:${taskId}:${comment.id}`,
+          wakeMode: "now",
+        }),
       });
       console.log(`[MENTION] Notified ${agent.id} for task ${taskId}: HTTP ${resp.status}`);
     } catch (e) {
