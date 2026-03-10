@@ -61,7 +61,7 @@ if (typeof document !== "undefined" && !document.getElementById(styleId)) {
   document.head.appendChild(style);
 }
 import OrgChart from "../components/OrgChart";
-import { AlertTriangle, BarChart3, Bot, Building2, CheckCircle2, Circle, ClipboardList, FlaskConical, Puzzle, Rocket, Search, Timer, Wrench, XCircle } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bot, Building2, CheckCircle2, ClipboardList, FlaskConical, Puzzle, Rocket, Search, Timer, Wrench, XCircle } from 'lucide-react';
 
 const STATUS_COLORS = {
   online: "#2E7D32",
@@ -607,7 +607,7 @@ function PipelineView() {
               color: b.severity === "high" ? "#BA1A1A" : "#E65100",
               fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8,
             }}>
-              {b.severity === "high" ? <Circle size={10} fill="#D32F2F" color="#D32F2F" /> : <Circle size={10} fill="#F9A825" color="#F9A825" />} {b.message}
+              {b.severity === "high" ? <span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#D32F2F"}} /> : <span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:"#F9A825"}} />} {b.message}
             </div>
           ))}
         </div>
