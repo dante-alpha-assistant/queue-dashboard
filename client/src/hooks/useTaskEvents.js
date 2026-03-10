@@ -3,13 +3,16 @@ import { useState, useEffect, useRef, useCallback } from "react";
 /**
  * SSE hook that connects to the task-dispatcher's event stream via the dashboard proxy.
  * Maintains per-task progress and monitor data.
+ * Accepts an optional onStatusChange callback to notify parent when task status changes.
  */
-export default function useTaskEvents() {
+export default function useTaskEvents({ onStatusChange } = {}) {
   const [progress, setProgress] = useState({}); // taskId → { percent, step, log, timestamp }
   const [monitor, setMonitor] = useState({});   // taskId → { sessionAlive, idleSeconds, elapsed, timestamp }
   const [connected, setConnected] = useState(false);
   const esRef = useRef(null);
   const retryRef = useRef(null);
+  const onStatusChangeRef = useRef(onStatusChange);
+  onStatusChangeRef.current = onStatusChange;
 
   const connect = useCallback(() => {
     if (esRef.current) {
@@ -60,6 +63,10 @@ export default function useTaskEvents() {
     es.addEventListener("task:status", (e) => {
       try {
         const data = JSON.parse(e.data);
+        // Notify parent to trigger immediate refetch so cards move columns
+        if (onStatusChangeRef.current) {
+          onStatusChangeRef.current(data);
+        }
         // Clean up progress/monitor for terminal tasks
         if (["failed", "deployed", "cancelled", "deprecated"].includes(data.status)) {
           setProgress((prev) => {

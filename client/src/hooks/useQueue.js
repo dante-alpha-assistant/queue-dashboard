@@ -77,6 +77,16 @@ export default function useQueue() {
     await fetchAll();
   }, [fetchAll]);
 
+  // Called by SSE task:status events to immediately update task status in local state
+  // so column grouping re-runs without waiting for the next poll cycle.
+  const applyStatusChange = useCallback((taskId, newStatus) => {
+    setTasks(prev => prev.map(t =>
+      t.id === taskId ? { ...t, status: newStatus, updated_at: new Date().toISOString() } : t
+    ));
+    // Also trigger a full refetch to get complete data (assigned_agent, result, etc.)
+    fetchAll();
+  }, [fetchAll]);
+
   const todo = tasks.filter(t => t.status === "todo");
   const assigned = [];
   const inProgress = tasks.filter(t => t.status === "in_progress");
@@ -90,7 +100,7 @@ export default function useQueue() {
 
   return {
     stats, tasks, todo, assigned, inProgress, qa, completed, deployed, blocked, failed, deploying, deployFailed,
-    loading, transitioning, dispatch, updateTask, deleteTask,
+    loading, transitioning, dispatch, updateTask, deleteTask, applyStatusChange,
     projects, selectedProject, setSelectedProject,
   };
 }
