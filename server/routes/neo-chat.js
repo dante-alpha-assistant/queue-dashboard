@@ -3,9 +3,15 @@ import supabase from "../supabase.js";
 
 export const neoChatRouter = Router();
 
-// Neo's OpenClaw gateway (in-cluster)
+// Neo's OpenClaw gateway (in-cluster) — used for text-only chat
 const NEO_GATEWAY = process.env.NEO_GATEWAY_URL || "http://neo.agents.svc.cluster.local:18789";
 const NEO_TOKEN = process.env.NEO_GATEWAY_TOKEN || "neo-gw-tok-2026";
+
+// Direct LLM API for vision support (OpenClaw chatCompletions strips image_url parts)
+// Set CHAT_LLM_URL + CHAT_LLM_KEY to use a vision-capable model directly
+const CHAT_LLM_URL = process.env.CHAT_LLM_URL || "https://openrouter.ai/api/v1/chat/completions";
+const CHAT_LLM_KEY = process.env.CHAT_LLM_KEY || process.env.OPENROUTER_API_KEY || "";
+const CHAT_LLM_MODEL = process.env.CHAT_LLM_MODEL || "anthropic/claude-sonnet-4";
 
 const SYSTEM_PROMPT = `You are Neo, an AI engineering assistant embedded in the tasks.dante.id dashboard.
 The user is describing work they need done. Your job is to:
@@ -214,8 +220,29 @@ neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
       }),
     ];
 
-    // Helper to call Neo gateway
+    // Helper to call LLM — uses direct API for vision, OpenClaw gateway for text-only
     async function callNeo(msgs, stream = true) {
+      const hasImages = msgs.some(m =>
+        Array.isArray(m.content) && m.content.some(p => p.type === "image_url")
+      );
+      if (hasImages && CHAT_LLM_KEY) {
+        // Direct LLM call — preserves image_url parts for vision
+        return fetch(CHAT_LLM_URL, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${CHAT_LLM_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: CHAT_LLM_MODEL,
+            messages: msgs,
+            tools: CHAT_TOOLS,
+            stream,
+            max_tokens: 4096,
+          }),
+        });
+      }
+      // Text-only: use OpenClaw gateway
       return fetch(`${NEO_GATEWAY}/v1/chat/completions`, {
         method: "POST",
         headers: {
