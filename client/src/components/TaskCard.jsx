@@ -764,7 +764,7 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
           )}
           <AttachmentIndicator count={task.metadata?.attachments?.length} />
           {task.status === "qa_testing" && (
-            task.qa_agent && task.assigned_agent
+            (task.qa_agent || task.assigned_agent)
               ? <span style={{
                   fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 100,
                   background: "#2E7D3220", color: "#2E7D32",
@@ -772,7 +772,7 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
                   textTransform: "uppercase", letterSpacing: "0.04em", lineHeight: 1.2,
                   fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
                 }}>
-                  <SearchCheckIcon size={11} color="#2E7D32" /> QA: {task.qa_agent}
+                  <SearchCheckIcon size={11} color="#2E7D32" /> QA: {task.qa_agent || task.assigned_agent}
                 </span>
               : <Badge label="Waiting for QA" color="#7B5EA7" bg="#7B5EA720" />
           )}
