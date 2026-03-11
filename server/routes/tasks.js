@@ -166,7 +166,7 @@ router.get("/tasks", async (req, res) => {
 // Create task
 router.post("/tasks", async (req, res) => {
   try {
-    const { title, description, prompt, type, priority, assigned_agent, status, project_id, repository_id, acceptance_criteria, stage } = req.body;
+    const { title, description, prompt, type, priority, assigned_agent, status, project_id, repository_id, acceptance_criteria, stage, app_id, metadata } = req.body;
     if (!title) return res.status(400).json({ error: "title required" });
     const validPriorities = ["low", "normal", "high", "urgent"];
     if (priority && !validPriorities.includes(priority)) {
@@ -175,6 +175,19 @@ router.post("/tasks", async (req, res) => {
     const validTypes = ["coding", "ops", "general", "review", "research", "qa"];
     if (type && !validTypes.includes(type)) {
       return res.status(400).json({ error: `Invalid type "${type}". Must be one of: ${validTypes.join(", ")}` });
+    }
+
+    // Auto-resolve app_id from metadata.repo if not explicitly provided
+    let resolvedAppId = app_id || null;
+    if (!resolvedAppId && metadata?.repo) {
+      try {
+        const { data: matchedApp } = await supabase
+          .from("apps")
+          .select("id")
+          .contains("repos", [metadata.repo])
+          .single();
+        if (matchedApp) resolvedAppId = matchedApp.id;
+      } catch (_) { /* no match, leave null */ }
     }
 
     const { data, error } = await supabase
@@ -192,6 +205,8 @@ router.post("/tasks", async (req, res) => {
         repository_id: repository_id || null,
         acceptance_criteria: acceptance_criteria || null,
         stage: stage || null,
+        app_id: resolvedAppId,
+        ...(metadata ? { metadata } : {}),
       })
       .select()
       .single();
