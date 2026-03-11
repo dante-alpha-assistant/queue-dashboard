@@ -13,10 +13,8 @@ import TaskDetailModal from "./components/TaskDetailModal";
 import BatchDeployModal from "./components/BatchDeployModal";
 import Pingboard from "./pages/Pingboard";
 import HealthDashboard from "./pages/HealthDashboard";
-import ContactsPage from "./pages/ContactsPage";
-import ContactDetailPage from "./pages/ContactDetailPage";
 import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
-import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Rocket, Search, XCircle, Zap, Users } from 'lucide-react';
+import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Rocket, Search, XCircle, Zap } from 'lucide-react';
 
 const MOBILE_TABS = [
   { key: "todo", label: "Todo", icon: "📋" },
@@ -68,12 +66,7 @@ export default function App() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("todo");
-  const [view, setView] = useState(() => {
-    if (typeof window !== "undefined") {
-      if (window.location.pathname.startsWith("/contacts")) return "contacts";
-    }
-    return "board";
-  });
+  const [view, setView] = useState("board");
 
   const [searchQuery, setSearchQuery] = useState("");
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
@@ -150,48 +143,7 @@ export default function App() {
     { key: "board", label: "Board", Icon: ClipboardList },
     { key: "pingboard", label: "Pingboard", Icon: Bot },
     { key: "health", label: "Health", Icon: HeartPulse },
-    { key: "contacts", label: "CRM", Icon: Users },
   ];
-
-  // Handle navigation to contacts view
-  const handleViewChange = useCallback((v) => {
-    setView(v);
-    if (v === "contacts") navigate("/contacts", { replace: true });
-    else if (v === "board") navigate("/", { replace: true });
-  }, [navigate]);
-
-  // Contacts views
-  if (view === "contacts") {
-    const isContactDetail = location.pathname.match(/^\/contacts\/([a-f0-9-]+)$/i);
-    return (
-      <div style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
-        <div className="header-glass" style={{
-          position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
-          display: "flex", alignItems: "center", gap: 2, padding: "0 16px", height: 48,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginRight: 16 }}>
-            <div style={{
-              width: 28, height: 28, background: "var(--md-primary)", color: "var(--md-on-primary)",
-              borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center",
-              fontWeight: 700, fontSize: 15,
-            }}>d</div>
-            <span style={{ fontWeight: 600, fontSize: 14, letterSpacing: "-0.02em", color: "var(--md-on-background)" }}>
-              tasks<span style={{ color: "var(--md-primary)", fontWeight: 700 }}>.</span>dante<span style={{ color: "var(--md-primary)", fontWeight: 700 }}>.</span>id
-            </span>
-          </div>
-          {VIEW_TABS.map(t => (
-            <button key={t.key} onClick={() => handleViewChange(t.key)} className={`nav-tab ${view === t.key ? "active" : ""}`}>
-              <t.Icon size={15} strokeWidth={view === t.key ? 2.2 : 1.8} />
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <div style={{ paddingTop: 52 }}>
-          {isContactDetail ? <ContactDetailPage /> : <ContactsPage />}
-        </div>
-      </div>
-    );
-  }
 
   if (view === "pingboard" || view === "health") {
     return (
@@ -211,7 +163,7 @@ export default function App() {
             </span>
           </div>
           {VIEW_TABS.map(t => (
-            <button key={t.key} onClick={() => handleViewChange(t.key)} className={`nav-tab ${view === t.key ? "active" : ""}`}>
+            <button key={t.key} onClick={() => setView(t.key)} className={`nav-tab ${view === t.key ? "active" : ""}`}>
               <t.Icon size={15} strokeWidth={view === t.key ? 2.2 : 1.8} />
               {t.label}
             </button>
@@ -314,14 +266,11 @@ export default function App() {
               tasks<span style={{ color: "var(--md-primary)", fontWeight: 700 }}>.</span>dante<span style={{ color: "var(--md-primary)", fontWeight: 700 }}>.</span>id
             </span>
             <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-              <button onClick={() => handleViewChange("pingboard")} className="nav-tab" style={{ padding: "4px 8px" }}>
+              <button onClick={() => setView("pingboard")} className="nav-tab" style={{ padding: "4px 8px" }}>
                 <Bot size={16} strokeWidth={1.8} />
               </button>
-              <button onClick={() => handleViewChange("health")} className="nav-tab" style={{ padding: "4px 8px" }}>
+              <button onClick={() => setView("health")} className="nav-tab" style={{ padding: "4px 8px" }}>
                 <HeartPulse size={16} strokeWidth={1.8} />
-              </button>
-              <button onClick={() => handleViewChange("contacts")} className="nav-tab" style={{ padding: "4px 8px" }}>
-                <Users size={16} strokeWidth={1.8} />
               </button>
             </div>
           </div>
@@ -470,7 +419,7 @@ export default function App() {
             </span>
             <div style={{ width: 1, height: 20, background: "var(--md-surface-variant)", margin: "0 4px" }} />
             {VIEW_TABS.map(t => (
-              <button key={t.key} onClick={() => handleViewChange(t.key)} className={`nav-tab ${view === t.key ? "active" : ""}`}>
+              <button key={t.key} onClick={() => setView(t.key)} className={`nav-tab ${view === t.key ? "active" : ""}`}>
                 <t.Icon size={15} strokeWidth={view === t.key ? 2.2 : 1.8} />
                 {t.label}
               </button>
