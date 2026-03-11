@@ -343,7 +343,7 @@ function renderMarkdownContent(content) {
   });
 }
 
-export default function NewTaskChat({ isMobile, apps = [] }) {
+export default function NewTaskChat({ isMobile, apps = [], selectedApp = "" }) {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(() => {
     try { return localStorage.getItem("neo-chat-expanded") === "true"; } catch { return false; }
@@ -365,7 +365,12 @@ export default function NewTaskChat({ isMobile, apps = [] }) {
   const [mentionQuery, setMentionQuery] = useState(null); // null = closed, string = open with query
   const [mentionStart, setMentionStart] = useState(null); // cursor position of the @ character
   const [taskMentions, setTaskMentions] = useState([]); // [{id, title, ...}] attached to current message
-  const [selectedAppId, setSelectedAppId] = useState(""); // app_id for task scoping
+  const [selectedAppId, setSelectedAppId] = useState(selectedApp || ""); // app_id for task scoping
+
+  // Auto-fill app when header filter changes
+  useEffect(() => {
+    setSelectedAppId(selectedApp || "");
+  }, [selectedApp]);
 
   const bottomRef = useRef(null);
   const inputRef = useRef(null);

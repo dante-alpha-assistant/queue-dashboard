@@ -247,8 +247,12 @@ export default function App() {
     }
   };
 
+  const handleAppFilter = useCallback((appId) => {
+    setSelectedApp(appId || "");
+  }, [setSelectedApp]);
+
   const renderCards = (tasks) =>
-    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={handleSelectTask} isMobile={isMobile} progress={taskProgress[t.id]} monitor={taskMonitor[t.id]} transitioning={!!transitioning[t.id]} />);
+    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={handleSelectTask} onAppFilter={handleAppFilter} isMobile={isMobile} progress={taskProgress[t.id]} monitor={taskMonitor[t.id]} transitioning={!!transitioning[t.id]} />);
 
   // MOBILE LAYOUT
   if (isMobile) {
@@ -379,13 +383,14 @@ export default function App() {
           })}
         </div>
 
-        <NewTaskChat isMobile={isMobile} apps={apps} />
+        <NewTaskChat isMobile={isMobile} apps={apps} selectedApp={selectedApp} />
         {selectedTask && !selectedTask._notFound && (
           <TaskDetailModal
             task={selectedTask}
             onClose={handleCloseTask}
             onStatusChange={async (id, updates) => { await updateTask(id, updates); setSelectedTask(prev => prev ? { ...prev, ...updates } : null); }}
             isMobile={isMobile}
+            apps={apps}
             progress={selectedTask ? taskProgress[selectedTask.id] : null}
             monitor={selectedTask ? taskMonitor[selectedTask.id] : null}
           />
@@ -585,7 +590,7 @@ export default function App() {
         </Column>
       </div>
 
-      <NewTaskChat isMobile={false} apps={apps} />
+      <NewTaskChat isMobile={false} apps={apps} selectedApp={selectedApp} />
 
       {selectedTask && !selectedTask._notFound && (
         <TaskDetailModal
@@ -594,6 +599,7 @@ export default function App() {
           onStatusChange={async (id, updates) => { await updateTask(id, updates); setSelectedTask(prev => prev ? { ...prev, ...updates } : null); }}
           isMobile={false}
           isTablet={isTablet}
+          apps={apps}
           progress={selectedTask ? taskProgress[selectedTask.id] : null}
           monitor={selectedTask ? taskMonitor[selectedTask.id] : null}
         />
