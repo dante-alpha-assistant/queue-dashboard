@@ -4,6 +4,17 @@ import { invalidateGithubRepoCache } from "./github.js";
 
 export const appsRouter = Router();
 
+// Transform app row: expand required_credentials jsonb into separate fields
+function expandCredentials(app) {
+  if (!app) return app;
+  const creds = app.required_credentials || {};
+  return {
+    ...app,
+    required_credentials: creds.coding || [],
+    required_qa_credentials: creds.qa || [],
+  };
+}
+
 // GET /api/apps — list all apps (optionally filter by status)
 appsRouter.get("/", async (req, res) => {
   try {
@@ -14,7 +25,7 @@ appsRouter.get("/", async (req, res) => {
     }
     const { data, error } = await query;
     if (error) throw error;
-    res.json(data);
+    res.json((data || []).map(expandCredentials));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -61,7 +72,7 @@ appsRouter.get("/:id", async (req, res) => {
       .eq(column, identifier)
       .single();
     if (error) return res.status(404).json({ error: "App not found" });
-    res.json(data);
+    res.json(expandCredentials(data));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -70,7 +81,7 @@ appsRouter.get("/:id", async (req, res) => {
 // POST /api/apps — create app
 appsRouter.post("/", async (req, res) => {
   try {
-    const { name, slug, description, repos, supabase_project_ref, deploy_target, deploy_config, env_keys, icon, qa_env_keys } = req.body;
+    const { name, slug, description, repos, supabase_project_ref, deploy_target, deploy_config, env_keys, icon, qa_env_keys, required_credentials, required_qa_credentials } = req.body;
     if (!name) return res.status(400).json({ error: "name required" });
     if (!slug) return res.status(400).json({ error: "slug required" });
 
@@ -78,6 +89,10 @@ appsRouter.post("/", async (req, res) => {
     if (deploy_target && !validTargets.includes(deploy_target)) {
       return res.status(400).json({ error: `Invalid deploy_target "${deploy_target}". Must be one of: ${validTargets.join(", ")}` });
     }
+
+    // Build required_credentials jsonb from separate coding/qa arrays
+    const codingCreds = required_credentials || ["GH_TOKEN"];
+    const qaCreds = required_qa_credentials || ["GH_TOKEN", "SUPABASE_SERVICE_ROLE_KEY"];
 
     const { data, error } = await supabase
       .from("apps")
@@ -92,6 +107,7 @@ appsRouter.post("/", async (req, res) => {
         env_keys: env_keys || [],
         icon: icon || null,
         qa_env_keys: qa_env_keys || [],
+        required_credentials: { coding: codingCreds, qa: qaCreds },
       })
       .select()
       .single();
@@ -101,7 +117,7 @@ appsRouter.post("/", async (req, res) => {
     }
     // Invalidate GitHub repo cache — new app may reference a new repo
     invalidateGithubRepoCache();
-    res.status(201).json(data);
+    res.status(201).json(expandCredentials(data));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -114,6 +130,18 @@ appsRouter.patch("/:id", async (req, res) => {
     // Don't allow changing id
     delete updates.id;
     delete updates.created_at;
+
+    // Merge required_credentials / required_qa_credentials into jsonb column
+    if (updates.required_credentials || updates.required_qa_credentials) {
+      // Fetch current to merge
+      const { data: current } = await supabase.from("apps").select("required_credentials").eq("id", req.params.id).single();
+      const existing = current?.required_credentials || { coding: [], qa: [] };
+      updates.required_credentials = {
+        coding: updates.required_credentials || existing.coding || [],
+        qa: updates.required_qa_credentials || existing.qa || [],
+      };
+      delete updates.required_qa_credentials;
+    }
 
     if (updates.deploy_target) {
       const validTargets = ["kubernetes", "vercel", "none"];
@@ -132,7 +160,7 @@ appsRouter.patch("/:id", async (req, res) => {
       if (error.code === "PGRST116") return res.status(404).json({ error: "App not found" });
       throw error;
     }
-    res.json(data);
+    res.json(expandCredentials(data));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

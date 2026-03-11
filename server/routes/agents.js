@@ -202,6 +202,21 @@ agentsRouter.get("/pipeline-stats", async (req, res) => {
 });
 
 
+// Agent capabilities with available credentials — for task routing credential matching
+agentsRouter.get("/capabilities", async (_req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("agent_cards")
+      .select("id, name, capabilities, task_types, available_credentials, max_capacity, current_load, status")
+      .neq("status", "disabled")
+      .order("name");
+    if (error) throw error;
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // A2A discovery — MUST be before /:name
 agentsRouter.get("/discover", async (req, res) => {
   try {
@@ -490,7 +505,7 @@ agentsRouter.get("/:name", async (req, res) => {
 // Update allowed fields only
 agentsRouter.patch("/:name", async (req, res) => {
   try {
-    const allowed = ["status", "current_load", "current_tasks", "last_heartbeat", "metrics", "metadata", "max_capacity", "description", "disabled_at", "disabled_by", "parent_agent", "tier", "role", "avatar"];
+    const allowed = ["status", "current_load", "current_tasks", "last_heartbeat", "metrics", "metadata", "max_capacity", "description", "disabled_at", "disabled_by", "parent_agent", "tier", "role", "avatar", "available_credentials"];
     const updates = { updated_at: new Date().toISOString() };
     for (const key of allowed) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
