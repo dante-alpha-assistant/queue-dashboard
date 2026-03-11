@@ -167,20 +167,29 @@ export default function BatchDeployModal({ tasks, onDeploy, onClose }) {
           }}>❌ {error}</div>
         )}
 
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", alignItems: "center" }}>
           <button onClick={onClose} style={{
-            padding: "8px 16px", borderRadius: 8, border: "1px solid var(--md-outline, #79747E)",
-            background: "transparent", fontSize: 12, fontWeight: 600, cursor: "pointer",
+            padding: "8px 16px", borderRadius: 8,
+            border: "1px solid var(--md-outline, #79747E)",
+            background: "transparent",
+            color: "var(--md-on-surface-variant, #52525B)",
+            fontSize: 12, fontWeight: 600, cursor: "pointer",
+            lineHeight: "1.2",
           }}>Cancel</button>
           <button onClick={handleDryRun} disabled={selected.size === 0 || loading} style={{
             padding: "8px 16px", borderRadius: 8, border: "none",
-            background: "var(--md-surface-variant, #E7E0EC)", fontSize: 12, fontWeight: 600,
+            background: "var(--md-surface-variant, #E7E0EC)",
+            color: "var(--md-on-surface-variant, #52525B)",
+            fontSize: 12, fontWeight: 600,
+            lineHeight: "1.2",
             cursor: selected.size === 0 || loading ? "not-allowed" : "pointer",
-          }}>{loading ? "Checking..." : "🔍 Dry Run"}</button>
+            opacity: selected.size === 0 || loading ? 0.5 : 1,
+          }}>{loading ? "Checking…" : "🔍 Dry Run"}</button>
           <button onClick={handleDeploy} disabled={selected.size === 0 || loading} style={{
             padding: "8px 16px", borderRadius: 8, border: "none",
             background: selected.size === 0 || loading ? "#79747E" : "#1B5E20",
             color: "#fff", fontSize: 12, fontWeight: 600,
+            lineHeight: "1.2",
             cursor: selected.size === 0 || loading ? "not-allowed" : "pointer",
           }}>🚀 Deploy {selected.size} task{selected.size !== 1 ? "s" : ""}</button>
         </div>
