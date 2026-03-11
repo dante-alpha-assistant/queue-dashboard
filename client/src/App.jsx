@@ -13,8 +13,9 @@ import TaskDetailModal from "./components/TaskDetailModal";
 import BatchDeployModal from "./components/BatchDeployModal";
 import Pingboard from "./pages/Pingboard";
 import HealthDashboard from "./pages/HealthDashboard";
+import AppsPage from "./pages/AppsPage";
 import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
-import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Rocket, Search, XCircle, Zap } from 'lucide-react';
+import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Package, Rocket, Search, XCircle, Zap } from 'lucide-react';
 
 const MOBILE_TABS = [
   { key: "todo", label: "Todo", icon: "📋" },
@@ -50,6 +51,7 @@ export default function App() {
     stats, tasks, todo, assigned, inProgress, qa, completed, deployed, blocked, failed, deploying, deployFailed,
     loading, transitioning, updateTask, applyStatusChange,
     projects, selectedProject, setSelectedProject,
+    apps,
   } = useQueue();
 
 
@@ -65,6 +67,7 @@ export default function App() {
   });
   const [typeFilter, setTypeFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
+  const [appFilter, setAppFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("todo");
   const [view, setView] = useState("board");
 
@@ -143,9 +146,10 @@ export default function App() {
     { key: "board", label: "Board", Icon: ClipboardList },
     { key: "pingboard", label: "Pingboard", Icon: Bot },
     { key: "health", label: "Health", Icon: HeartPulse },
+    { key: "apps", label: "Apps", Icon: Package },
   ];
 
-  if (view === "pingboard" || view === "health") {
+  if (view === "pingboard" || view === "health" || view === "apps") {
     return (
       <div style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
         <div className="header-glass" style={{
@@ -170,7 +174,7 @@ export default function App() {
           ))}
         </div>
         <div style={{ paddingTop: 42 }}>
-          {view === "pingboard" ? <Pingboard /> : <HealthDashboard />}
+          {view === "pingboard" ? <Pingboard /> : view === "apps" ? <AppsPage /> : <HealthDashboard />}
         </div>
       </div>
     );
@@ -184,6 +188,7 @@ export default function App() {
     let filtered = allTasksRaw;
     if (typeFilter !== "all") filtered = filtered.filter(t => t.type === typeFilter);
     if (stageFilter !== "all") filtered = filtered.filter(t => t.stage === stageFilter);
+    if (appFilter !== "all") filtered = filtered.filter(t => t.app_id === appFilter);
     if (searchQuery.trim()) filtered = filtered.filter(t => t.title?.toLowerCase().includes(searchQuery.toLowerCase()));
     return {
       today: filterTasksByTime(filtered, "today").length,
@@ -199,6 +204,7 @@ export default function App() {
     let filtered = filterTasksByTime(tasks, timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
     if (typeFilter !== "all") filtered = filtered.filter(t => t.type === typeFilter);
     if (stageFilter !== "all") filtered = filtered.filter(t => t.stage === stageFilter);
+    if (appFilter !== "all") filtered = filtered.filter(t => t.app_id === appFilter);
     if (searchQuery.trim()) filtered = filtered.filter(t => t.title?.toLowerCase().includes(searchQuery.toLowerCase()));
     return filtered;
   };
@@ -242,8 +248,11 @@ export default function App() {
     }
   };
 
+  const appsMap = {};
+  if (apps) apps.forEach(a => { appsMap[a.id] = a.name; });
+
   const renderCards = (tasks) =>
-    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={handleSelectTask} isMobile={isMobile} progress={taskProgress[t.id]} monitor={taskMonitor[t.id]} transitioning={!!transitioning[t.id]} />);
+    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={handleSelectTask} isMobile={isMobile} progress={taskProgress[t.id]} monitor={taskMonitor[t.id]} transitioning={!!transitioning[t.id]} appName={t.app_id ? appsMap[t.app_id] : null} />);
 
   // MOBILE LAYOUT
   if (isMobile) {
@@ -297,6 +306,19 @@ export default function App() {
               {activeStages.map(stage => (
                 <button key={stage} onClick={() => setStageFilter(stage)} className={`filter-chip ${stageFilter === stage ? "active" : ""}`} style={{ minHeight: 36, padding: "6px 14px" }}>{stage === "all" ? "all stages" : stage}</button>
               ))}
+            </div>
+          )}
+          {apps.length > 0 && (
+            <div style={{ marginTop: 6 }}>
+              <select value={appFilter} onChange={e => setAppFilter(e.target.value)} style={{
+                width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--md-surface-variant)",
+                background: "var(--md-surface)", color: "var(--md-on-background)", fontSize: 13,
+                fontWeight: 500, fontFamily: "'Inter', system-ui, -apple-system, sans-serif", outline: "none",
+                minHeight: 44,
+              }}>
+                <option value="all">All Apps</option>
+                {apps.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
             </div>
           )}
           <div style={{ marginTop: 6 }}>
@@ -369,6 +391,7 @@ export default function App() {
             isMobile={isMobile}
             progress={selectedTask ? taskProgress[selectedTask.id] : null}
             monitor={selectedTask ? taskMonitor[selectedTask.id] : null}
+            apps={apps}
           />
         )}
         {selectedTask && selectedTask._notFound && (
@@ -463,6 +486,21 @@ export default function App() {
                   <button key={stage} onClick={() => setStageFilter(stage)} className={`filter-chip ${stageFilter === stage ? "active" : ""}`}>{stage === "all" ? "all stages" : stage}</button>
                 ))}
               </div>
+            </div>
+          </>)}
+          {apps.length > 0 && (<>
+            <div style={{ width: 1, height: 24, background: "var(--md-surface-variant)" }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px" }}>App</span>
+              <select value={appFilter} onChange={e => setAppFilter(e.target.value)} style={{
+                padding: "4px 10px", borderRadius: 8, border: "1px solid var(--md-surface-variant)",
+                background: "var(--md-surface)", color: "var(--md-on-background)", fontSize: 12,
+                fontWeight: 500, fontFamily: "'Inter', system-ui, sans-serif", outline: "none",
+                cursor: "pointer",
+              }}>
+                <option value="all">All</option>
+                {apps.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
             </div>
           </>)}
           <div style={{ width: 1, height: 24, background: "var(--md-surface-variant)" }} />
@@ -562,6 +600,7 @@ export default function App() {
           isTablet={isTablet}
           progress={selectedTask ? taskProgress[selectedTask.id] : null}
           monitor={selectedTask ? taskMonitor[selectedTask.id] : null}
+          apps={apps}
         />
       )}
       {selectedTask && selectedTask._notFound && (

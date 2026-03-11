@@ -639,7 +639,7 @@ const PROCESSING_STATUSES = {
 };
 
 /* ── Task Card ────────────────────────────────────────────── */
-export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, progress, monitor, transitioning }) {
+export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, progress, monitor, transitioning, appName }) {
   const agent = task.assigned_agent?.toLowerCase();
   const role = AGENT_ROLES[agent] || "Agent";
   const statusColor = STATUS_COLORS[task.status] || "#79747E";
@@ -854,6 +854,19 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
           }}>
             <FolderIcon size={12} color="#79747E" style={{ marginRight: 4, verticalAlign: "middle" }} />
             {task.project.name}
+          </div>
+        )}
+        {appName && (
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: 4,
+            fontSize: 11, color: "#6750A4", fontWeight: 600,
+            marginTop: 6, padding: "2px 8px", borderRadius: 10,
+            background: "#6750A414",
+          }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+            </svg>
+            {appName}
           </div>
         )}
       </div>

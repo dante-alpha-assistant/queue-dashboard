@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
 // Lightweight columns for list view — exclude heavy JSON blobs
-const LIST_COLUMNS = "id,title,status,type,priority,assigned_agent,created_at,updated_at,error,deploy_target,pull_request_url,deployment_url,started_at,completed_at,paused,blocked_reason,stage,repository_url,project_id,repository_id,project:agent_projects(id,name,slug),repository:agent_repositories(id,name,url,provider)";
+const LIST_COLUMNS = "id,title,status,type,priority,assigned_agent,created_at,updated_at,error,deploy_target,pull_request_url,deployment_url,started_at,completed_at,paused,blocked_reason,stage,repository_url,project_id,repository_id,app_id,project:agent_projects(id,name,slug),repository:agent_repositories(id,name,url,provider)";
 
 export default function useQueue({ since, until } = {}) {
   const [stats, setStats] = useState({ todo: 0, assigned: 0, in_progress: 0, qa: 0, completed: 0, failed: 0 });
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState("");
+  const [apps, setApps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [transitioning, setTransitioning] = useState({});
   const initialLoad = useRef(true);
@@ -21,15 +22,18 @@ export default function useQueue({ since, until } = {}) {
       params.set("columns", "light");
       const qs = params.toString() ? `?${params}` : "";
 
-      const [sRes, tRes, pRes] = await Promise.all([
+      const [sRes, tRes, pRes, aRes] = await Promise.all([
         fetch(`/api/stats${selectedProject ? `?project_id=${selectedProject}` : ""}`),
         fetch(`/api/tasks${qs}`),
         fetch("/api/projects"),
+        fetch("/api/apps"),
       ]);
       setStats(await sRes.json());
       const newTasks = await tRes.json();
       if (Array.isArray(newTasks)) setTasks(newTasks);
       setProjects(await pRes.json());
+      const appsData = await aRes.json();
+      if (Array.isArray(appsData)) setApps(appsData);
       if (initialLoad.current) {
         setLoading(false);
         initialLoad.current = false;
@@ -109,5 +113,6 @@ export default function useQueue({ since, until } = {}) {
     stats, tasks, todo, assigned, inProgress, qa, completed, deployed, blocked, failed, deploying, deployFailed,
     loading, transitioning, dispatch, updateTask, deleteTask, applyStatusChange,
     projects, selectedProject, setSelectedProject,
+    apps,
   };
 }
