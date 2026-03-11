@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Plus, Mail, Phone, Building2, Tag, XCircle, User, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Plus, Upload, Mail, Phone, Building2, Tag, XCircle, User, ChevronLeft, ChevronRight } from "lucide-react";
 import ContactFormModal from "../components/ContactFormModal";
+import ImportContactsModal from "../components/ImportContactsModal";
 
 export default function ContactsPage() {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ export default function ContactsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [showForm, setShowForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [editingContact, setEditingContact] = useState(null);
   const PAGE_SIZE = 25;
 
@@ -63,15 +65,27 @@ export default function ContactsPage() {
             {total} contact{total !== 1 ? "s" : ""}
           </p>
         </div>
-        <button onClick={handleCreate} style={{
-          display: "flex", alignItems: "center", gap: 6,
-          padding: "8px 20px", borderRadius: 20,
-          background: "var(--md-primary)", color: "var(--md-on-primary)",
-          border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13,
-          fontFamily: "'Inter', system-ui, sans-serif",
-        }}>
-          <Plus size={16} /> Add Contact
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => setShowImport(true)} style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "8px 20px", borderRadius: 20,
+            background: "var(--md-surface-container, var(--md-surface-variant))",
+            color: "var(--md-on-surface)",
+            border: "1px solid var(--md-surface-variant)", cursor: "pointer", fontWeight: 600, fontSize: 13,
+            fontFamily: "'Inter', system-ui, sans-serif",
+          }}>
+            <Upload size={16} /> Import
+          </button>
+          <button onClick={handleCreate} style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "8px 20px", borderRadius: 20,
+            background: "var(--md-primary)", color: "var(--md-on-primary)",
+            border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13,
+            fontFamily: "'Inter', system-ui, sans-serif",
+          }}>
+            <Plus size={16} /> Add Contact
+          </button>
+        </div>
       </div>
 
       {/* Search */}
@@ -237,6 +251,14 @@ export default function ContactsPage() {
           contact={editingContact}
           onClose={() => { setShowForm(false); setEditingContact(null); }}
           onSaved={handleSaved}
+        />
+      )}
+
+      {/* Import Modal */}
+      {showImport && (
+        <ImportContactsModal
+          onClose={() => setShowImport(false)}
+          onImported={() => { fetchContacts(); }}
         />
       )}
     </div>

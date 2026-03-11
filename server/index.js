@@ -10,6 +10,7 @@ import { healthRouter } from "./routes/health.js";
 import { skillsRouter } from "./routes/skills.js";
 import { attachmentsRouter, ensureAttachmentsBucket } from "./routes/attachments.js";
 import { contactsRouter } from "./routes/contacts.js";
+import { importRouter } from "./routes/import.js";
 
 const app = express();
 app.use(cors());
@@ -22,6 +23,7 @@ app.use("/api/health", healthRouter);
 app.use("/api/skills", skillsRouter);
 app.use("/api", attachmentsRouter);
 app.use("/api/contacts", contactsRouter);
+app.use("/api/import", importRouter);
 
 // Serve static frontend in production
 import { serveStatic } from "./static.js";
