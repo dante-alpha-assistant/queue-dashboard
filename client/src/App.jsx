@@ -11,6 +11,7 @@ import TaskCard from "./components/TaskCard";
 import NewTaskChat from "./components/NewTaskChat";
 import TaskDetailModal from "./components/TaskDetailModal";
 import BatchDeployModal from "./components/BatchDeployModal";
+import HelloWorldModal from "./components/HelloWorldModal";
 import Pingboard from "./pages/Pingboard";
 import HealthDashboard from "./pages/HealthDashboard";
 import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
@@ -116,6 +117,7 @@ export default function App() {
 
   // Batch deploy modal
   const [showBatchDeploy, setShowBatchDeploy] = useState(false);
+  const [showHelloWorld, setShowHelloWorld] = useState(false);
 
   // All columns are collapsible
   const COLLAPSIBLE_COLUMNS = ["todo", "in_progress", "blocked", "qa_testing", "completed", "deploying", "deployed", "deploy_failed", "failed"];
@@ -168,10 +170,14 @@ export default function App() {
               {t.label}
             </button>
           ))}
+          <button onClick={() => setShowHelloWorld(true)} className="nav-tab" style={{ marginLeft: 8 }}>
+            Hello World
+          </button>
         </div>
         <div style={{ paddingTop: 42 }}>
           {view === "pingboard" ? <Pingboard /> : <HealthDashboard />}
         </div>
+        {showHelloWorld && <HelloWorldModal onClose={() => setShowHelloWorld(false)} />}
       </div>
     );
   }
@@ -266,6 +272,9 @@ export default function App() {
               tasks<span style={{ color: "var(--md-primary)", fontWeight: 700 }}>.</span>dante<span style={{ color: "var(--md-primary)", fontWeight: 700 }}>.</span>id
             </span>
             <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+              <button onClick={() => setShowHelloWorld(true)} className="nav-tab" style={{ padding: "4px 8px", fontSize: 12 }}>
+                Hello World
+              </button>
               <button onClick={() => setView("pingboard")} className="nav-tab" style={{ padding: "4px 8px" }}>
                 <Bot size={16} strokeWidth={1.8} />
               </button>
@@ -393,6 +402,7 @@ export default function App() {
             </div>
           </div>
         )}
+        {showHelloWorld && <HelloWorldModal onClose={() => setShowHelloWorld(false)} />}
       </div>
     );
   }
@@ -425,6 +435,9 @@ export default function App() {
               </button>
             ))}
             <span style={{ fontSize: 10, color: 'var(--md-on-surface-variant)', opacity: 0.5, fontFamily: "'JetBrains Mono', monospace", marginLeft: 8, background: 'var(--md-surface-container)', padding: '2px 6px', borderRadius: 4 }}>{__COMMIT_HASH__}</span>
+            <button onClick={() => setShowHelloWorld(true)} className="nav-tab" style={{ marginLeft: 8 }}>
+              Hello World
+            </button>
           </div>
           <StatsBar stats={stats} isTablet={isTablet} />
         </div>
@@ -588,5 +601,6 @@ export default function App() {
       )}
     </div>
       {showBatchDeploy && <BatchDeployModal tasks={filterByType(completed)} onDeploy={() => { setShowBatchDeploy(false); }} onClose={() => setShowBatchDeploy(false)} />}
+      {showHelloWorld && <HelloWorldModal onClose={() => setShowHelloWorld(false)} />}
   </>);
 }
