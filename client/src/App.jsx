@@ -15,7 +15,7 @@ import Pingboard from "./pages/Pingboard";
 import HealthDashboard from "./pages/HealthDashboard";
 import AppsPage from "./pages/AppsPage";
 import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
-import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Package, Rocket, Search, XCircle, Zap } from 'lucide-react';
+import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Package, Plus, Rocket, Search, XCircle, Zap } from 'lucide-react';
 
 const MOBILE_TABS = [
   { key: "todo", label: "Todo", icon: "📋" },
@@ -286,26 +286,28 @@ export default function App() {
 
         {/* Filter bar - wrapping */}
         <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--md-surface-variant)" }}>
-          <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)} style={{
-            width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--md-surface-variant)",
-            background: "var(--md-surface)", color: "var(--md-on-background)", fontSize: 13,
-            fontWeight: 500, fontFamily: "'Inter', system-ui, -apple-system, sans-serif", outline: "none",
-            marginBottom: 8, minHeight: 44,
-          }}>
-            <option value="">All Projects</option>
-            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-          {apps.length > 0 && (
+          <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
             <select value={selectedApp} onChange={e => setSelectedApp(e.target.value)} style={{
-              width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--md-surface-variant)",
+              flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--md-surface-variant)",
               background: "var(--md-surface)", color: "var(--md-on-background)", fontSize: 13,
               fontWeight: 500, fontFamily: "'Inter', system-ui, -apple-system, sans-serif", outline: "none",
-              marginBottom: 8, minHeight: 44,
+              minHeight: 44,
             }}>
               <option value="">All Apps</option>
-              {apps.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              {apps.map(a => <option key={a.id} value={a.id}>{a.icon ? `${a.icon} ` : ""}{a.name}</option>)}
             </select>
-          )}
+            <button
+              onClick={() => setView("apps")}
+              title="Create new App"
+              style={{
+                width: 36, height: 36, borderRadius: "50%", border: "1px solid var(--md-surface-variant)",
+                background: "var(--md-surface)", color: "var(--md-on-surface-variant)", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flexShrink: 0,
+              }}
+            >
+              <Plus size={16} strokeWidth={2.5} />
+            </button>
+          </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {activeTypes.map(type => (
               <button key={type} onClick={() => setTypeFilter(type)} className={`filter-chip ${typeFilter === type ? "active" : ""}`} style={{ minHeight: 36, padding: "6px 14px" }}>{type}</button>
@@ -453,32 +455,31 @@ export default function App() {
           paddingBottom: 10, borderBottom: "1px solid var(--header-border)",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Project</span>
-            <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)} style={{
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px" }}>App</span>
+            <select value={selectedApp} onChange={e => setSelectedApp(e.target.value)} style={{
               padding: "6px 12px", borderRadius: 8, border: "1px solid var(--md-surface-variant)",
               background: "var(--md-surface)", color: "var(--md-on-background)", fontSize: 13,
               fontWeight: 500, fontFamily: "'Inter', system-ui, -apple-system, sans-serif", outline: "none",
-              cursor: "pointer", minWidth: 160,
+              cursor: "pointer", minWidth: 120,
             }}>
               <option value="">All</option>
-              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {apps.map(a => <option key={a.id} value={a.id}>{a.icon ? `${a.icon} ` : ""}{a.name}</option>)}
             </select>
+            <button
+              onClick={() => setView("apps")}
+              title="Create new App"
+              style={{
+                width: 24, height: 24, borderRadius: "50%", border: "1px solid var(--md-surface-variant)",
+                background: "var(--md-surface)", color: "var(--md-on-surface-variant)", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = "var(--md-surface-variant)"; e.currentTarget.style.color = "var(--md-on-background)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "var(--md-surface)"; e.currentTarget.style.color = "var(--md-on-surface-variant)"; }}
+            >
+              <Plus size={14} strokeWidth={2.5} />
+            </button>
           </div>
-          {apps.length > 0 && (<>
-            <div style={{ width: 1, height: 24, background: "var(--md-surface-variant)" }} />
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px" }}>App</span>
-              <select value={selectedApp} onChange={e => setSelectedApp(e.target.value)} style={{
-                padding: "6px 12px", borderRadius: 8, border: "1px solid var(--md-surface-variant)",
-                background: "var(--md-surface)", color: "var(--md-on-background)", fontSize: 13,
-                fontWeight: 500, fontFamily: "'Inter', system-ui, -apple-system, sans-serif", outline: "none",
-                cursor: "pointer", minWidth: 120,
-              }}>
-                <option value="">All</option>
-                {apps.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
-            </div>
-          </>)}
           <div style={{ width: 1, height: 24, background: "var(--md-surface-variant)" }} />
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Type</span>
