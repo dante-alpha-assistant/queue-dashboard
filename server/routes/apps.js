@@ -20,6 +20,34 @@ appsRouter.get("/", async (req, res) => {
   }
 });
 
+// GET /api/apps/stats/bulk — bulk task stats for all apps (MUST be before /:id)
+appsRouter.get("/stats/bulk", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("agent_tasks")
+      .select("app_id, status, updated_at")
+      .not("app_id", "is", null)
+      .neq("status", "deprecated");
+    if (error) throw error;
+
+    const stats = {};
+    for (const task of data || []) {
+      if (!task.app_id) continue;
+      if (!stats[task.app_id]) stats[task.app_id] = { total: 0, active: 0, completed: 0, failed: 0, deployed: 0, last_activity: null };
+      const s = stats[task.app_id];
+      s.total++;
+      if (["todo", "assigned", "in_progress", "blocked", "qa_testing"].includes(task.status)) s.active++;
+      if (task.status === "completed") s.completed++;
+      if (task.status === "failed") s.failed++;
+      if (task.status === "deployed") s.deployed++;
+      if (!s.last_activity || task.updated_at > s.last_activity) s.last_activity = task.updated_at;
+    }
+    res.json(stats);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /api/apps/:id — get single app by id or slug
 appsRouter.get("/:id", async (req, res) => {
   try {
@@ -123,6 +151,32 @@ appsRouter.delete("/:id", async (req, res) => {
       throw error;
     }
     res.json({ ok: true, app: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/apps/:id/stats — task stats for a single app
+appsRouter.get("/:id/stats", async (req, res) => {
+  try {
+    const appId = req.params.id;
+    const { data, error } = await supabase
+      .from("agent_tasks")
+      .select("status, updated_at")
+      .eq("app_id", appId)
+      .neq("status", "deprecated");
+    if (error) throw error;
+
+    const result = { total: 0, active: 0, completed: 0, failed: 0, deployed: 0, last_activity: null };
+    for (const task of data || []) {
+      result.total++;
+      if (["todo", "assigned", "in_progress", "blocked", "qa_testing"].includes(task.status)) result.active++;
+      if (task.status === "completed") result.completed++;
+      if (task.status === "failed") result.failed++;
+      if (task.status === "deployed") result.deployed++;
+      if (!result.last_activity || task.updated_at > result.last_activity) result.last_activity = task.updated_at;
+    }
+    res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
