@@ -873,7 +873,16 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
 
 /* ── Main Modal ───────────────────────────────────────────── */
 
-export default function TaskDetailModal({ task, onClose, onStatusChange, isMobile, isTablet, progress, monitor }) {
+/* ── App slug color helper ────────────────────────────────── */
+function appSlugColor(slug) {
+  if (!slug) return "#6750A4";
+  let hash = 0;
+  for (let i = 0; i < slug.length; i++) hash = ((hash << 5) - hash + slug.charCodeAt(i)) | 0;
+  const hue = ((hash % 360) + 360) % 360;
+  return `hsl(${hue}, 45%, 42%)`;
+}
+
+export default function TaskDetailModal({ task, onClose, onStatusChange, isMobile, isTablet, apps = [], progress, monitor }) {
   const [closing, setClosing] = useState(false);
   const [actionProcessing, setActionProcessing] = useState(false);
   const [fieldSaving, setFieldSaving] = useState(false);
@@ -1193,13 +1202,29 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
           {task.project && (
             <MetaCell label="Project">{task.project.name}</MetaCell>
           )}
-          {task.app && (
-            <MetaCell label="App">
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                📦 {task.app.name}
-              </span>
-            </MetaCell>
-          )}
+          <MetaCell label="App">
+            {apps.length > 0 ? (
+              <select
+                className="tdm-stage-select"
+                value={task.app_id || ""}
+                disabled={fieldSaving || actionProcessing}
+                onChange={e => handleFieldChange({ app_id: e.target.value || null })}
+                onClick={e => e.stopPropagation()}
+                style={{ color: task.app ? appSlugColor(task.app.slug || task.app.name) : 'var(--md-outline, #79747E)' }}
+              >
+                <option value="">No app</option>
+                {apps.map(a => <option key={a.id} value={a.id}>{a.icon || "📦"} {a.name}</option>)}
+              </select>
+            ) : (
+              task.app ? (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: appSlugColor(task.app.slug || task.app.name) }}>
+                  {task.app.icon || "📦"} {task.app.name}
+                </span>
+              ) : (
+                <span style={{ color: 'var(--md-outline, #79747E)', fontStyle: 'italic' }}>No app</span>
+              )
+            )}
+          </MetaCell>
 
           <MetaCell label="Deploy">
             <select

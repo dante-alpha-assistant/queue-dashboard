@@ -638,8 +638,41 @@ const PROCESSING_STATUSES = {
   deploying: { label: "Deploying…", color: "#F57C00" },
 };
 
+/* ── App Badge ─────────────────────────────────────────────── */
+function appSlugColor(slug) {
+  if (!slug) return "#6750A4";
+  let hash = 0;
+  for (let i = 0; i < slug.length; i++) hash = ((hash << 5) - hash + slug.charCodeAt(i)) | 0;
+  const hue = ((hash % 360) + 360) % 360;
+  return `hsl(${hue}, 45%, 42%)`;
+}
+
+function AppBadge({ app, onAppFilter }) {
+  if (!app) return null;
+  const color = appSlugColor(app.slug || app.name);
+  return (
+    <span
+      onClick={(e) => { e.stopPropagation(); onAppFilter?.(app.id); }}
+      title={`Filter by ${app.name}`}
+      style={{
+        fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 100,
+        background: `${color}14`, color: color,
+        letterSpacing: "0.02em",
+        lineHeight: 1.2, whiteSpace: "nowrap",
+        fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+        display: "inline-flex", alignItems: "center", gap: 3,
+        cursor: "pointer", transition: "opacity 150ms",
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.8"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+    >
+      {app.icon || "📦"} {app.name}
+    </span>
+  );
+}
+
 /* ── Task Card ────────────────────────────────────────────── */
-export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, progress, monitor, transitioning }) {
+export default function TaskCard({ task, onStatusChange, onCardClick, onAppFilter, isMobile, progress, monitor, transitioning }) {
   const agent = task.assigned_agent?.toLowerCase();
   const role = AGENT_ROLES[agent] || "Agent";
   const statusColor = STATUS_COLORS[task.status] || "#79747E";
@@ -737,6 +770,7 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
             <TaskTypeIcon type={task.type} size={11} color={typeColor} />
             {task.type}
           </span>
+          <AppBadge app={task.app} onAppFilter={onAppFilter} />
           {priority && (
             <span style={{
               fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 100,
@@ -847,26 +881,14 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
           }}>{formatTime(task.created_at)}</span>
         </div>
 
-        {(task.project || task.app) && (
+        {task.project && (
           <div style={{
             display: "flex", gap: 10, alignItems: "center", marginTop: 8, flexWrap: "wrap",
           }}>
-            {task.project && (
-              <span style={{ fontSize: 11, color: "var(--md-outline, #79747E)", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <FolderIcon size={12} color="#79747E" />
-                {task.project.name}
-              </span>
-            )}
-            {task.app && (
-              <span style={{
-                fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 6,
-                background: "#6750A412", color: "#6750A4",
-                display: "inline-flex", alignItems: "center", gap: 4,
-                fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
-              }}>
-                📦 {task.app.name}
-              </span>
-            )}
+            <span style={{ fontSize: 11, color: "var(--md-outline, #79747E)", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <FolderIcon size={12} color="#79747E" />
+              {task.project.name}
+            </span>
           </div>
         )}
       </div>

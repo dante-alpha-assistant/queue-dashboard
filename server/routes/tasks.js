@@ -122,8 +122,8 @@ router.get("/tasks", async (req, res) => {
     // Light mode: exclude heavy columns (description, result, qa_result, metadata) for list view
     const isLight = req.query.columns === "light";
     const selectCols = isLight
-      ? "id,title,status,type,priority,assigned_agent,created_at,updated_at,error,deploy_target,pull_request_url,deployment_url,started_at,completed_at,paused,blocked_reason,stage,repository_url,project_id,repository_id,app_id,project:agent_projects(id,name,slug),repository:agent_repositories(id,name,url,provider),app:apps(id,name,slug)"
-      : "*, project:agent_projects(id, name, slug), repository:agent_repositories(id, name, url, provider), app:apps(id, name, slug, repos, deploy_target, supabase_project_ref)";
+      ? "id,title,status,type,priority,assigned_agent,created_at,updated_at,error,deploy_target,pull_request_url,deployment_url,started_at,completed_at,paused,blocked_reason,stage,repository_url,project_id,repository_id,app_id,project:agent_projects(id,name,slug),repository:agent_repositories(id,name,url,provider),app:apps(id,name,slug,icon)"
+      : "*, project:agent_projects(id, name, slug), repository:agent_repositories(id, name, url, provider), app:apps(id, name, slug, icon, repos, deploy_target, supabase_project_ref)";
 
     let query = supabase
       .from("agent_tasks")
@@ -224,7 +224,7 @@ router.get("/tasks/:id", async (req, res) => {
   try {
     const { data, error } = await supabase
       .from("agent_tasks")
-      .select("*, project:agent_projects(id, name, slug), repository:agent_repositories(id, name, url, provider), app:apps(id, name, slug, repos, deploy_target, supabase_project_ref)")
+      .select("*, project:agent_projects(id, name, slug), repository:agent_repositories(id, name, url, provider), app:apps(id, name, slug, icon, repos, deploy_target, supabase_project_ref)")
       .eq("id", req.params.id)
       .single();
     if (error) return res.status(404).json({ error: "Task not found" });
