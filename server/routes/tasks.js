@@ -122,7 +122,7 @@ router.get("/tasks", async (req, res) => {
     // Light mode: exclude heavy columns (description, result, qa_result, metadata) for list view
     const isLight = req.query.columns === "light";
     const selectCols = isLight
-      ? "id,title,status,type,priority,assigned_agent,created_at,updated_at,error,deploy_target,pull_request_url,deployment_url,started_at,completed_at,paused,blocked_reason,stage,repository_url,project_id,repository_id,project:agent_projects(id,name,slug),repository:agent_repositories(id,name,url,provider)"
+      ? "id,title,status,type,priority,assigned_agent,created_at,updated_at,error,deploy_target,pull_request_url,deployment_url,started_at,completed_at,paused,blocked_reason,stage,repository_url,project_id,repository_id,app_id,project:agent_projects(id,name,slug),repository:agent_repositories(id,name,url,provider)"
       : "*, project:agent_projects(id, name, slug), repository:agent_repositories(id, name, url, provider)";
 
     let query = supabase
@@ -131,6 +131,7 @@ router.get("/tasks", async (req, res) => {
       .order("created_at", { ascending: false });
     if (req.query.project_id) query = query.eq("project_id", req.query.project_id);
     if (req.query.repository_id) query = query.eq("repository_id", req.query.repository_id);
+    if (req.query.app_id) query = query.eq("app_id", req.query.app_id);
     // Hide deprecated tasks by default (soft-deleted); include with ?include_deprecated=true
     if (req.query.include_deprecated !== "true") {
       query = query.neq("status", "deprecated");
@@ -166,7 +167,7 @@ router.get("/tasks", async (req, res) => {
 // Create task
 router.post("/tasks", async (req, res) => {
   try {
-    const { title, description, prompt, type, priority, assigned_agent, status, project_id, repository_id, acceptance_criteria, stage } = req.body;
+    const { title, description, prompt, type, priority, assigned_agent, status, project_id, repository_id, acceptance_criteria, stage, app_id } = req.body;
     if (!title) return res.status(400).json({ error: "title required" });
     const validPriorities = ["low", "normal", "high", "urgent"];
     if (priority && !validPriorities.includes(priority)) {
@@ -192,6 +193,7 @@ router.post("/tasks", async (req, res) => {
         repository_id: repository_id || null,
         acceptance_criteria: acceptance_criteria || null,
         stage: stage || null,
+        app_id: app_id || null,
       })
       .select()
       .single();

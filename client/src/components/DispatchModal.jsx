@@ -4,7 +4,7 @@ const AGENTS = ["neo", "mu", "beta", "flow"];
 const TYPES = ["general", "coding", "research", "ops", "test"];
 const PRIORITIES = ["low", "normal", "high", "urgent"];
 
-export default function DispatchModal({ onClose, dispatch, projects = [], isMobile, isTablet }) {
+export default function DispatchModal({ onClose, dispatch, projects = [], apps = [], isMobile, isTablet }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [acceptanceCriteria, setAcceptanceCriteria] = useState("");
@@ -13,6 +13,7 @@ export default function DispatchModal({ onClose, dispatch, projects = [], isMobi
   const [agent, setAgent] = useState("");
   const [projectId, setProjectId] = useState("");
   const [repositoryId, setRepositoryId] = useState("");
+  const [appId, setAppId] = useState("");
   const [repos, setRepos] = useState([]);
   const [sending, setSending] = useState(false);
 
@@ -28,6 +29,17 @@ export default function DispatchModal({ onClose, dispatch, projects = [], isMobi
     }
   }, [projectId]);
 
+  // When app is selected, auto-fill deploy_target from app data
+  const handleAppChange = (newAppId) => {
+    setAppId(newAppId);
+    if (newAppId) {
+      const app = apps.find(a => a.id === newAppId);
+      if (app) {
+        // App data is available for reference but deploy_target is set on the task via the app
+      }
+    }
+  };
+
   const submit = async () => {
     if (!title.trim()) return;
     setSending(true);
@@ -39,9 +51,9 @@ export default function DispatchModal({ onClose, dispatch, projects = [], isMobi
         type,
         priority,
         assigned_agent: agent || null,
-        assigned_agent: agent || null,
         project_id: projectId || null,
         repository_id: repositoryId || null,
+        app_id: appId || null,
       });
       onClose();
     } catch {
@@ -120,10 +132,16 @@ export default function DispatchModal({ onClose, dispatch, projects = [], isMobi
         />
 
         <div style={{ display: "flex", gap: 12, marginBottom: 12, flexDirection: isMobile ? "column" : "row" }}>
+          <select value={appId} onChange={e => handleAppChange(e.target.value)} style={{ ...inputStyle, flex: 1 }}>
+            <option value="">No app</option>
+            {apps.map(a => <option key={a.id} value={a.id}>📦 {a.name}</option>)}
+          </select>
           <select value={projectId} onChange={e => setProjectId(e.target.value)} style={{ ...inputStyle, flex: 1 }}>
             <option value="">No project</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
+        </div>
+        <div style={{ display: "flex", gap: 12, marginBottom: 12, flexDirection: isMobile ? "column" : "row" }}>
           <select value={repositoryId} onChange={e => setRepositoryId(e.target.value)} style={{ ...inputStyle, flex: 1 }} disabled={!projectId}>
             <option value="">No repo</option>
             {repos.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}

@@ -873,7 +873,7 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
 
 /* ── Main Modal ───────────────────────────────────────────── */
 
-export default function TaskDetailModal({ task, onClose, onStatusChange, isMobile, isTablet, progress, monitor }) {
+export default function TaskDetailModal({ task, onClose, onStatusChange, isMobile, isTablet, progress, monitor, apps }) {
   const [closing, setClosing] = useState(false);
   const [actionProcessing, setActionProcessing] = useState(false);
   const [fieldSaving, setFieldSaving] = useState(false);
@@ -1192,6 +1192,18 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
           )}
           {task.project && (
             <MetaCell label="Project">{task.project.name}</MetaCell>
+          )}
+          {task.app_id && apps && (
+            <MetaCell label="App">
+              <span style={{
+                display: "inline-flex", alignItems: "center", gap: 4,
+                padding: "2px 8px", borderRadius: 10,
+                background: "#6750A414", color: "#6750A4",
+                fontWeight: 600, fontSize: 12,
+              }}>
+                📦 {apps.find(a => a.id === task.app_id)?.name || task.app_id.slice(0, 8)}
+              </span>
+            </MetaCell>
           )}
 
           <MetaCell label="Deploy">
@@ -1613,6 +1625,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
             <MetaCell label="QA Agent">{task.qa_agent || <span style={{ color: 'var(--md-outline)', fontStyle: 'italic' }}>None</span>}</MetaCell>
             <MetaCell label="Owner">{task.dispatched_by || <span style={{ color: 'var(--md-outline)', fontStyle: 'italic' }}>None</span>}</MetaCell>
             <MetaCell label="Project">{task.project?.name || <span style={{ color: 'var(--md-outline)', fontStyle: 'italic' }}>None</span>}</MetaCell>
+            <MetaCell label="App">{task.app_id && apps ? (apps.find(a => a.id === task.app_id)?.name || task.app_id.slice(0, 8)) : <span style={{ color: 'var(--md-outline)', fontStyle: 'italic' }}>None</span>}</MetaCell>
             <MetaCell label="Created"><span title={task.created_at}>{formatDateShort(task.created_at)}</span></MetaCell>
             <MetaCell label="Updated"><span title={task.updated_at}>{formatDateShort(task.updated_at)}</span></MetaCell>
             {task.started_at && <MetaCell label="Started"><span title={task.started_at}>{formatDateShort(task.started_at)}</span></MetaCell>}
