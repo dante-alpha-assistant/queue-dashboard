@@ -513,7 +513,7 @@ router.post("/deploy/batch", async (req, res) => {
     const { data: deployTask, error: createErr } = await supabase
       .from("agent_tasks")
       .insert({
-        title: `Batch Deploy — ${deployable.length} tasks across ${Object.keys(byRepo).length} repo(s)`,
+        title: `Batch Deploy — ${deployable.length} tasks across ${Object.keys(byRepo).length} repo(s) [${new Date().toISOString().slice(0,16)}]`,
         type: "deploy",
         priority: "urgent",
         status: "todo",
