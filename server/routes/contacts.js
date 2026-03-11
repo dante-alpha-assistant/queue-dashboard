@@ -231,4 +231,103 @@ contactsRouter.post("/:id/avatar", async (req, res) => {
   }
 });
 
+// Bulk actions on contacts
+contactsRouter.post("/bulk", async (req, res) => {
+  try {
+    const { contact_ids, action, tags, group_id } = req.body;
+    if (!contact_ids || !Array.isArray(contact_ids) || contact_ids.length === 0) {
+      return res.status(400).json({ error: "contact_ids array is required" });
+    }
+
+    switch (action) {
+      case "add_tags": {
+        if (!tags || !Array.isArray(tags) || tags.length === 0) {
+          return res.status(400).json({ error: "tags array is required for add_tags action" });
+        }
+        // Fetch current contacts to merge tags
+        const { data: contacts, error: fetchErr } = await supabase
+          .from("crm_contacts")
+          .select("id, tags")
+          .in("id", contact_ids);
+        if (fetchErr) throw fetchErr;
+
+        let updated = 0;
+        for (const c of (contacts || [])) {
+          const existingTags = c.tags || [];
+          const newTags = [...new Set([...existingTags, ...tags])];
+          if (newTags.length !== existingTags.length) {
+            const { error } = await supabase
+              .from("crm_contacts")
+              .update({ tags: newTags })
+              .eq("id", c.id);
+            if (!error) updated++;
+          }
+        }
+        return res.json({ ok: true, action: "add_tags", updated });
+      }
+
+      case "add_to_group": {
+        if (!group_id) {
+          return res.status(400).json({ error: "group_id is required for add_to_group action" });
+        }
+        const inserts = contact_ids.map(cid => ({
+          group_id,
+          contact_id: cid,
+        }));
+        const { data, error } = await supabase
+          .from("crm_group_members")
+          .upsert(inserts, { onConflict: "group_id,contact_id", ignoreDuplicates: true })
+          .select();
+        if (error) throw error;
+        return res.json({ ok: true, action: "add_to_group", added: data?.length || 0 });
+      }
+
+      case "delete": {
+        // Also remove from all groups first
+        const { error: gmErr } = await supabase
+          .from("crm_group_members")
+          .delete()
+          .in("contact_id", contact_ids);
+        if (gmErr) console.error("[CRM] Failed to remove group memberships:", gmErr.message);
+
+        const { error } = await supabase
+          .from("crm_contacts")
+          .delete()
+          .in("id", contact_ids);
+        if (error) throw error;
+        return res.json({ ok: true, action: "delete", deleted: contact_ids.length });
+      }
+
+      default:
+        return res.status(400).json({ error: `Unknown action: ${action}. Valid: add_tags, add_to_group, delete` });
+    }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get groups for a contact
+contactsRouter.get("/:id/groups", async (req, res) => {
+  try {
+    const { data: memberships, error } = await supabase
+      .from("crm_group_members")
+      .select("group_id")
+      .eq("contact_id", req.params.id);
+    if (error) throw error;
+
+    if (!memberships || memberships.length === 0) {
+      return res.json([]);
+    }
+
+    const groupIds = memberships.map(m => m.group_id);
+    const { data: groups, error: gErr } = await supabase
+      .from("crm_groups")
+      .select("id, name, color")
+      .in("id", groupIds);
+    if (gErr) throw gErr;
+    res.json(groups || []);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 

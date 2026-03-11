@@ -9,6 +9,7 @@ import { agentsRouter } from "./routes/agents.js";
 import { healthRouter } from "./routes/health.js";
 import { skillsRouter } from "./routes/skills.js";
 import { attachmentsRouter, ensureAttachmentsBucket } from "./routes/attachments.js";
+import { groupsRouter } from "./routes/groups.js";
 import { contactsRouter } from "./routes/contacts.js";
 
 const app = express();
@@ -21,6 +22,7 @@ app.use("/api/agents", agentsRouter);
 app.use("/api/health", healthRouter);
 app.use("/api/skills", skillsRouter);
 app.use("/api", attachmentsRouter);
+app.use("/api/groups", groupsRouter);
 app.use("/api/contacts", contactsRouter);
 
 // Serve static frontend in production

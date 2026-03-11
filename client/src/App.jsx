@@ -15,6 +15,7 @@ import Pingboard from "./pages/Pingboard";
 import HealthDashboard from "./pages/HealthDashboard";
 import ContactsPage from "./pages/ContactsPage";
 import ContactDetailPage from "./pages/ContactDetailPage";
+import GroupDetailPage from "./pages/GroupDetailPage";
 import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
 import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Rocket, Search, XCircle, Zap, Users } from 'lucide-react';
 
@@ -70,7 +71,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("todo");
   const [view, setView] = useState(() => {
     if (typeof window !== "undefined") {
-      if (window.location.pathname.startsWith("/contacts")) return "contacts";
+      if (window.location.pathname.startsWith("/contacts") || window.location.pathname.startsWith("/groups")) return "contacts";
     }
     return "board";
   });
@@ -163,6 +164,17 @@ export default function App() {
   // Contacts views
   if (view === "contacts") {
     const isContactDetail = location.pathname.match(/^\/contacts\/([a-f0-9-]+)$/i);
+    const isGroupDetail = location.pathname.match(/^\/groups\/([a-f0-9-]+)$/i);
+
+    let crmContent;
+    if (isGroupDetail) {
+      crmContent = <GroupDetailPage groupId={isGroupDetail[1]} />;
+    } else if (isContactDetail) {
+      crmContent = <ContactDetailPage />;
+    } else {
+      crmContent = <ContactsPage />;
+    }
+
     return (
       <div style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
         <div className="header-glass" style={{
@@ -187,7 +199,7 @@ export default function App() {
           ))}
         </div>
         <div style={{ paddingTop: 52 }}>
-          {isContactDetail ? <ContactDetailPage /> : <ContactsPage />}
+          {crmContent}
         </div>
       </div>
     );
