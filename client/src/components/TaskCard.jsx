@@ -847,13 +847,26 @@ export default function TaskCard({ task, onStatusChange, onCardClick, isMobile, 
           }}>{formatTime(task.created_at)}</span>
         </div>
 
-        {task.project && (
+        {(task.project || task.app) && (
           <div style={{
-            fontSize: 11, color: "var(--md-outline, #79747E)",
-            marginTop: 8, fontWeight: 500,
+            display: "flex", gap: 10, alignItems: "center", marginTop: 8, flexWrap: "wrap",
           }}>
-            <FolderIcon size={12} color="#79747E" style={{ marginRight: 4, verticalAlign: "middle" }} />
-            {task.project.name}
+            {task.project && (
+              <span style={{ fontSize: 11, color: "var(--md-outline, #79747E)", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <FolderIcon size={12} color="#79747E" />
+                {task.project.name}
+              </span>
+            )}
+            {task.app && (
+              <span style={{
+                fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 6,
+                background: "#6750A412", color: "#6750A4",
+                display: "inline-flex", alignItems: "center", gap: 4,
+                fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+              }}>
+                📦 {task.app.name}
+              </span>
+            )}
           </div>
         )}
       </div>

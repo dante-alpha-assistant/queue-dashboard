@@ -343,7 +343,7 @@ function renderMarkdownContent(content) {
   });
 }
 
-export default function NewTaskChat({ isMobile }) {
+export default function NewTaskChat({ isMobile, apps = [] }) {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(() => {
     try { return localStorage.getItem("neo-chat-expanded") === "true"; } catch { return false; }
@@ -365,6 +365,7 @@ export default function NewTaskChat({ isMobile }) {
   const [mentionQuery, setMentionQuery] = useState(null); // null = closed, string = open with query
   const [mentionStart, setMentionStart] = useState(null); // cursor position of the @ character
   const [taskMentions, setTaskMentions] = useState([]); // [{id, title, ...}] attached to current message
+  const [selectedAppId, setSelectedAppId] = useState(""); // app_id for task scoping
 
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
@@ -636,6 +637,7 @@ export default function NewTaskChat({ isMobile }) {
           content,
           images: imageUrls.length ? imageUrls : undefined,
           taskMentions: mentionedTaskIds.length ? mentionedTaskIds : undefined,
+          app_id: selectedAppId || undefined,
         }),
         signal: controller.signal,
       });
@@ -1004,6 +1006,35 @@ export default function NewTaskChat({ isMobile }) {
             background: "none", border: "none", color: "var(--md-error, #B3261E)",
             cursor: "pointer", fontSize: 14, padding: "0 4px",
           }}>✕</button>
+        </div>
+      )}
+
+      {/* App selector */}
+      {apps.length > 0 && (
+        <div style={{
+          padding: "6px 12px", display: "flex", alignItems: "center", gap: 8,
+          borderTop: "1px solid var(--md-surface-variant)",
+        }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.04em", flexShrink: 0 }}>App</span>
+          <select value={selectedAppId} onChange={e => setSelectedAppId(e.target.value)} style={{
+            flex: 1, padding: "5px 10px", borderRadius: 8,
+            border: "1px solid var(--md-surface-variant, #E7E0EC)",
+            background: "var(--md-surface)", color: "var(--md-on-background)",
+            fontSize: 12, fontWeight: 500, fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+            outline: "none", cursor: "pointer",
+          }}>
+            <option value="">No app</option>
+            {apps.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+          {selectedAppId && (() => {
+            const app = apps.find(a => a.id === selectedAppId);
+            if (!app) return null;
+            return (
+              <span style={{ fontSize: 10, color: "var(--md-on-surface-variant)", opacity: 0.7, flexShrink: 0 }}>
+                {app.repos?.length ? app.repos[0].split("/").pop() : ""} · {app.deploy_target}
+              </span>
+            );
+          })()}
         </div>
       )}
 

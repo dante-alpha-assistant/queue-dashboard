@@ -13,8 +13,9 @@ import TaskDetailModal from "./components/TaskDetailModal";
 import BatchDeployModal from "./components/BatchDeployModal";
 import Pingboard from "./pages/Pingboard";
 import HealthDashboard from "./pages/HealthDashboard";
+import AppsPage from "./pages/AppsPage";
 import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
-import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Rocket, Search, XCircle, Zap } from 'lucide-react';
+import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Package, Rocket, Search, XCircle, Zap } from 'lucide-react';
 
 const MOBILE_TABS = [
   { key: "todo", label: "Todo", icon: "📋" },
@@ -50,6 +51,7 @@ export default function App() {
     stats, tasks, todo, assigned, inProgress, qa, completed, deployed, blocked, failed, deploying, deployFailed,
     loading, transitioning, updateTask, applyStatusChange,
     projects, selectedProject, setSelectedProject,
+    apps, selectedApp, setSelectedApp,
   } = useQueue();
 
 
@@ -143,9 +145,10 @@ export default function App() {
     { key: "board", label: "Board", Icon: ClipboardList },
     { key: "pingboard", label: "Pingboard", Icon: Bot },
     { key: "health", label: "Health", Icon: HeartPulse },
+    { key: "apps", label: "Apps", Icon: Package },
   ];
 
-  if (view === "pingboard" || view === "health") {
+  if (view === "pingboard" || view === "health" || view === "apps") {
     return (
       <div style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
         <div className="header-glass" style={{
@@ -170,7 +173,7 @@ export default function App() {
           ))}
         </div>
         <div style={{ paddingTop: 42 }}>
-          {view === "pingboard" ? <Pingboard /> : <HealthDashboard />}
+          {view === "pingboard" ? <Pingboard /> : view === "apps" ? <AppsPage /> : <HealthDashboard />}
         </div>
       </div>
     );
@@ -184,6 +187,7 @@ export default function App() {
     let filtered = allTasksRaw;
     if (typeFilter !== "all") filtered = filtered.filter(t => t.type === typeFilter);
     if (stageFilter !== "all") filtered = filtered.filter(t => t.stage === stageFilter);
+    if (selectedApp) filtered = filtered.filter(t => t.app_id === selectedApp);
     if (searchQuery.trim()) filtered = filtered.filter(t => t.title?.toLowerCase().includes(searchQuery.toLowerCase()));
     return {
       today: filterTasksByTime(filtered, "today").length,
@@ -199,6 +203,7 @@ export default function App() {
     let filtered = filterTasksByTime(tasks, timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
     if (typeFilter !== "all") filtered = filtered.filter(t => t.type === typeFilter);
     if (stageFilter !== "all") filtered = filtered.filter(t => t.stage === stageFilter);
+    if (selectedApp) filtered = filtered.filter(t => t.app_id === selectedApp);
     if (searchQuery.trim()) filtered = filtered.filter(t => t.title?.toLowerCase().includes(searchQuery.toLowerCase()));
     return filtered;
   };
@@ -272,6 +277,9 @@ export default function App() {
               <button onClick={() => setView("health")} className="nav-tab" style={{ padding: "4px 8px" }}>
                 <HeartPulse size={16} strokeWidth={1.8} />
               </button>
+              <button onClick={() => setView("apps")} className="nav-tab" style={{ padding: "4px 8px" }}>
+                <Package size={16} strokeWidth={1.8} />
+              </button>
             </div>
           </div>
         </div>
@@ -287,6 +295,17 @@ export default function App() {
             <option value="">All Projects</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
+          {apps.length > 0 && (
+            <select value={selectedApp} onChange={e => setSelectedApp(e.target.value)} style={{
+              width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--md-surface-variant)",
+              background: "var(--md-surface)", color: "var(--md-on-background)", fontSize: 13,
+              fontWeight: 500, fontFamily: "'Inter', system-ui, -apple-system, sans-serif", outline: "none",
+              marginBottom: 8, minHeight: 44,
+            }}>
+              <option value="">All Apps</option>
+              {apps.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          )}
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {activeTypes.map(type => (
               <button key={type} onClick={() => setTypeFilter(type)} className={`filter-chip ${typeFilter === type ? "active" : ""}`} style={{ minHeight: 36, padding: "6px 14px" }}>{type}</button>
@@ -360,7 +379,7 @@ export default function App() {
           })}
         </div>
 
-        <NewTaskChat isMobile={isMobile} />
+        <NewTaskChat isMobile={isMobile} apps={apps} />
         {selectedTask && !selectedTask._notFound && (
           <TaskDetailModal
             task={selectedTask}
@@ -445,6 +464,21 @@ export default function App() {
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
+          {apps.length > 0 && (<>
+            <div style={{ width: 1, height: 24, background: "var(--md-surface-variant)" }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px" }}>App</span>
+              <select value={selectedApp} onChange={e => setSelectedApp(e.target.value)} style={{
+                padding: "6px 12px", borderRadius: 8, border: "1px solid var(--md-surface-variant)",
+                background: "var(--md-surface)", color: "var(--md-on-background)", fontSize: 13,
+                fontWeight: 500, fontFamily: "'Inter', system-ui, -apple-system, sans-serif", outline: "none",
+                cursor: "pointer", minWidth: 120,
+              }}>
+                <option value="">All</option>
+                {apps.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            </div>
+          </>)}
           <div style={{ width: 1, height: 24, background: "var(--md-surface-variant)" }} />
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Type</span>
@@ -551,7 +585,7 @@ export default function App() {
         </Column>
       </div>
 
-      <NewTaskChat isMobile={false} />
+      <NewTaskChat isMobile={false} apps={apps} />
 
       {selectedTask && !selectedTask._notFound && (
         <TaskDetailModal
