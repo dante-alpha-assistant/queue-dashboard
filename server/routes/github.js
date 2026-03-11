@@ -84,11 +84,14 @@ githubRouter.get("/repos", async (req, res) => {
       language: r.language,
       updated_at: r.updated_at,
       default_branch: r.default_branch,
+      html_url: r.html_url,
+      private: r.private,
     }));
 
     setCache(cacheKey, result);
     res.json(result);
   } catch (e) {
+    console.error("[GitHub] repo search error:", e.message);
     res.status(500).json({ error: e.message });
   }
 });

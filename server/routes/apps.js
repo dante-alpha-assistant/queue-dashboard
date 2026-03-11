@@ -70,7 +70,7 @@ appsRouter.get("/:id", async (req, res) => {
 // POST /api/apps — create app
 appsRouter.post("/", async (req, res) => {
   try {
-    const { name, slug, description, repos, supabase_project_ref, deploy_target, deploy_config, env_keys, icon } = req.body;
+    const { name, slug, description, repos, supabase_project_ref, deploy_target, deploy_config, env_keys, icon, qa_env_keys } = req.body;
     if (!name) return res.status(400).json({ error: "name required" });
     if (!slug) return res.status(400).json({ error: "slug required" });
 
@@ -91,6 +91,7 @@ appsRouter.post("/", async (req, res) => {
         deploy_config: deploy_config || {},
         env_keys: env_keys || [],
         icon: icon || null,
+        qa_env_keys: qa_env_keys || [],
       })
       .select()
       .single();

@@ -15,6 +15,7 @@ import Pingboard from "./pages/Pingboard";
 import HealthDashboard from "./pages/HealthDashboard";
 import AppsPage from "./pages/AppsPage";
 import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
+import AppCreationWizard from "./components/AppCreationWizard";
 import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Package, Plus, Rocket, Search, XCircle, Zap } from 'lucide-react';
 
 const MOBILE_TABS = [
@@ -69,6 +70,7 @@ export default function App() {
   const [stageFilter, setStageFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("todo");
   const [view, setView] = useState("board");
+  const [showAppWizard, setShowAppWizard] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
@@ -300,17 +302,12 @@ export default function App() {
               <option value="">All Apps</option>
               {apps.map(a => <option key={a.id} value={a.id}>{a.icon ? `${a.icon} ` : ""}{a.name}</option>)}
             </select>
-            <button
-              onClick={() => setView("apps")}
-              title="Create new App"
-              style={{
-                width: 36, height: 36, borderRadius: "50%", border: "1px solid var(--md-surface-variant)",
-                background: "var(--md-surface)", color: "var(--md-on-surface-variant)", cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flexShrink: 0,
-              }}
-            >
-              <Plus size={16} strokeWidth={2.5} />
-            </button>
+            <button onClick={() => setShowAppWizard(true)} title="Create new app" style={{
+              width: 32, height: 32, borderRadius: "50%", border: "none",
+              background: "var(--md-primary, #6750A4)", color: "#fff",
+              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              padding: 0, flexShrink: 0,
+            }}><Plus size={16} strokeWidth={3} /></button>
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {activeTypes.map(type => (
@@ -470,21 +467,14 @@ export default function App() {
               <option value="">All</option>
               {apps.map(a => <option key={a.id} value={a.id}>{a.icon ? `${a.icon} ` : ""}{a.name}</option>)}
             </select>
-            <button
-              onClick={() => setView("apps")}
-              title="Create new App"
-              style={{
-                width: 24, height: 24, borderRadius: "50%", border: "1px solid var(--md-surface-variant)",
-                background: "var(--md-surface)", color: "var(--md-on-surface-variant)", cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
-                transition: "all 0.15s ease",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = "var(--md-surface-variant)"; e.currentTarget.style.color = "var(--md-on-background)"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "var(--md-surface)"; e.currentTarget.style.color = "var(--md-on-surface-variant)"; }}
-            >
-              <Plus size={14} strokeWidth={2.5} />
-            </button>
+            <button onClick={() => setShowAppWizard(true)} title="Create new app" style={{
+              width: 24, height: 24, borderRadius: "50%", border: "none",
+              background: "var(--md-primary, #6750A4)", color: "#fff",
+              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              padding: 0, flexShrink: 0,
+            }}><Plus size={14} strokeWidth={3} /></button>
           </div>
+
           <div style={{ width: 1, height: 24, background: "var(--md-surface-variant)" }} />
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Type</span>
@@ -629,5 +619,6 @@ export default function App() {
       )}
     </div>
       {showBatchDeploy && <BatchDeployModal tasks={filterByType(completed)} onDeploy={() => { setShowBatchDeploy(false); }} onClose={() => setShowBatchDeploy(false)} />}
+      {showAppWizard && <AppCreationWizard onClose={() => setShowAppWizard(false)} onCreated={(app) => { setShowAppWizard(false); setSelectedApp(app.id); }} />}
   </>);
 }
