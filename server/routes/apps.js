@@ -1,5 +1,6 @@
 import { Router } from "express";
 import supabase from "../supabase.js";
+import { invalidateGithubRepoCache } from "./github.js";
 
 export const appsRouter = Router();
 
@@ -68,6 +69,8 @@ appsRouter.post("/", async (req, res) => {
       if (error.code === "23505") return res.status(409).json({ error: "App with this name or slug already exists" });
       throw error;
     }
+    // Invalidate GitHub repo cache — new app may reference a new repo
+    invalidateGithubRepoCache();
     res.status(201).json(data);
   } catch (e) {
     res.status(500).json({ error: e.message });
