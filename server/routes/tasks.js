@@ -3,6 +3,50 @@ import supabase from "../supabase.js";
 
 export const router = Router();
 
+// --- App ID auto-detection from repo string ---
+// Repo pattern → app slug mapping (cached)
+const REPO_TO_SLUG = {
+  "queue-dashboard": "queue-dashboard",
+  "dante-crm": "dante-crm",
+  "game-landing": "game-landing",
+  "task-dispatcher": "task-dispatcher",
+  "agent-skills": "agent-skills",
+  "dante-gitops": "gitops",
+};
+
+// Cache: slug → app id (populated on first use)
+let _appSlugCache = null;
+let _appSlugCacheExpires = 0;
+
+async function getAppSlugMap() {
+  const now = Date.now();
+  if (_appSlugCache && _appSlugCacheExpires > now) return _appSlugCache;
+
+  const { data, error } = await supabase
+    .from("apps")
+    .select("id, slug")
+    .eq("status", "active");
+
+  if (error || !data) return {};
+  _appSlugCache = Object.fromEntries(data.map(a => [a.slug, a.id]));
+  _appSlugCacheExpires = now + 60_000; // cache for 60s
+  return _appSlugCache;
+}
+
+async function detectAppIdFromRepo(repo) {
+  if (!repo) return null;
+  const repoLower = repo.toLowerCase();
+
+  // Find matching slug from repo string
+  for (const [pattern, slug] of Object.entries(REPO_TO_SLUG)) {
+    if (repoLower.includes(pattern)) {
+      const slugMap = await getAppSlugMap();
+      return slugMap[slug] || null;
+    }
+  }
+  return null;
+}
+
 // --- Counts by time period (cached 30s in-memory) ---
 const _countsCacheMap = {};
 
@@ -166,7 +210,8 @@ router.get("/tasks", async (req, res) => {
 // Create task
 router.post("/tasks", async (req, res) => {
   try {
-    const { title, description, prompt, type, priority, assigned_agent, status, project_id, repository_id, acceptance_criteria, stage } = req.body;
+    const { title, description, prompt, type, priority, assigned_agent, status, project_id, repository_id, acceptance_criteria, stage, metadata } = req.body;
+    let { app_id } = req.body;
     if (!title) return res.status(400).json({ error: "title required" });
     const validPriorities = ["low", "normal", "high", "urgent"];
     if (priority && !validPriorities.includes(priority)) {
@@ -175,6 +220,24 @@ router.post("/tasks", async (req, res) => {
     const validTypes = ["coding", "ops", "general", "review", "research", "qa"];
     if (type && !validTypes.includes(type)) {
       return res.status(400).json({ error: `Invalid type "${type}". Must be one of: ${validTypes.join(", ")}` });
+    }
+
+    // Validate app_id if explicitly provided
+    if (app_id) {
+      const { data: appExists, error: appErr } = await supabase
+        .from("apps")
+        .select("id")
+        .eq("id", app_id)
+        .single();
+      if (appErr || !appExists) {
+        return res.status(400).json({ error: `Invalid app_id "${app_id}" — app not found` });
+      }
+    }
+
+    // Auto-detect app_id from metadata.repo if not explicitly provided
+    if (!app_id && metadata?.repo) {
+      const detectedAppId = await detectAppIdFromRepo(metadata.repo);
+      if (detectedAppId) app_id = detectedAppId;
     }
 
     const { data, error } = await supabase
@@ -192,6 +255,8 @@ router.post("/tasks", async (req, res) => {
         repository_id: repository_id || null,
         acceptance_criteria: acceptance_criteria || null,
         stage: stage || null,
+        metadata: metadata || null,
+        app_id: app_id || null,
       })
       .select()
       .single();
