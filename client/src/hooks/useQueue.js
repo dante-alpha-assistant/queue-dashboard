@@ -16,6 +16,12 @@ export default function useQueue({ since, until } = {}) {
   const [transitioning, setTransitioning] = useState({});
   const initialLoad = useRef(true);
 
+  // Stable wrapper — must be a top-level hook call, NOT in the return statement
+  const wrappedSetSelectedApp = useCallback((val) => {
+    setSelectedApp(val);
+    try { localStorage.setItem("selected-app", val); } catch {}
+  }, []);
+
   const fetchAll = useCallback(async () => {
     try {
       const params = new URLSearchParams();
@@ -118,9 +124,6 @@ export default function useQueue({ since, until } = {}) {
     stats, tasks, todo, assigned, inProgress, qa, completed, deployed, blocked, failed, deploying, deployFailed,
     loading, transitioning, dispatch, updateTask, deleteTask, applyStatusChange,
     projects, selectedProject, setSelectedProject,
-    apps, selectedApp, setSelectedApp: useCallback((val) => {
-      setSelectedApp(val);
-      try { localStorage.setItem("selected-app", val); } catch {}
-    }, []),
+    apps, selectedApp, setSelectedApp: wrappedSetSelectedApp,
   };
 }
