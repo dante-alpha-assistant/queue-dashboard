@@ -1,5 +1,5 @@
 import { useReducer, useEffect, useRef, useCallback, useState } from "react";
-import { X, ChevronLeft, ChevronRight, Check, Loader2, AlertCircle } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Check, Loader2, AlertCircle, Search, RefreshCw, Star, ExternalLink } from "lucide-react";
 
 /* ── Constants ─────────────────────────────────────────── */
 const STEPS = [
@@ -42,6 +42,7 @@ const initialState = {
   slugManual: false,
   description: "",
   icon: "",
+  selectedRepos: [],
 };
 
 function reducer(state, action) {
@@ -55,6 +56,21 @@ function reducer(state, action) {
       return { ...state, slug: action.value, slugManual: true };
     case "SET_FIELD":
       return { ...state, [action.field]: action.value };
+    case "TOGGLE_REPO": {
+      const repo = action.repo;
+      const exists = state.selectedRepos.some((r) => r.full_name === repo.full_name);
+      return {
+        ...state,
+        selectedRepos: exists
+          ? state.selectedRepos.filter((r) => r.full_name !== repo.full_name)
+          : [...state.selectedRepos, repo],
+      };
+    }
+    case "REMOVE_REPO":
+      return {
+        ...state,
+        selectedRepos: state.selectedRepos.filter((r) => r.full_name !== action.fullName),
+      };
     case "NEXT_STEP":
       return { ...state, step: Math.min(state.step + 1, STEPS.length - 1) };
     case "PREV_STEP":
@@ -522,6 +538,332 @@ function OnboardingStep1({ state, dispatch }) {
 }
 
 /* ── Placeholder Steps ─────────────────────────────────── */
+/* ── Step 2: GitHub Repo Picker ────────────────────────── */
+
+function timeAgo(dateStr) {
+  if (!dateStr) return "";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return mins <= 1 ? "just now" : `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  return `${Math.floor(months / 12)}y ago`;
+}
+
+function langBadge(lang) {
+  if (!lang) return null;
+  const map = {
+    JavaScript: { bg: "#F7DF1E", color: "#000" },
+    TypeScript:  { bg: "#3178C6", color: "#fff" },
+    Python:      { bg: "#3776AB", color: "#fff" },
+    Go:          { bg: "#00ADD8", color: "#fff" },
+    Rust:        { bg: "#CE422B", color: "#fff" },
+    Ruby:        { bg: "#CC342D", color: "#fff" },
+    Java:        { bg: "#ED8B00", color: "#fff" },
+    Shell:       { bg: "#89E051", color: "#000" },
+  };
+  const style = map[lang] || { bg: "#79747E", color: "#fff" };
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 100,
+      background: style.bg, color: style.color, whiteSpace: "nowrap",
+    }}>
+      {lang}
+    </span>
+  );
+}
+
+function OnboardingStep2({ state, dispatch }) {
+  const [repos, setRepos] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const debounceRef = useRef(null);
+  const fetchCountRef = useRef(0);
+
+  const fetchRepos = useCallback(async (q) => {
+    const id = ++fetchCountRef.current;
+    setLoading(true);
+    setError(null);
+    try {
+      const url = q ? `/api/github/repos?q=${encodeURIComponent(q)}` : "/api/github/repos";
+      const resp = await fetch(url);
+      if (id !== fetchCountRef.current) return; // stale
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      setRepos(data);
+    } catch (e) {
+      if (id !== fetchCountRef.current) return;
+      setError("Failed to load repos. Try again.");
+    } finally {
+      if (id === fetchCountRef.current) setLoading(false);
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => { fetchRepos(""); }, [fetchRepos]);
+
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchTerm(val);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchRepos(val), 300);
+  };
+
+  const handleRefresh = () => fetchRepos(searchTerm);
+
+  const isSelected = (repo) => state.selectedRepos.some((r) => r.full_name === repo.full_name);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 0, height: "100%" }}>
+      {/* GitHub connected panel */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 10,
+        padding: "12px 16px", borderRadius: 12, marginBottom: 20,
+        background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)",
+      }}>
+        {/* GitHub logo SVG */}
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" style={{ color: "#1a1a1a", flexShrink: 0 }}>
+          <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0 1 12 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+        </svg>
+        <Check size={16} style={{ color: "#22c55e", flexShrink: 0 }} />
+        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--md-on-surface)" }}>
+          Connected as <span style={{ color: "#6750A4" }}>dante-alpha-assistant</span>
+        </span>
+      </div>
+
+      {/* Selected repos chips */}
+      {state.selectedRepos.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)", marginBottom: 8 }}>
+            {state.selectedRepos.length} repo{state.selectedRepos.length !== 1 ? "s" : ""} selected
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 80, overflowY: "auto" }}>
+            {state.selectedRepos.map((repo) => (
+              <span key={repo.full_name} style={{
+                display: "inline-flex", alignItems: "center", gap: 5,
+                background: "rgba(103,80,164,0.12)", color: "#6750A4",
+                padding: "4px 10px", borderRadius: 100, fontSize: 12, fontWeight: 600,
+                border: "1px solid rgba(103,80,164,0.3)",
+              }}>
+                {repo.name}
+                <button
+                  onClick={() => dispatch({ type: "REMOVE_REPO", fullName: repo.full_name })}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer", padding: 0,
+                    color: "inherit", display: "flex", alignItems: "center", opacity: 0.7,
+                  }}
+                  aria-label={`Remove ${repo.name}`}
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Search bar */}
+      <div style={{ position: "relative", marginBottom: 12 }}>
+        <Search size={16} style={{
+          position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)",
+          color: "var(--md-on-surface-variant)", pointerEvents: "none",
+        }} />
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={handleSearchChange}
+          placeholder="Search repositories..."
+          style={{
+            width: "100%", boxSizing: "border-box",
+            padding: "10px 40px 10px 38px", borderRadius: 10, fontSize: 14,
+            border: "1px solid var(--md-surface-variant, #E7E0EC)",
+            background: "var(--md-surface, #FFFBFE)", color: "var(--md-on-surface)",
+            outline: "none", transition: "border-color 150ms",
+          }}
+          onFocus={(e) => { e.target.style.borderColor = "#6750A4"; }}
+          onBlur={(e) => { e.target.style.borderColor = "var(--md-surface-variant, #E7E0EC)"; }}
+        />
+        <button
+          onClick={handleRefresh}
+          style={{
+            position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
+            background: "none", border: "none", cursor: "pointer", padding: 4,
+            color: "var(--md-on-surface-variant)", display: "flex", alignItems: "center",
+            borderRadius: 6,
+          }}
+          title="Refresh list"
+        >
+          <RefreshCw size={14} style={loading ? { animation: "spin 1s linear infinite" } : {}} />
+        </button>
+      </div>
+
+      {/* Repo list */}
+      <div style={{
+        flex: 1, overflowY: "auto", borderRadius: 10,
+        border: "1px solid var(--md-surface-variant, #E7E0EC)",
+        minHeight: 200,
+      }}>
+        {loading && repos.length === 0 && (
+          <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+            {[1, 2, 3].map((i) => (
+              <div key={i} style={{
+                padding: "14px 16px", borderRadius: 8, display: "flex", gap: 12, alignItems: "center",
+                background: "var(--md-surface-container, #F5F0FB)",
+                animation: "pulse 1.5s ease-in-out infinite",
+              }}>
+                <div style={{ width: 24, height: 24, borderRadius: 4, background: "rgba(0,0,0,0.06)" }} />
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ height: 13, width: "40%", borderRadius: 4, background: "rgba(0,0,0,0.06)" }} />
+                  <div style={{ height: 10, width: "70%", borderRadius: 4, background: "rgba(0,0,0,0.04)" }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {error && (
+          <div style={{
+            padding: 32, display: "flex", flexDirection: "column", alignItems: "center",
+            gap: 10, color: "var(--md-on-surface-variant)",
+          }}>
+            <AlertCircle size={28} style={{ color: "#dc2626" }} />
+            <span style={{ fontSize: 13, color: "#dc2626" }}>{error}</span>
+            <button
+              onClick={handleRefresh}
+              style={{
+                padding: "6px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                background: "#6750A4", color: "#fff", border: "none", cursor: "pointer",
+              }}
+            >
+              Try again
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && repos.length === 0 && (
+          <div style={{
+            padding: 40, display: "flex", flexDirection: "column", alignItems: "center",
+            gap: 10, color: "var(--md-on-surface-variant)",
+          }}>
+            <Search size={28} style={{ opacity: 0.4 }} />
+            <span style={{ fontSize: 13 }}>No repos found matching your search</span>
+          </div>
+        )}
+
+        {!error && repos.length > 0 && (
+          <div>
+            {repos.map((repo, idx) => {
+              const selected = isSelected(repo);
+              return (
+                <div
+                  key={repo.full_name}
+                  onClick={() => dispatch({ type: "TOGGLE_REPO", repo: { full_name: repo.full_name, name: repo.name } })}
+                  style={{
+                    display: "flex", alignItems: "flex-start", gap: 12, padding: "13px 16px",
+                    cursor: "pointer", transition: "background 120ms",
+                    borderBottom: idx < repos.length - 1 ? "1px solid var(--md-surface-variant, #E7E0EC)" : "none",
+                    background: selected ? "rgba(103,80,164,0.07)" : "transparent",
+                    borderLeft: selected ? "3px solid #6750A4" : "3px solid transparent",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!selected) e.currentTarget.style.background = "rgba(0,0,0,0.03)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = selected ? "rgba(103,80,164,0.07)" : "transparent";
+                  }}
+                >
+                  {/* Checkbox */}
+                  <div style={{
+                    width: 20, height: 20, borderRadius: 6, flexShrink: 0, marginTop: 1,
+                    border: selected ? "none" : "2px solid var(--md-surface-variant, #CAC4D0)",
+                    background: selected ? "#6750A4" : "transparent",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    transition: "all 150ms",
+                  }}>
+                    {selected && <Check size={12} style={{ color: "#fff" }} />}
+                  </div>
+
+                  {/* Repo info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 3 }}>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: "var(--md-on-surface)" }}>
+                        {repo.name}
+                      </span>
+                      {repo.private && (
+                        <span style={{
+                          fontSize: 10, padding: "1px 6px", borderRadius: 100,
+                          background: "rgba(0,0,0,0.08)", color: "var(--md-on-surface-variant)",
+                          fontWeight: 600,
+                        }}>Private</span>
+                      )}
+                    </div>
+                    {repo.description && (
+                      <div style={{
+                        fontSize: 12, color: "var(--md-on-surface-variant)", marginBottom: 6,
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        maxWidth: "100%",
+                      }}>
+                        {repo.description}
+                      </div>
+                    )}
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                      {langBadge(repo.language)}
+                      {repo.stargazers_count > 0 && (
+                        <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11, color: "var(--md-on-surface-variant)" }}>
+                          <Star size={11} style={{ fill: "#F59E0B", color: "#F59E0B" }} />
+                          {repo.stargazers_count}
+                        </span>
+                      )}
+                      {repo.updated_at && (
+                        <span style={{ fontSize: 11, color: "var(--md-on-surface-variant)", opacity: 0.7 }}>
+                          Updated {timeAgo(repo.updated_at)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Footer: Create new repo */}
+      <div style={{
+        marginTop: 12, display: "flex", alignItems: "center", gap: 10,
+        padding: "10px 0", borderTop: "1px solid var(--md-surface-variant, #E7E0EC)",
+      }}>
+        <button
+          onClick={() => window.open("https://github.com/new", "_blank")}
+          style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+            border: "1px solid var(--md-surface-variant, #E7E0EC)",
+            background: "var(--md-surface, #FFFBFE)", color: "var(--md-on-surface)",
+            cursor: "pointer", transition: "all 150ms",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "var(--md-surface-variant, #E7E0EC)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "var(--md-surface, #FFFBFE)"; }}
+        >
+          <ExternalLink size={13} />
+          Create new repo
+        </button>
+        <span style={{ fontSize: 11, color: "var(--md-on-surface-variant)", opacity: 0.7 }}>
+          After creating, click <RefreshCw size={10} style={{ display: "inline", verticalAlign: "middle" }} /> to refresh the list.
+        </span>
+      </div>
+
+      {/* Pulse keyframe */}
+      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }`}</style>
+    </div>
+  );
+}
+
 function PlaceholderStep({ label }) {
   return (
     <div style={{
@@ -623,6 +965,7 @@ export default function AppOnboardingWizard({ onClose, onCreated }) {
   const canNext = () => {
     switch (state.step) {
       case 0: return isStep1Valid();
+      case 1: return state.selectedRepos && state.selectedRepos.length > 0;
       default: return true;
     }
   };
@@ -630,7 +973,7 @@ export default function AppOnboardingWizard({ onClose, onCreated }) {
   const renderStep = () => {
     switch (state.step) {
       case 0: return <OnboardingStep1 state={state} dispatch={dispatch} />;
-      case 1: return <PlaceholderStep label="Repositories" />;
+      case 1: return <OnboardingStep2 state={state} dispatch={dispatch} />;
       case 2: return <PlaceholderStep label="Deploy Target" />;
       case 3: return <PlaceholderStep label="Credentials" />;
       case 4: return <PlaceholderStep label="Review & Create" />;
