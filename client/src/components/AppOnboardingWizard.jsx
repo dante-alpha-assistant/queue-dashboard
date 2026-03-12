@@ -43,6 +43,8 @@ const initialState = {
   description: "",
   icon: "",
   selectedRepos: [],
+  repoDeployConfigs: {},
+  supabaseProjectRef: "",
 };
 
 function reducer(state, action) {
@@ -71,6 +73,31 @@ function reducer(state, action) {
         ...state,
         selectedRepos: state.selectedRepos.filter((r) => r.full_name !== action.fullName),
       };
+    case "SET_REPO_DEPLOY": {
+      const existing = state.repoDeployConfigs[action.repoName] || { deploy_target: "none", deploy_config: {} };
+      return {
+        ...state,
+        repoDeployConfigs: {
+          ...state.repoDeployConfigs,
+          [action.repoName]: { ...existing, deploy_target: action.target },
+        },
+      };
+    }
+    case "SET_REPO_DEPLOY_CONFIG": {
+      const existing = state.repoDeployConfigs[action.repoName] || { deploy_target: "none", deploy_config: {} };
+      return {
+        ...state,
+        repoDeployConfigs: {
+          ...state.repoDeployConfigs,
+          [action.repoName]: {
+            ...existing,
+            deploy_config: { ...existing.deploy_config, [action.configKey]: action.configValue },
+          },
+        },
+      };
+    }
+    case "SET_SUPABASE_REF":
+      return { ...state, supabaseProjectRef: action.value };
     case "NEXT_STEP":
       return { ...state, step: Math.min(state.step + 1, STEPS.length - 1) };
     case "PREV_STEP":
@@ -864,6 +891,280 @@ function OnboardingStep2({ state, dispatch }) {
   );
 }
 
+/* ── Step 3: Per-Repo Deploy Target ───────────────────── */
+function RepoDeployCard({ repo, config, dispatch }) {
+  const repoName = repo.full_name.split("/").pop();
+  const target = config.deploy_target || "none";
+  const deployConfig = config.deploy_config || {};
+  const [customNamespace, setCustomNamespace] = useState(false);
+
+  const pillStyle = (active) => ({
+    padding: "8px 16px",
+    cursor: "pointer",
+    fontWeight: 500,
+    fontSize: 14,
+    border: "1px solid var(--md-surface-variant, #E7E0EC)",
+    background: active ? "#6750A4" : "transparent",
+    color: active ? "#fff" : "var(--md-on-surface-variant)",
+    transition: "all 150ms",
+    fontFamily: "'Inter', system-ui, sans-serif",
+  });
+
+  const labelStyle = {
+    display: "block",
+    fontSize: 12,
+    fontWeight: 600,
+    color: "var(--md-on-surface-variant)",
+    textTransform: "uppercase",
+    letterSpacing: "0.5px",
+    marginBottom: 4,
+  };
+
+  const inputStyle = {
+    width: "100%",
+    padding: "8px 12px",
+    borderRadius: 8,
+    border: "1px solid var(--md-surface-variant, #E7E0EC)",
+    background: "var(--md-surface, #FFFBFE)",
+    color: "var(--md-on-surface)",
+    fontSize: 14,
+    fontFamily: "'Inter', system-ui, sans-serif",
+    boxSizing: "border-box",
+  };
+
+  return (
+    <div style={{
+      border: "1px solid var(--md-surface-variant, #E7E0EC)",
+      borderRadius: 12,
+      padding: 20,
+      marginBottom: 16,
+      background: "var(--md-surface-container, #F5F0FB)",
+    }}>
+      {/* Repo header */}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontWeight: 700, fontSize: 15, color: "var(--md-on-surface)", marginBottom: 2 }}>
+          {repo.full_name}
+        </div>
+        {repo.description && (
+          <div style={{ fontSize: 13, color: "var(--md-on-surface-variant)", opacity: 0.8 }}>
+            {repo.description}
+          </div>
+        )}
+      </div>
+
+      {/* Deploy target pills */}
+      <div style={{ marginBottom: 16 }}>
+        <span style={{ ...labelStyle, marginBottom: 8 }}>Deploy Target</span>
+        <div style={{ display: "flex", borderRadius: 8, overflow: "hidden" }}>
+          <button
+            style={{ ...pillStyle(target === "kubernetes"), borderRight: "none", borderRadius: "8px 0 0 8px" }}
+            onClick={() => dispatch({ type: "SET_REPO_DEPLOY", repoName: repo.full_name, target: "kubernetes" })}
+          >
+            ☸ Kubernetes
+          </button>
+          <button
+            style={{ ...pillStyle(target === "vercel"), borderRight: "none", borderRadius: 0 }}
+            onClick={() => dispatch({ type: "SET_REPO_DEPLOY", repoName: repo.full_name, target: "vercel" })}
+          >
+            ▲ Vercel
+          </button>
+          <button
+            style={{ ...pillStyle(target === "none"), borderRadius: "0 8px 8px 0" }}
+            onClick={() => dispatch({ type: "SET_REPO_DEPLOY", repoName: repo.full_name, target: "none" })}
+          >
+            — None
+          </button>
+        </div>
+      </div>
+
+      {/* Inline config */}
+      {target === "kubernetes" && (
+        <div style={{
+          background: "var(--md-surface, #FFFBFE)",
+          border: "1px solid var(--md-surface-variant, #E7E0EC)",
+          borderRadius: 8, padding: 16, display: "flex", flexDirection: "column", gap: 12,
+        }}>
+          {/* Namespace */}
+          <div>
+            <label style={labelStyle}>Namespace</label>
+            <select
+              value={customNamespace ? "custom" : (deployConfig.namespace || "dev")}
+              onChange={(e) => {
+                if (e.target.value === "custom") {
+                  setCustomNamespace(true);
+                } else {
+                  setCustomNamespace(false);
+                  dispatch({ type: "SET_REPO_DEPLOY_CONFIG", repoName: repo.full_name, configKey: "namespace", configValue: e.target.value });
+                }
+              }}
+              style={{ ...inputStyle, width: "auto", minWidth: 160 }}
+            >
+              <option value="agents">agents</option>
+              <option value="dev">dev</option>
+              <option value="infra">infra</option>
+              <option value="dante">dante</option>
+              <option value="custom">Custom...</option>
+            </select>
+            {customNamespace && (
+              <input
+                type="text"
+                placeholder="Enter custom namespace"
+                value={deployConfig.namespace || ""}
+                onChange={(e) => dispatch({ type: "SET_REPO_DEPLOY_CONFIG", repoName: repo.full_name, configKey: "namespace", configValue: e.target.value })}
+                style={{ ...inputStyle, marginTop: 8 }}
+              />
+            )}
+          </div>
+          {/* Service name */}
+          <div>
+            <label style={labelStyle}>Service Name</label>
+            <input
+              type="text"
+              value={deployConfig.service_name !== undefined ? deployConfig.service_name : repoName}
+              onChange={(e) => dispatch({ type: "SET_REPO_DEPLOY_CONFIG", repoName: repo.full_name, configKey: "service_name", configValue: e.target.value })}
+              style={inputStyle}
+            />
+          </div>
+          {/* ArgoCD */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              id={`argocd-${repo.full_name}`}
+              checked={deployConfig.argocd_managed !== false}
+              onChange={(e) => dispatch({ type: "SET_REPO_DEPLOY_CONFIG", repoName: repo.full_name, configKey: "argocd_managed", configValue: e.target.checked })}
+              style={{ width: 16, height: 16, cursor: "pointer" }}
+            />
+            <label htmlFor={`argocd-${repo.full_name}`} style={{ fontSize: 14, color: "var(--md-on-surface)", cursor: "pointer" }}>
+              ArgoCD managed
+            </label>
+          </div>
+        </div>
+      )}
+
+      {target === "vercel" && (
+        <div style={{
+          background: "var(--md-surface, #FFFBFE)",
+          border: "1px solid var(--md-surface-variant, #E7E0EC)",
+          borderRadius: 8, padding: 16, display: "flex", flexDirection: "column", gap: 12,
+        }}>
+          <div>
+            <label style={labelStyle}>Vercel Project Name</label>
+            <input
+              type="text"
+              value={deployConfig.vercel_project !== undefined ? deployConfig.vercel_project : repoName}
+              onChange={(e) => dispatch({ type: "SET_REPO_DEPLOY_CONFIG", repoName: repo.full_name, configKey: "vercel_project", configValue: e.target.value })}
+              style={inputStyle}
+            />
+          </div>
+          <div style={{
+            background: "#FFF3CD", border: "1px solid #FFE083", borderRadius: 8, padding: "10px 14px",
+            fontSize: 13, color: "#7B5800", display: "flex", alignItems: "center", gap: 8,
+          }}>
+            ⚠️ Requires VERCEL_TOKEN credential
+          </div>
+          <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)", fontStyle: "italic" }}>
+            No framework detected
+          </div>
+        </div>
+      )}
+
+      {target === "none" && (
+        <div style={{
+          fontSize: 13, color: "var(--md-on-surface-variant)", fontStyle: "italic", opacity: 0.8,
+        }}>
+          No deployment pipeline. Code changes only (skills, configs, libraries).
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OnboardingStep3({ state, dispatch }) {
+  const supabaseRef = state.supabaseProjectRef || "";
+  const supabaseValid = !supabaseRef || /^[a-z]{20}$/.test(supabaseRef);
+
+  return (
+    <div>
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ margin: "0 0 4px", fontSize: 20, fontWeight: 700, color: "var(--md-on-surface)" }}>
+          Configure deployment for each repository
+        </h2>
+        <p style={{ margin: 0, fontSize: 14, color: "var(--md-on-surface-variant)" }}>
+          Choose how each repo will be deployed to your infrastructure
+        </p>
+      </div>
+
+      {/* Per-repo cards */}
+      {state.selectedRepos.length === 0 ? (
+        <div style={{
+          textAlign: "center", padding: "40px 20px",
+          color: "var(--md-on-surface-variant)", fontSize: 14,
+        }}>
+          No repositories selected. Go back to Step 2 to pick repos.
+        </div>
+      ) : (
+        state.selectedRepos.map((repo) => (
+          <RepoDeployCard
+            key={repo.full_name}
+            repo={repo}
+            config={state.repoDeployConfigs[repo.full_name] || { deploy_target: "none", deploy_config: {} }}
+            dispatch={dispatch}
+          />
+        ))
+      )}
+
+      {/* Supabase section */}
+      <div style={{
+        marginTop: 32, border: "1px solid var(--md-surface-variant, #E7E0EC)",
+        borderRadius: 12, padding: 20, background: "var(--md-surface-container, #F5F0FB)",
+      }}>
+        <div style={{ marginBottom: 14 }}>
+          <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "var(--md-on-surface)" }}>
+            Connect Supabase Project <span style={{ fontWeight: 400, fontSize: 13, color: "var(--md-on-surface-variant)" }}>(optional)</span>
+          </h3>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--md-on-surface-variant)" }}>
+            Link a Supabase database to this app for backend storage
+          </p>
+        </div>
+        <div>
+          <input
+            type="text"
+            placeholder="e.g. abcdefghijklmnop"
+            value={supabaseRef}
+            onChange={(e) => dispatch({ type: "SET_SUPABASE_REF", value: e.target.value })}
+            style={{
+              width: "100%",
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: `1px solid ${!supabaseValid ? "#C00012" : "var(--md-surface-variant, #E7E0EC)"}`,
+              background: "var(--md-surface, #FFFBFE)",
+              color: "var(--md-on-surface)",
+              fontSize: 14,
+              fontFamily: "'Inter', system-ui, sans-serif",
+              boxSizing: "border-box",
+            }}
+          />
+          {!supabaseValid && (
+            <div style={{ marginTop: 6, fontSize: 12, color: "#C00012" }}>
+              Project ref must be exactly 20 lowercase letters
+            </div>
+          )}
+          <div style={{ marginTop: 8 }}>
+            <a
+              href="https://supabase.com/dashboard/new/_"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ fontSize: 13, color: "#6750A4", textDecoration: "none" }}
+            >
+              Create new project →
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PlaceholderStep({ label }) {
   return (
     <div style={{
@@ -966,6 +1267,7 @@ export default function AppOnboardingWizard({ onClose, onCreated }) {
     switch (state.step) {
       case 0: return isStep1Valid();
       case 1: return state.selectedRepos && state.selectedRepos.length > 0;
+      case 2: return !state.supabaseProjectRef || /^[a-z]{20}$/.test(state.supabaseProjectRef);
       default: return true;
     }
   };
@@ -974,7 +1276,7 @@ export default function AppOnboardingWizard({ onClose, onCreated }) {
     switch (state.step) {
       case 0: return <OnboardingStep1 state={state} dispatch={dispatch} />;
       case 1: return <OnboardingStep2 state={state} dispatch={dispatch} />;
-      case 2: return <PlaceholderStep label="Deploy Target" />;
+      case 2: return <OnboardingStep3 state={state} dispatch={dispatch} />;
       case 3: return <PlaceholderStep label="Credentials" />;
       case 4: return <PlaceholderStep label="Review & Create" />;
       default: return null;
