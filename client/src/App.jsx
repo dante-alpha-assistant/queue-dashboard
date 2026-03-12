@@ -15,7 +15,8 @@ import Pingboard from "./pages/Pingboard";
 import HealthDashboard from "./pages/HealthDashboard";
 import AppsPage from "./pages/AppsPage";
 import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
-import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Package, Rocket, Search, XCircle, Zap } from 'lucide-react';
+import AppCreationWizard from "./components/AppCreationWizard";
+import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Package, Plus, Rocket, Search, XCircle, Zap } from 'lucide-react';
 
 const MOBILE_TABS = [
   { key: "todo", label: "Todo", icon: "📋" },
@@ -120,6 +121,11 @@ export default function App() {
     setSelectedTask(prev => prev ? { ...prev, ...updates } : null);
   }, [updateTask]);
 
+
+  // App creation wizard
+  const [showAppWizard, setShowAppWizard] = useState(false);
+  const handleAppWizardClose = useCallback(() => setShowAppWizard(false), []);
+  const handleAppCreated = useCallback(() => { setShowAppWizard(false); }, []);
 
   // Batch deploy modal
   const [showBatchDeploy, setShowBatchDeploy] = useState(false);
@@ -459,6 +465,14 @@ export default function App() {
               <option value="">All</option>
               {apps.map(a => <option key={a.id} value={a.id}>{a.icon ? a.icon + ' ' : ''}{a.name}</option>)}
             </select>
+            <button onClick={() => setShowAppWizard(true)} title="Create new app" style={{
+              width: 28, height: 28, borderRadius: 8, border: "1px solid var(--md-surface-variant)",
+              background: "var(--md-surface)", color: "var(--md-primary, #6750A4)",
+              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              padding: 0, transition: "all 150ms",
+            }}>
+              <Plus size={14} />
+            </button>
           </div>
           <div style={{ width: 1, height: 24, background: "var(--md-surface-variant)" }} />
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -604,5 +618,6 @@ export default function App() {
       )}
     </div>
       {showBatchDeploy && <BatchDeployModal tasks={filterByType(completed)} onDeploy={() => { setShowBatchDeploy(false); }} onClose={() => setShowBatchDeploy(false)} />}
+      {showAppWizard && <AppCreationWizard onClose={handleAppWizardClose} onCreated={handleAppCreated} />}
   </>);
 }
