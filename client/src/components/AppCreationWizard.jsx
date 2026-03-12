@@ -19,15 +19,16 @@ const DEPLOY_TARGETS = [
 const K8S_NAMESPACES = ["agents", "dev", "infra", "dante"];
 
 const CREDENTIAL_OPTIONS = [
-  { key: "GH_TOKEN", label: "GH_TOKEN" },
-  { key: "SUPABASE_SERVICE_ROLE_KEY", label: "SUPABASE_SERVICE_ROLE_KEY" },
-  { key: "SUPABASE_MGMT_TOKEN", label: "SUPABASE_MGMT_TOKEN" },
-  { key: "VERCEL_TOKEN", label: "VERCEL_TOKEN" },
-  { key: "KUBECONFIG", label: "KUBECONFIG" },
+  { key: "GH_TOKEN", icon: "🔑", label: "GH_TOKEN", desc: "GitHub access for cloning and pushing code", alwaysRequired: true },
+  { key: "SUPABASE_SERVICE_ROLE_KEY", icon: "🗄️", label: "SUPABASE_SERVICE_ROLE_KEY", desc: "Full access to Supabase database and storage" },
+  { key: "SUPABASE_MGMT_TOKEN", icon: "⚙️", label: "SUPABASE_MGMT_TOKEN", desc: "Run SQL migrations and manage Supabase projects" },
+  { key: "VERCEL_TOKEN", icon: "▲", label: "VERCEL_TOKEN", desc: "Deploy to Vercel" },
+  { key: "KUBECONFIG", icon: "☸️", label: "KUBECONFIG", desc: "Direct Kubernetes cluster access" },
+  { key: "OPENROUTER_API_KEY", icon: "🤖", label: "OPENROUTER_API_KEY", desc: "AI model access via OpenRouter" },
 ];
 
 const DEFAULT_REQ_CREDS = ["GH_TOKEN"];
-const DEFAULT_QA_CREDS = ["GH_TOKEN", "SUPABASE_SERVICE_ROLE_KEY"];
+const DEFAULT_QA_CREDS = ["GH_TOKEN", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_MGMT_TOKEN"];
 
 /* ── Helpers ───────────────────────────────────────────── */
 function slugify(str) {
@@ -98,6 +99,11 @@ function reducer(state, action) {
       if (!val || state[field].includes(val)) return state;
       return { ...state, [field]: [...state[field], val], [action.inputField]: "" };
     }
+    case "AUTO_ADD_CRED": {
+      const field = action.field;
+      if (state[field].includes(action.key)) return state;
+      return { ...state, [field]: [...state[field], action.key] };
+    }
     case "NEXT_STEP":
       return { ...state, step: Math.min(state.step + 1, STEPS.length - 1), error: null };
     case "PREV_STEP":
@@ -114,6 +120,47 @@ export default function AppCreationWizard({ onClose, onCreated }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const searchTimer = useRef(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const [agentCapabilities, setAgentCapabilities] = useState([]);
+
+  // Fetch agent capabilities for preview
+  useEffect(() => {
+    fetch("/api/agents/capabilities")
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setAgentCapabilities(data || []))
+      .catch(() => setAgentCapabilities([]));
+  }, []);
+
+  // Auto-suggest credentials based on Step 3 selections
+  useEffect(() => {
+    const repos = state.repos || [];
+    const repoDeploy = state.repoDeploy || {};
+    const deployTargets = repos.map(r => (repoDeploy[r.full_name]?.target) || state.deployTarget);
+    const hasVercel = deployTargets.includes("vercel");
+    const hasK8s = deployTargets.includes("kubernetes");
+    const hasSupabase = !!(state.supabaseRef && state.supabaseRef.trim());
+
+    if (hasVercel && !state.reqCredentials.includes("VERCEL_TOKEN")) {
+      dispatch({ type: "AUTO_ADD_CRED", field: "reqCredentials", key: "VERCEL_TOKEN" });
+    }
+    if (hasK8s && !state.reqCredentials.includes("KUBECONFIG")) {
+      dispatch({ type: "AUTO_ADD_CRED", field: "reqCredentials", key: "KUBECONFIG" });
+    }
+    if (hasSupabase) {
+      if (!state.reqCredentials.includes("SUPABASE_SERVICE_ROLE_KEY")) {
+        dispatch({ type: "AUTO_ADD_CRED", field: "reqCredentials", key: "SUPABASE_SERVICE_ROLE_KEY" });
+      }
+      if (!state.reqCredentials.includes("SUPABASE_MGMT_TOKEN")) {
+        dispatch({ type: "AUTO_ADD_CRED", field: "reqCredentials", key: "SUPABASE_MGMT_TOKEN" });
+      }
+      if (!state.qaCredentials.includes("SUPABASE_SERVICE_ROLE_KEY")) {
+        dispatch({ type: "AUTO_ADD_CRED", field: "qaCredentials", key: "SUPABASE_SERVICE_ROLE_KEY" });
+      }
+      if (!state.qaCredentials.includes("SUPABASE_MGMT_TOKEN")) {
+        dispatch({ type: "AUTO_ADD_CRED", field: "qaCredentials", key: "SUPABASE_MGMT_TOKEN" });
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.repos, state.supabaseRef, state.deployTarget, state.repoDeploy]);
 
   // Track changes
   useEffect(() => {
@@ -484,85 +531,256 @@ export default function AppCreationWizard({ onClose, onCreated }) {
   );
 
   const renderCredentials = () => {
-    const renderCredList = (field, inputField, defaults) => (
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {CREDENTIAL_OPTIONS.map(c => {
-          const checked = state[field].includes(c.key);
-          return (
-            <label key={c.key} style={{
-              display: "flex", alignItems: "center", gap: 10, padding: "8px 12px",
-              borderRadius: 8, cursor: "pointer",
-              background: checked ? "rgba(103,80,164,0.06)" : "transparent",
-              transition: "background 100ms",
+    /* ── Credential column renderer ─────────────────────── */
+    const renderCredColumn = (title, subtitle, field, inputField) => (
+      <div style={{
+        flex: 1, minWidth: 240,
+        background: "var(--md-surface-container-low, #F7F2FA)",
+        borderRadius: 16, padding: "20px 18px",
+        border: "1px solid var(--md-surface-variant, #E7E0EC)",
+        display: "flex", flexDirection: "column", gap: 0,
+      }}>
+        {/* Column header */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--md-on-surface)", marginBottom: 4 }}>{title}</div>
+          <div style={{ fontSize: 11, color: "var(--md-on-surface-variant)", lineHeight: 1.4 }}>{subtitle}</div>
+        </div>
+
+        {/* Standard credential options */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          {CREDENTIAL_OPTIONS.map(c => {
+            const checked = state[field].includes(c.key);
+            const locked = c.alwaysRequired;
+            return (
+              <label key={c.key} onClick={() => !locked && dispatch({ type: "TOGGLE_CRED", field, key: c.key })} style={{
+                display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px",
+                borderRadius: 10, cursor: locked ? "default" : "pointer",
+                background: checked ? "rgba(103,80,164,0.08)" : "white",
+                border: `1px solid ${checked ? "rgba(103,80,164,0.3)" : "transparent"}`,
+                transition: "all 120ms",
+              }}>
+                {/* Custom checkbox */}
+                <div style={{
+                  marginTop: 2, flexShrink: 0,
+                  width: 18, height: 18, borderRadius: 5,
+                  border: `2px solid ${checked ? "var(--md-primary, #6750A4)" : "var(--md-outline, #79747E)"}`,
+                  background: checked ? "var(--md-primary, #6750A4)" : "white",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  {checked && (
+                    <svg width="10" height="10" viewBox="0 0 10 10">
+                      <polyline points="1.5,5 4,7.5 8.5,2.5" stroke="white" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </div>
+                {/* Content */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 14, lineHeight: 1 }}>{c.icon}</span>
+                    <span style={{
+                      fontSize: 11, fontWeight: 700,
+                      fontFamily: "'JetBrains Mono', monospace",
+                      color: "var(--md-on-surface)", letterSpacing: "0.02em",
+                    }}>{c.label}</span>
+                    {locked && (
+                      <span style={{
+                        fontSize: 9, padding: "1px 5px", borderRadius: 4,
+                        background: "rgba(103,80,164,0.15)", color: "var(--md-primary, #6750A4)",
+                        fontWeight: 700, letterSpacing: "0.03em",
+                      }}>REQUIRED</span>
+                    )}
+                  </div>
+                  <div style={{
+                    fontSize: 10, color: "var(--md-on-surface-variant)",
+                    marginTop: 3, lineHeight: 1.4,
+                  }}>{c.desc}</div>
+                </div>
+              </label>
+            );
+          })}
+
+          {/* Custom credentials */}
+          {state[field].filter(c => !CREDENTIAL_OPTIONS.some(o => o.key === c)).map(c => (
+            <div key={c} style={{
+              display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px",
+              borderRadius: 10, background: "rgba(103,80,164,0.08)",
+              border: "1px solid rgba(103,80,164,0.3)",
             }}>
-              <input
-                type="checkbox"
-                checked={checked}
-                onChange={() => dispatch({ type: "TOGGLE_CRED", field, key: c.key })}
-                style={{ width: 16, height: 16, accentColor: "var(--md-primary, #6750A4)" }}
-              />
-              <span style={{
-                fontSize: 12, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace",
-                color: "var(--md-on-surface)",
-              }}>{c.label}</span>
-            </label>
-          );
-        })}
-        {/* Custom credentials */}
-        {state[field].filter(c => !CREDENTIAL_OPTIONS.some(o => o.key === c)).map(c => (
-          <label key={c} style={{
-            display: "flex", alignItems: "center", gap: 10, padding: "8px 12px",
-            borderRadius: 8, background: "rgba(103,80,164,0.06)",
-          }}>
-            <input type="checkbox" checked readOnly onChange={() => dispatch({ type: "TOGGLE_CRED", field, key: c })}
-              style={{ width: 16, height: 16, accentColor: "var(--md-primary, #6750A4)" }} />
-            <span style={{ fontSize: 12, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace", color: "var(--md-on-surface)" }}>{c}</span>
-            <span style={{ fontSize: 10, color: "var(--md-on-surface-variant)" }}>(custom)</span>
-          </label>
-        ))}
-        <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-          <input
-            value={state[inputField]}
-            onChange={e => dispatch({ type: "SET_FIELD", field: inputField, value: e.target.value })}
-            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); dispatch({ type: "ADD_CUSTOM_CRED", field, value: state[inputField], inputField }); } }}
-            placeholder="CUSTOM_KEY"
-            style={{ ...inputStyle, flex: 1, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, padding: "6px 10px" }}
-          />
-          <button
-            onClick={() => dispatch({ type: "ADD_CUSTOM_CRED", field, value: state[inputField], inputField })}
-            disabled={!state[inputField].trim()}
-            style={{
-              padding: "6px 14px", borderRadius: 8, border: "none",
-              background: state[inputField].trim() ? "var(--md-primary, #6750A4)" : "var(--md-surface-variant)",
-              color: "#fff", cursor: state[inputField].trim() ? "pointer" : "not-allowed",
-              fontSize: 11, fontWeight: 600, fontFamily: "'Inter', system-ui",
-            }}
-          >Add</button>
+              <div style={{
+                marginTop: 2, flexShrink: 0,
+                width: 18, height: 18, borderRadius: 5,
+                border: "2px solid var(--md-primary, #6750A4)",
+                background: "var(--md-primary, #6750A4)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <svg width="10" height="10" viewBox="0 0 10 10">
+                  <polyline points="1.5,5 4,7.5 8.5,2.5" stroke="white" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 14 }}>🔐</span>
+                  <span style={{
+                    fontSize: 11, fontWeight: 700,
+                    fontFamily: "'JetBrains Mono', monospace", color: "var(--md-on-surface)",
+                  }}>{c}</span>
+                  <span style={{
+                    fontSize: 9, padding: "1px 5px", borderRadius: 4,
+                    background: "rgba(0,0,0,0.06)", color: "var(--md-on-surface-variant)", fontWeight: 600,
+                  }}>CUSTOM</span>
+                </div>
+              </div>
+              <button onClick={() => dispatch({ type: "TOGGLE_CRED", field, key: c })} style={{
+                background: "none", border: "none", cursor: "pointer",
+                color: "var(--md-on-surface-variant)", padding: "0 2px",
+                fontSize: 16, lineHeight: 1, flexShrink: 0,
+              }}>×</button>
+            </div>
+          ))}
+
+          {/* Add custom credential */}
+          <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+            <input
+              value={state[inputField]}
+              onChange={e => dispatch({ type: "SET_FIELD", field: inputField, value: e.target.value })}
+              onKeyDown={e => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  dispatch({ type: "ADD_CUSTOM_CRED", field, value: state[inputField], inputField });
+                }
+              }}
+              placeholder="CUSTOM_KEY"
+              style={{
+                ...inputStyle, flex: 1,
+                fontFamily: "'JetBrains Mono', monospace", fontSize: 11, padding: "7px 10px",
+              }}
+            />
+            <button
+              onClick={() => dispatch({ type: "ADD_CUSTOM_CRED", field, value: state[inputField], inputField })}
+              disabled={!state[inputField].trim()}
+              style={{
+                padding: "7px 14px", borderRadius: 8, border: "none",
+                background: state[inputField].trim() ? "var(--md-primary, #6750A4)" : "var(--md-surface-variant)",
+                color: state[inputField].trim() ? "#fff" : "var(--md-on-surface-variant)",
+                cursor: state[inputField].trim() ? "pointer" : "not-allowed",
+                fontSize: 11, fontWeight: 600, flexShrink: 0,
+              }}
+            >Add</button>
+          </div>
         </div>
       </div>
     );
 
+    /* ── Agent Capability Preview ────────────────────────── */
+    const renderAgentPreview = () => {
+      if (agentCapabilities.length === 0) return null;
+      const isQaAgent = (a) => (a.capabilities || []).includes("qa");
+      return (
+        <div style={{ marginTop: 4 }}>
+          <div style={{
+            fontSize: 11, fontWeight: 700, color: "var(--md-on-surface-variant)",
+            textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8,
+          }}>Agent Capability Preview</div>
+          <div style={{
+            fontSize: 12, color: "var(--md-on-surface-variant)",
+            marginBottom: 12, lineHeight: 1.5,
+          }}>
+            Based on your selections, these agents can work on this app:
+          </div>
+          <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 4 }}>
+            {agentCapabilities.map(agent => {
+              const qaAgent = isQaAgent(agent);
+              const requiredCreds = qaAgent ? state.qaCredentials : state.reqCredentials;
+              const available = agent.available_credentials || [];
+              // GH_TOKEN is always assumed available (any agent with a GH_TOKEN)
+              const missing = requiredCreds.filter(c => c !== "GH_TOKEN" && !available.includes(c));
+              const compatible = missing.length === 0;
+              return (
+                <div key={agent.id || agent.name} style={{
+                  flexShrink: 0, padding: "12px 14px", borderRadius: 12,
+                  border: `2px solid ${compatible ? "rgba(21,128,61,0.3)" : "rgba(185,28,28,0.25)"}`,
+                  background: compatible ? "rgba(21,128,61,0.05)" : "rgba(185,28,28,0.04)",
+                  minWidth: 180, maxWidth: 240,
+                }}>
+                  {/* Agent header */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <div style={{
+                      fontSize: 18, width: 32, height: 32, borderRadius: 8,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      background: "var(--md-surface-container, #F5F0FB)", flexShrink: 0,
+                    }}>{agent.avatar || (qaAgent ? "🧪" : "🤖")}</div>
+                    <div>
+                      <div style={{
+                        fontSize: 11, fontWeight: 700, color: "var(--md-on-surface)",
+                        fontFamily: "'JetBrains Mono', monospace",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160,
+                      }}>{agent.id || agent.name}</div>
+                      {qaAgent && (
+                        <div style={{ fontSize: 10, color: "var(--md-on-surface-variant)" }}>QA Agent</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Compatibility badge */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {compatible ? (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 14 14" style={{ flexShrink: 0 }}>
+                          <circle cx="7" cy="7" r="7" fill="#15803d"/>
+                          <polyline points="3.5,7 5.5,9.5 10.5,4.5" stroke="white" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#15803d" }}>COMPATIBLE</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 14 14" style={{ flexShrink: 0 }}>
+                          <circle cx="7" cy="7" r="7" fill="#b91c1c"/>
+                          <line x1="4.5" y1="4.5" x2="9.5" y2="9.5" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+                          <line x1="9.5" y1="4.5" x2="4.5" y2="9.5" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+                        </svg>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#b91c1c" }}>MISSING</span>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Missing creds list */}
+                  {!compatible && (
+                    <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {missing.map(m => (
+                        <span key={m} style={{
+                          fontSize: 9, padding: "2px 5px", borderRadius: 4,
+                          background: "rgba(185,28,28,0.1)", color: "#b91c1c",
+                          fontFamily: "'JetBrains Mono', monospace", fontWeight: 600,
+                        }}>{m}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    };
+
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        <div>
-          <label style={{ ...labelStyle, marginBottom: 10 }}>Required Credentials</label>
-          {renderCredList("reqCredentials", "customCredential", DEFAULT_REQ_CREDS)}
+        {/* Two-column layout: stacks on narrow viewports via flexWrap */}
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+          {renderCredColumn(
+            "What does the coding agent need?",
+            "Select env vars the agent must have to build and deploy this app",
+            "reqCredentials", "customCredential"
+          )}
+          {renderCredColumn(
+            "What does the QA agent need?",
+            "Select env vars the QA agent must have to review and verify",
+            "qaCredentials", "customQaCredential"
+          )}
         </div>
-        <div style={{ height: 1, background: "var(--md-surface-variant, #E7E0EC)" }} />
-        <div>
-          <label style={{ ...labelStyle, marginBottom: 10 }}>QA Credentials</label>
-          {renderCredList("qaCredentials", "customQaCredential", DEFAULT_QA_CREDS)}
-        </div>
-        <div style={{ height: 1, background: "var(--md-surface-variant, #E7E0EC)" }} />
-        <div>
-          <label style={labelStyle}>Supabase Project Ref (optional)</label>
-          <input
-            value={state.supabaseRef}
-            onChange={e => dispatch({ type: "SET_FIELD", field: "supabaseRef", value: e.target.value })}
-            placeholder="abcdefghijklmnop"
-            style={{ ...inputStyle, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}
-          />
-        </div>
+
+        {/* Agent capability preview */}
+        {renderAgentPreview()}
       </div>
     );
   };
