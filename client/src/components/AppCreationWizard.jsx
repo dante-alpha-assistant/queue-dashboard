@@ -34,6 +34,19 @@ function slugify(str) {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
+function defaultRepoDeployConfig(repo) {
+  return {
+    deploy_target: "kubernetes",
+    deploy_config: {
+      namespace: "agents",
+      service: repo.name,
+      argocd: true,
+      vercelProject: repo.name,
+      customNamespace: "",
+    },
+  };
+}
+
 /* ── Reducer ───────────────────────────────────────────── */
 const initialState = {
   step: 0,
@@ -46,15 +59,12 @@ const initialState = {
   repoSearch: "",
   repoResults: [],
   repoLoading: false,
-  deployTarget: "kubernetes",
-  k8sNamespace: "infra",
-  k8sService: "",
-  vercelProject: "",
+  repoDeployConfigs: {},         // keyed by full_name: { deploy_target, deploy_config: { namespace, service, argocd, vercelProject, customNamespace } }
+  supabaseRef: "",
   reqCredentials: [...DEFAULT_REQ_CREDS],
   qaCredentials: [...DEFAULT_QA_CREDS],
   customCredential: "",
   customQaCredential: "",
-  supabaseRef: "",
   submitting: false,
   error: null,
 };
@@ -70,21 +80,56 @@ function reducer(state, action) {
     }
     case "TOGGLE_REPO": {
       const idx = state.repos.findIndex(r => r.full_name === action.repo.full_name);
-      const repos = idx >= 0
-        ? state.repos.filter((_, i) => i !== idx)
-        : [...state.repos, action.repo];
-      const s = { ...state, repos };
-      // Auto-suggest k8s service or vercel project from first repo
-      if (repos.length > 0 && !state.k8sService) {
-        s.k8sService = repos[0].name;
+      let repos;
+      let repoDeployConfigs = { ...state.repoDeployConfigs };
+      if (idx >= 0) {
+        repos = state.repos.filter((_, i) => i !== idx);
+        delete repoDeployConfigs[action.repo.full_name];
+      } else {
+        repos = [...state.repos, action.repo];
+        if (!repoDeployConfigs[action.repo.full_name]) {
+          repoDeployConfigs[action.repo.full_name] = defaultRepoDeployConfig(action.repo);
+        }
       }
-      if (repos.length > 0 && !state.vercelProject) {
-        s.vercelProject = repos[0].name;
-      }
-      return s;
+      return { ...state, repos, repoDeployConfigs };
+    }
+    case "REMOVE_REPO": {
+      const repos = state.repos.filter(r => r.full_name !== action.fullName);
+      const repoDeployConfigs = { ...state.repoDeployConfigs };
+      delete repoDeployConfigs[action.fullName];
+      return { ...state, repos, repoDeployConfigs };
+    }
+    case "SET_REPO_DEPLOY_TARGET": {
+      const existing = state.repoDeployConfigs[action.repoFullName] || { deploy_config: {} };
+      return {
+        ...state,
+        repoDeployConfigs: {
+          ...state.repoDeployConfigs,
+          [action.repoFullName]: {
+            ...existing,
+            deploy_target: action.target,
+          },
+        },
+      };
+    }
+    case "SET_REPO_DEPLOY_CONFIG": {
+      const existing = state.repoDeployConfigs[action.repoFullName] || { deploy_target: "kubernetes", deploy_config: {} };
+      return {
+        ...state,
+        repoDeployConfigs: {
+          ...state.repoDeployConfigs,
+          [action.repoFullName]: {
+            ...existing,
+            deploy_config: {
+              ...existing.deploy_config,
+              [action.key]: action.value,
+            },
+          },
+        },
+      };
     }
     case "TOGGLE_CRED": {
-      const field = action.field; // reqCredentials or qaCredentials
+      const field = action.field;
       const creds = state[field];
       const idx = creds.indexOf(action.key);
       return {
@@ -169,22 +214,30 @@ export default function AppCreationWizard({ onClose, onCreated }) {
     dispatch({ type: "SET_FIELD", field: "error", value: null });
 
     try {
-      const deployConfig = {};
-      if (state.deployTarget === "kubernetes") {
-        deployConfig.namespace = state.k8sNamespace;
-        deployConfig.service = state.k8sService || state.repos[0]?.name || "";
-      } else if (state.deployTarget === "vercel") {
-        deployConfig.project = state.vercelProject || state.repos[0]?.name || "";
-      }
+      // Build per-repo deploy config array
+      const repos = state.repos.map(r => {
+        const cfg = state.repoDeployConfigs[r.full_name] || { deploy_target: "none", deploy_config: {} };
+        const deployConf = {};
+        if (cfg.deploy_target === "kubernetes") {
+          deployConf.namespace = cfg.deploy_config?.customNamespace?.trim() || cfg.deploy_config?.namespace || "agents";
+          deployConf.service = cfg.deploy_config?.service || r.name;
+          deployConf.argocd = cfg.deploy_config?.argocd !== false;
+        } else if (cfg.deploy_target === "vercel") {
+          deployConf.project = cfg.deploy_config?.vercelProject || r.name;
+        }
+        return {
+          repo: r.full_name,
+          deploy_target: cfg.deploy_target,
+          deploy_config: deployConf,
+        };
+      });
 
       const body = {
         name: state.name.trim(),
         slug: state.slug.trim(),
         description: state.description.trim() || null,
         icon: state.icon || null,
-        repos: state.repos.map(r => r.full_name),
-        deploy_target: state.deployTarget,
-        deploy_config: deployConfig,
+        repos,
         env_keys: state.reqCredentials,
         qa_env_keys: state.qaCredentials,
         supabase_project_ref: state.supabaseRef.trim() || null,
@@ -309,7 +362,7 @@ export default function AppCreationWizard({ onClose, onCreated }) {
                 fontSize: 12, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace",
               }}>
                 {r.name}
-                <button onClick={() => dispatch({ type: "TOGGLE_REPO", repo: r })} style={{
+                <button onClick={() => dispatch({ type: "REMOVE_REPO", fullName: r.full_name })} style={{
                   background: "none", border: "none", color: "rgba(255,255,255,0.8)",
                   cursor: "pointer", padding: 0, display: "flex", fontSize: 14, lineHeight: 1,
                 }}>×</button>
@@ -403,85 +456,229 @@ export default function AppCreationWizard({ onClose, onCreated }) {
     );
   };
 
-  const renderDeploy = () => (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div>
-        <label style={labelStyle}>Deploy Target</label>
-        <div style={{ display: "flex", gap: 10 }}>
-          {DEPLOY_TARGETS.map(t => {
-            const active = state.deployTarget === t.value;
-            return (
-              <button key={t.value} onClick={() => dispatch({ type: "SET_FIELD", field: "deployTarget", value: t.value })} style={{
-                flex: 1, padding: "16px 12px", borderRadius: 12,
-                border: `2px solid ${active ? t.color : "var(--md-surface-variant, #E7E0EC)"}`,
-                background: active ? `${t.color}12` : "transparent",
-                cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
-                color: active ? t.color : "var(--md-on-surface-variant)",
-                fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
-                transition: "all 150ms",
+  /* ── Per-repo deploy card ───────────────────────────── */
+  const renderRepoDeployCard = (repo) => {
+    const cfg = state.repoDeployConfigs[repo.full_name] || defaultRepoDeployConfig(repo);
+    const target = cfg.deploy_target;
+    const dcfg = cfg.deploy_config || {};
+    const tInfo = DEPLOY_TARGETS.find(t => t.value === target);
+    const isCustomNs = dcfg.namespace === "custom" || (dcfg.customNamespace && !K8S_NAMESPACES.includes(dcfg.namespace));
+
+    return (
+      <div key={repo.full_name} style={{
+        border: "1px solid var(--md-surface-variant, #E7E0EC)",
+        borderRadius: 16, overflow: "hidden", marginBottom: 12,
+      }}>
+        {/* Repo header */}
+        <div style={{
+          padding: "12px 16px",
+          background: "var(--md-surface-container, #F5F0FB)",
+          borderBottom: "1px solid var(--md-surface-variant, #E7E0EC)",
+          display: "flex", alignItems: "center", gap: 10,
+        }}>
+          <GitBranch size={14} color="var(--md-on-surface-variant, #49454F)" />
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--md-on-surface)" }}>{repo.name}</div>
+            <div style={{ fontSize: 11, color: "var(--md-on-surface-variant)", fontFamily: "'JetBrains Mono', monospace" }}>{repo.full_name}</div>
+          </div>
+        </div>
+
+        {/* Deploy target selector — segmented radio pills */}
+        <div style={{ padding: "12px 16px" }}>
+          <label style={labelStyle}>Deploy Target</label>
+          <div style={{ display: "flex", gap: 6 }}>
+            {DEPLOY_TARGETS.map(t => {
+              const active = target === t.value;
+              return (
+                <button
+                  key={t.value}
+                  onClick={() => dispatch({ type: "SET_REPO_DEPLOY_TARGET", repoFullName: repo.full_name, target: t.value })}
+                  style={{
+                    flex: 1, padding: "10px 8px", borderRadius: 10,
+                    border: `2px solid ${active ? t.color : "var(--md-surface-variant, #E7E0EC)"}`,
+                    background: active ? `${t.color}14` : "transparent",
+                    cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                    color: active ? t.color : "var(--md-on-surface-variant)",
+                    fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                    transition: "all 150ms",
+                    outline: active ? `3px solid ${t.color}30` : "none",
+                    outlineOffset: 2,
+                  }}
+                >
+                  <span style={{ fontSize: 18 }}>{t.icon}</span>
+                  <span style={{ fontSize: 11, fontWeight: active ? 700 : 500 }}>{t.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Kubernetes config */}
+        {target === "kubernetes" && (
+          <div style={{
+            margin: "0 16px 16px", padding: 14, borderRadius: 12,
+            background: "rgba(50,108,229,0.04)", border: "1px solid rgba(50,108,229,0.15)",
+            display: "flex", flexDirection: "column", gap: 12,
+          }}>
+            <div>
+              <label style={labelStyle}>Namespace</label>
+              <select
+                value={isCustomNs ? "custom" : (dcfg.namespace || "agents")}
+                onChange={e => {
+                  if (e.target.value === "custom") {
+                    dispatch({ type: "SET_REPO_DEPLOY_CONFIG", repoFullName: repo.full_name, key: "namespace", value: "custom" });
+                  } else {
+                    dispatch({ type: "SET_REPO_DEPLOY_CONFIG", repoFullName: repo.full_name, key: "namespace", value: e.target.value });
+                    dispatch({ type: "SET_REPO_DEPLOY_CONFIG", repoFullName: repo.full_name, key: "customNamespace", value: "" });
+                  }
+                }}
+                style={{ ...inputStyle, cursor: "pointer" }}
+              >
+                {K8S_NAMESPACES.map(ns => <option key={ns} value={ns}>{ns}</option>)}
+                <option value="custom">Other…</option>
+              </select>
+              {isCustomNs && (
+                <input
+                  value={dcfg.customNamespace || ""}
+                  onChange={e => dispatch({ type: "SET_REPO_DEPLOY_CONFIG", repoFullName: repo.full_name, key: "customNamespace", value: e.target.value })}
+                  placeholder="my-namespace"
+                  style={{ ...inputStyle, marginTop: 8, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}
+                  autoFocus
+                />
+              )}
+            </div>
+            <div>
+              <label style={labelStyle}>Service Name</label>
+              <input
+                value={dcfg.service !== undefined ? dcfg.service : repo.name}
+                onChange={e => dispatch({ type: "SET_REPO_DEPLOY_CONFIG", repoFullName: repo.full_name, key: "service", value: e.target.value })}
+                placeholder={repo.name}
+                style={inputStyle}
+              />
+            </div>
+            <label style={{
+              display: "flex", alignItems: "center", gap: 10, cursor: "pointer",
+              fontSize: 13, color: "var(--md-on-surface)",
+            }}>
+              <input
+                type="checkbox"
+                checked={dcfg.argocd !== false}
+                onChange={e => dispatch({ type: "SET_REPO_DEPLOY_CONFIG", repoFullName: repo.full_name, key: "argocd", value: e.target.checked })}
+                style={{ width: 16, height: 16, accentColor: "#326CE5", cursor: "pointer" }}
+              />
+              <span>ArgoCD managed</span>
+              <span style={{ fontSize: 11, color: "var(--md-on-surface-variant)", marginLeft: -4 }}>(recommended)</span>
+            </label>
+          </div>
+        )}
+
+        {/* Vercel config */}
+        {target === "vercel" && (
+          <div style={{
+            margin: "0 16px 16px", padding: 14, borderRadius: 12,
+            background: "rgba(0,0,0,0.02)", border: "1px solid var(--md-surface-variant, #E7E0EC)",
+            display: "flex", flexDirection: "column", gap: 12,
+          }}>
+            <div style={{
+              padding: "8px 12px", borderRadius: 8,
+              background: "rgba(234,179,8,0.1)", color: "#92400E",
+              fontSize: 12, fontWeight: 500,
+            }}>
+              ⚠️ Requires VERCEL_TOKEN credential
+            </div>
+            <div>
+              <label style={labelStyle}>Vercel Project Name</label>
+              <input
+                value={dcfg.vercelProject !== undefined ? dcfg.vercelProject : repo.name}
+                onChange={e => dispatch({ type: "SET_REPO_DEPLOY_CONFIG", repoFullName: repo.full_name, key: "vercelProject", value: e.target.value })}
+                placeholder={repo.name}
+                style={inputStyle}
+              />
+            </div>
+            <div style={{ fontSize: 11, color: "var(--md-on-surface-variant)", fontStyle: "italic" }}>
+              🔍 Framework auto-detect: Next.js / Vite / Static (from package.json)
+            </div>
+          </div>
+        )}
+
+        {/* None */}
+        {target === "none" && (
+          <div style={{
+            margin: "0 16px 16px", padding: 12, borderRadius: 12,
+            background: "var(--md-surface-container, #F5F0FB)",
+            color: "var(--md-on-surface-variant)", fontSize: 13, lineHeight: 1.6,
+          }}>
+            ℹ️ No deployment pipeline. Code changes only (skills, configs, libraries).
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderDeploy = () => {
+    const supabaseValid = state.supabaseRef.length === 0 || /^[a-z]{20}$/.test(state.supabaseRef);
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--md-on-surface-variant)", lineHeight: 1.5 }}>
+          Choose a deploy target for each selected repository.
+        </p>
+
+        {state.repos.map(repo => renderRepoDeployCard(repo))}
+
+        {/* Supabase section */}
+        <div style={{
+          marginTop: 8, padding: 16, borderRadius: 16,
+          border: "1px solid var(--md-surface-variant, #E7E0EC)",
+        }}>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--md-on-surface)" }}>Connect Supabase Project</div>
+            <div style={{ fontSize: 11, color: "var(--md-on-surface-variant)", marginTop: 2 }}>Optional — shared across all repos in this app</div>
+          </div>
+          <div style={{ position: "relative" }}>
+            <input
+              value={state.supabaseRef}
+              onChange={e => dispatch({ type: "SET_FIELD", field: "supabaseRef", value: e.target.value.toLowerCase().replace(/[^a-z]/g, "") })}
+              placeholder="abcdefghijklmnop"
+              maxLength={20}
+              style={{
+                ...inputStyle,
+                fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
+                paddingRight: state.supabaseRef.length > 0 ? 36 : 14,
+                borderColor: state.supabaseRef.length > 0
+                  ? (supabaseValid ? "rgba(34,197,94,0.6)" : "rgba(239,68,68,0.6)")
+                  : "var(--md-surface-variant, #E7E0EC)",
+              }}
+            />
+            {state.supabaseRef.length > 0 && (
+              <span style={{
+                position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
+                fontSize: 14,
               }}>
-                <span style={{ fontSize: 24 }}>{t.icon}</span>
-                <span style={{ fontSize: 12, fontWeight: 600 }}>{t.label}</span>
-              </button>
-            );
-          })}
+                {supabaseValid ? "✅" : "❌"}
+              </span>
+            )}
+          </div>
+          {state.supabaseRef.length > 0 && !supabaseValid && (
+            <div style={{ fontSize: 11, color: "rgba(239,68,68,0.9)", marginTop: 4 }}>
+              Invalid format — must be 20 lowercase letters (e.g. abcdefghijklmnopqrst)
+            </div>
+          )}
+          <a
+            href="https://supabase.com/dashboard/new"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 4, marginTop: 8,
+              fontSize: 12, color: "var(--md-primary, #6750A4)", fontWeight: 600, textDecoration: "none",
+            }}
+          >
+            <ExternalLink size={11} /> Create new project
+          </a>
         </div>
       </div>
-
-      {state.deployTarget === "kubernetes" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16, borderRadius: 12, background: "rgba(50,108,229,0.04)", border: "1px solid rgba(50,108,229,0.15)" }}>
-          <div>
-            <label style={labelStyle}>Namespace</label>
-            <select
-              value={state.k8sNamespace}
-              onChange={e => dispatch({ type: "SET_FIELD", field: "k8sNamespace", value: e.target.value })}
-              style={{ ...inputStyle, cursor: "pointer" }}
-            >
-              {K8S_NAMESPACES.map(ns => <option key={ns} value={ns}>{ns}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={labelStyle}>Service Name</label>
-            <input
-              value={state.k8sService}
-              onChange={e => dispatch({ type: "SET_FIELD", field: "k8sService", value: e.target.value })}
-              placeholder={state.repos[0]?.name || "my-service"}
-              style={inputStyle}
-            />
-          </div>
-        </div>
-      )}
-
-      {state.deployTarget === "vercel" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16, borderRadius: 12, background: "rgba(0,0,0,0.02)", border: "1px solid var(--md-surface-variant, #E7E0EC)" }}>
-          <div style={{
-            padding: "10px 14px", borderRadius: 8, background: "rgba(234,179,8,0.1)",
-            color: "#92400E", fontSize: 12, fontWeight: 500,
-          }}>
-            ⚠️ Vercel deployments require VERCEL_TOKEN in credentials
-          </div>
-          <div>
-            <label style={labelStyle}>Vercel Project Name</label>
-            <input
-              value={state.vercelProject}
-              onChange={e => dispatch({ type: "SET_FIELD", field: "vercelProject", value: e.target.value })}
-              placeholder={state.repos[0]?.name || "my-project"}
-              style={inputStyle}
-            />
-          </div>
-        </div>
-      )}
-
-      {state.deployTarget === "none" && (
-        <div style={{
-          padding: "14px 16px", borderRadius: 12, background: "var(--md-surface-container, #F5F0FB)",
-          color: "var(--md-on-surface-variant)", fontSize: 13, lineHeight: 1.6,
-        }}>
-          ℹ️ <strong>Code changes only.</strong> Tasks for this app will produce PRs but won't trigger deployments.
-        </div>
-      )}
-    </div>
-  );
+    );
+  };
 
   const renderCredentials = () => {
     const renderCredList = (field, inputField, defaults) => (
@@ -553,22 +750,11 @@ export default function AppCreationWizard({ onClose, onCreated }) {
           <label style={{ ...labelStyle, marginBottom: 10 }}>QA Credentials</label>
           {renderCredList("qaCredentials", "customQaCredential", DEFAULT_QA_CREDS)}
         </div>
-        <div style={{ height: 1, background: "var(--md-surface-variant, #E7E0EC)" }} />
-        <div>
-          <label style={labelStyle}>Supabase Project Ref (optional)</label>
-          <input
-            value={state.supabaseRef}
-            onChange={e => dispatch({ type: "SET_FIELD", field: "supabaseRef", value: e.target.value })}
-            placeholder="abcdefghijklmnop"
-            style={{ ...inputStyle, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}
-          />
-        </div>
       </div>
     );
   };
 
   const renderReview = () => {
-    const dtCfg = DEPLOY_TARGETS.find(t => t.value === state.deployTarget);
     return (
       <div style={{
         display: "flex", flexDirection: "column", gap: 0,
@@ -593,36 +779,40 @@ export default function AppCreationWizard({ onClose, onCreated }) {
           )}
         </div>
 
-        {/* Repos */}
+        {/* Repos + Deploy */}
         <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--md-surface-variant, #E7E0EC)" }}>
-          <div style={{ ...labelStyle, marginBottom: 8 }}>Repositories ({state.repos.length})</div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {state.repos.map(r => (
-              <span key={r.full_name} style={{
-                fontSize: 11, padding: "4px 10px", borderRadius: 6,
-                background: "var(--md-surface-container, #F5F0FB)",
-                color: "var(--md-on-surface-variant)", fontFamily: "'JetBrains Mono', monospace",
-              }}>{r.full_name}</span>
-            ))}
-          </div>
-        </div>
-
-        {/* Deploy */}
-        <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--md-surface-variant, #E7E0EC)" }}>
-          <div style={{ ...labelStyle, marginBottom: 8 }}>Deploy Target</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 16 }}>{dtCfg?.icon}</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--md-on-surface)" }}>{dtCfg?.label}</span>
-            {state.deployTarget === "kubernetes" && (
-              <span style={{ fontSize: 11, color: "var(--md-on-surface-variant)", fontFamily: "'JetBrains Mono', monospace" }}>
-                {state.k8sNamespace}/{state.k8sService || state.repos[0]?.name}
-              </span>
-            )}
-            {state.deployTarget === "vercel" && (
-              <span style={{ fontSize: 11, color: "var(--md-on-surface-variant)", fontFamily: "'JetBrains Mono', monospace" }}>
-                {state.vercelProject || state.repos[0]?.name}
-              </span>
-            )}
+          <div style={{ ...labelStyle, marginBottom: 10 }}>Repositories &amp; Deploy Targets ({state.repos.length})</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {state.repos.map(r => {
+              const cfg = state.repoDeployConfigs[r.full_name] || { deploy_target: "none", deploy_config: {} };
+              const tInfo = DEPLOY_TARGETS.find(t => t.value === cfg.deploy_target);
+              const dcfg = cfg.deploy_config || {};
+              let detail = "";
+              if (cfg.deploy_target === "kubernetes") {
+                const ns = dcfg.customNamespace?.trim() || dcfg.namespace || "agents";
+                const svc = dcfg.service || r.name;
+                detail = `${ns}/${svc}${dcfg.argocd !== false ? " · ArgoCD ✓" : ""}`;
+              } else if (cfg.deploy_target === "vercel") {
+                detail = dcfg.vercelProject || r.name;
+              }
+              return (
+                <div key={r.full_name} style={{
+                  display: "flex", alignItems: "center", gap: 10, padding: "8px 12px",
+                  borderRadius: 10, background: "var(--md-surface-container, #F5F0FB)",
+                }}>
+                  <span style={{ fontSize: 16, flexShrink: 0 }}>{tInfo?.icon}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface)", fontFamily: "'JetBrains Mono', monospace" }}>{r.full_name}</div>
+                    {detail && (
+                      <div style={{ fontSize: 11, color: "var(--md-on-surface-variant)", marginTop: 2 }}>{tInfo?.label} · {detail}</div>
+                    )}
+                    {!detail && (
+                      <div style={{ fontSize: 11, color: "var(--md-on-surface-variant)", marginTop: 2 }}>{tInfo?.label}</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
