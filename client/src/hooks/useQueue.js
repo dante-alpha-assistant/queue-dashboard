@@ -9,16 +9,15 @@ export default function useQueue({ since, until } = {}) {
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState("");
   const [apps, setApps] = useState([]);
-  const [selectedApp, setSelectedApp] = useState(() => {
+  const [selectedApp, setSelectedAppRaw] = useState(() => {
     try { return localStorage.getItem("selected-app") || ""; } catch { return ""; }
   });
   const [loading, setLoading] = useState(true);
   const [transitioning, setTransitioning] = useState({});
   const initialLoad = useRef(true);
 
-  // Stable wrapper — must be a top-level hook call, NOT in the return statement
-  const wrappedSetSelectedApp = useCallback((val) => {
-    setSelectedApp(val);
+  const setSelectedApp = useCallback((val) => {
+    setSelectedAppRaw(val);
     try { localStorage.setItem("selected-app", val); } catch {}
   }, []);
 
@@ -124,6 +123,6 @@ export default function useQueue({ since, until } = {}) {
     stats, tasks, todo, assigned, inProgress, qa, completed, deployed, blocked, failed, deploying, deployFailed,
     loading, transitioning, dispatch, updateTask, deleteTask, applyStatusChange,
     projects, selectedProject, setSelectedProject,
-    apps, selectedApp, setSelectedApp: wrappedSetSelectedApp,
+    apps, selectedApp, setSelectedApp,
   };
 }

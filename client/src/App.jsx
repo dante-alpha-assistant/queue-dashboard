@@ -13,10 +13,8 @@ import TaskDetailModal from "./components/TaskDetailModal";
 import BatchDeployModal from "./components/BatchDeployModal";
 import Pingboard from "./pages/Pingboard";
 import HealthDashboard from "./pages/HealthDashboard";
-import AppsPage from "./pages/AppsPage";
 import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
-import AppCreationWizard from "./components/AppCreationWizard";
-import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Package, Plus, Rocket, Search, XCircle, Zap } from 'lucide-react';
+import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Rocket, Search, XCircle, Zap } from 'lucide-react';
 
 const MOBILE_TABS = [
   { key: "todo", label: "Todo", icon: "📋" },
@@ -70,7 +68,6 @@ export default function App() {
   const [stageFilter, setStageFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("todo");
   const [view, setView] = useState("board");
-  const [showAppWizard, setShowAppWizard] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
@@ -84,10 +81,11 @@ export default function App() {
     // when realtime updates cause task arrays to change and strip _full flag)
     setSelectedTask(prev => {
       if (prev && prev.id === deepLinkId) return prev;
-      const found = tasks.find(t => t.id === deepLinkId);
+      const allLoaded = [...todo, ...assigned, ...inProgress, ...blocked, ...qa, ...completed, ...deploying, ...deployed, ...deployFailed, ...failed];
+      const found = allLoaded.find(t => t.id === deepLinkId);
       return found || { _notFound: true, id: deepLinkId };
     });
-  }, [deepLinkId, loading, tasks]);
+  }, [deepLinkId, loading, todo, assigned, inProgress, blocked, qa, completed, deploying, deployed, deployFailed, failed]);
 
   // Fetch full task data when selected (list uses light columns without description/result/qa_result)
   useEffect(() => {
@@ -146,10 +144,9 @@ export default function App() {
     { key: "board", label: "Board", Icon: ClipboardList },
     { key: "pingboard", label: "Pingboard", Icon: Bot },
     { key: "health", label: "Health", Icon: HeartPulse },
-    { key: "apps", label: "Apps", Icon: Package },
   ];
 
-  if (view === "pingboard" || view === "health" || view === "apps") {
+  if (view === "pingboard" || view === "health") {
     return (
       <div style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
         <div className="header-glass" style={{
@@ -174,7 +171,7 @@ export default function App() {
           ))}
         </div>
         <div style={{ paddingTop: 42 }}>
-          {view === "pingboard" ? <Pingboard /> : view === "apps" ? <AppsPage /> : <HealthDashboard />}
+          {view === "pingboard" ? <Pingboard /> : <HealthDashboard />}
         </div>
       </div>
     );
@@ -188,8 +185,8 @@ export default function App() {
     let filtered = allTasksRaw;
     if (typeFilter !== "all") filtered = filtered.filter(t => t.type === typeFilter);
     if (stageFilter !== "all") filtered = filtered.filter(t => t.stage === stageFilter);
-    if (selectedApp) filtered = filtered.filter(t => t.app_id === selectedApp);
     if (searchQuery.trim()) filtered = filtered.filter(t => t.title?.toLowerCase().includes(searchQuery.toLowerCase()));
+    if (selectedApp) filtered = filtered.filter(t => t.app_id === selectedApp);
     return {
       today: filterTasksByTime(filtered, "today").length,
       last_24h: filterTasksByTime(filtered, "24h").length,
@@ -204,8 +201,8 @@ export default function App() {
     let filtered = filterTasksByTime(tasks, timeFilter.range, timeFilter.customFrom, timeFilter.customTo);
     if (typeFilter !== "all") filtered = filtered.filter(t => t.type === typeFilter);
     if (stageFilter !== "all") filtered = filtered.filter(t => t.stage === stageFilter);
-    if (selectedApp) filtered = filtered.filter(t => t.app_id === selectedApp);
     if (searchQuery.trim()) filtered = filtered.filter(t => t.title?.toLowerCase().includes(searchQuery.toLowerCase()));
+    if (selectedApp) filtered = filtered.filter(t => t.app_id === selectedApp);
     return filtered;
   };
   const filterByType = filterTasks;
@@ -248,12 +245,8 @@ export default function App() {
     }
   };
 
-  const handleAppFilter = useCallback((appId) => {
-    setSelectedApp(appId || "");
-  }, [setSelectedApp]);
-
   const renderCards = (tasks) =>
-    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={handleSelectTask} onAppFilter={handleAppFilter} isMobile={isMobile} progress={taskProgress[t.id]} monitor={taskMonitor[t.id]} transitioning={!!transitioning[t.id]} />);
+    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={handleSelectTask} isMobile={isMobile} progress={taskProgress[t.id]} monitor={taskMonitor[t.id]} transitioning={!!transitioning[t.id]} />);
 
   // MOBILE LAYOUT
   if (isMobile) {
@@ -282,32 +275,21 @@ export default function App() {
               <button onClick={() => setView("health")} className="nav-tab" style={{ padding: "4px 8px" }}>
                 <HeartPulse size={16} strokeWidth={1.8} />
               </button>
-              <button onClick={() => setView("apps")} className="nav-tab" style={{ padding: "4px 8px" }}>
-                <Package size={16} strokeWidth={1.8} />
-              </button>
             </div>
           </div>
         </div>
 
         {/* Filter bar - wrapping */}
         <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--md-surface-variant)" }}>
-          <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
-            <select value={selectedApp} onChange={e => setSelectedApp(e.target.value)} style={{
-              flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--md-surface-variant)",
-              background: "var(--md-surface)", color: "var(--md-on-background)", fontSize: 13,
-              fontWeight: 500, fontFamily: "'Inter', system-ui, -apple-system, sans-serif", outline: "none",
-              minHeight: 44,
-            }}>
-              <option value="">All Apps</option>
-              {apps.map(a => <option key={a.id} value={a.id}>{a.icon ? `${a.icon} ` : ""}{a.name}</option>)}
-            </select>
-            <button onClick={() => setShowAppWizard(true)} title="Create new app" style={{
-              width: 32, height: 32, borderRadius: "50%", border: "none",
-              background: "var(--md-primary, #6750A4)", color: "#fff",
-              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-              padding: 0, flexShrink: 0,
-            }}><Plus size={16} strokeWidth={3} /></button>
-          </div>
+          <select value={selectedApp} onChange={e => setSelectedApp(e.target.value)} style={{
+            width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--md-surface-variant)",
+            background: "var(--md-surface)", color: "var(--md-on-background)", fontSize: 13,
+            fontWeight: 500, fontFamily: "'Inter', system-ui, -apple-system, sans-serif", outline: "none",
+            marginBottom: 8, minHeight: 44,
+          }}>
+            <option value="">All Apps</option>
+            {apps.map(a => <option key={a.id} value={a.id}>{a.icon ? a.icon + ' ' : ''}{a.name}</option>)}
+          </select>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {activeTypes.map(type => (
               <button key={type} onClick={() => setTypeFilter(type)} className={`filter-chip ${typeFilter === type ? "active" : ""}`} style={{ minHeight: 36, padding: "6px 14px" }}>{type}</button>
@@ -381,14 +363,13 @@ export default function App() {
           })}
         </div>
 
-        <NewTaskChat isMobile={isMobile} apps={apps} selectedApp={selectedApp} />
+        <NewTaskChat isMobile={isMobile} />
         {selectedTask && !selectedTask._notFound && (
           <TaskDetailModal
             task={selectedTask}
             onClose={handleCloseTask}
             onStatusChange={async (id, updates) => { await updateTask(id, updates); setSelectedTask(prev => prev ? { ...prev, ...updates } : null); }}
             isMobile={isMobile}
-            apps={apps}
             progress={selectedTask ? taskProgress[selectedTask.id] : null}
             monitor={selectedTask ? taskMonitor[selectedTask.id] : null}
           />
@@ -461,19 +442,12 @@ export default function App() {
               padding: "6px 12px", borderRadius: 8, border: "1px solid var(--md-surface-variant)",
               background: "var(--md-surface)", color: "var(--md-on-background)", fontSize: 13,
               fontWeight: 500, fontFamily: "'Inter', system-ui, -apple-system, sans-serif", outline: "none",
-              cursor: "pointer", minWidth: 120,
+              cursor: "pointer", minWidth: 160,
             }}>
               <option value="">All</option>
-              {apps.map(a => <option key={a.id} value={a.id}>{a.icon ? `${a.icon} ` : ""}{a.name}</option>)}
+              {apps.map(a => <option key={a.id} value={a.id}>{a.icon ? a.icon + ' ' : ''}{a.name}</option>)}
             </select>
-            <button onClick={() => setShowAppWizard(true)} title="Create new app" style={{
-              width: 24, height: 24, borderRadius: "50%", border: "none",
-              background: "var(--md-primary, #6750A4)", color: "#fff",
-              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-              padding: 0, flexShrink: 0,
-            }}><Plus size={14} strokeWidth={3} /></button>
           </div>
-
           <div style={{ width: 1, height: 24, background: "var(--md-surface-variant)" }} />
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Type</span>
@@ -580,7 +554,7 @@ export default function App() {
         </Column>
       </div>
 
-      <NewTaskChat isMobile={false} apps={apps} selectedApp={selectedApp} />
+      <NewTaskChat isMobile={false} />
 
       {selectedTask && !selectedTask._notFound && (
         <TaskDetailModal
@@ -589,7 +563,6 @@ export default function App() {
           onStatusChange={async (id, updates) => { await updateTask(id, updates); setSelectedTask(prev => prev ? { ...prev, ...updates } : null); }}
           isMobile={false}
           isTablet={isTablet}
-          apps={apps}
           progress={selectedTask ? taskProgress[selectedTask.id] : null}
           monitor={selectedTask ? taskMonitor[selectedTask.id] : null}
         />
@@ -618,6 +591,5 @@ export default function App() {
       )}
     </div>
       {showBatchDeploy && <BatchDeployModal tasks={filterByType(completed)} onDeploy={() => { setShowBatchDeploy(false); }} onClose={() => setShowBatchDeploy(false)} />}
-      {showAppWizard && <AppCreationWizard onClose={() => setShowAppWizard(false)} onCreated={(app) => { setShowAppWizard(false); setSelectedApp(app.id); }} />}
   </>);
 }
