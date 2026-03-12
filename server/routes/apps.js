@@ -86,8 +86,30 @@ appsRouter.post("/", async (req, res) => {
     if (!slug) return res.status(400).json({ error: "slug required" });
 
     const validTargets = ["kubernetes", "vercel", "none"];
-    if (deploy_target && !validTargets.includes(deploy_target)) {
-      return res.status(400).json({ error: `Invalid deploy_target "${deploy_target}". Must be one of: ${validTargets.join(", ")}` });
+
+    // Handle per-repo deploy config (new format) vs legacy string array + single deploy_target
+    let reposArray = repos || [];
+    let reposConfig = [];
+    let primaryDeployTarget = deploy_target || "none";
+    let primaryDeployConfig = deploy_config || {};
+
+    if (reposArray.length > 0 && typeof reposArray[0] === "object") {
+      // New per-repo format: [{repo, deploy_target, deploy_config}]
+      reposConfig = reposArray;
+      reposArray = reposArray.map(r => r.repo);
+      primaryDeployTarget = reposConfig[0]?.deploy_target || "none";
+      primaryDeployConfig = reposConfig[0]?.deploy_config || {};
+    } else {
+      // Legacy string array format
+      reposConfig = reposArray.map(r => ({
+        repo: r,
+        deploy_target: deploy_target || "none",
+        deploy_config: deploy_config || {},
+      }));
+    }
+
+    if (primaryDeployTarget && !validTargets.includes(primaryDeployTarget)) {
+      return res.status(400).json({ error: `Invalid deploy_target "${primaryDeployTarget}". Must be one of: ${validTargets.join(", ")}` });
     }
 
     // Build required_credentials jsonb from separate coding/qa arrays
@@ -100,10 +122,11 @@ appsRouter.post("/", async (req, res) => {
         name,
         slug,
         description: description || null,
-        repos: repos || [],
+        repos: reposArray,
+        repos_config: reposConfig,
         supabase_project_ref: supabase_project_ref || null,
-        deploy_target: deploy_target || "none",
-        deploy_config: deploy_config || {},
+        deploy_target: primaryDeployTarget,
+        deploy_config: primaryDeployConfig,
         env_keys: env_keys || [],
         icon: icon || null,
         qa_env_keys: qa_env_keys || [],
