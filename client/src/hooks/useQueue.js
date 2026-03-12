@@ -116,9 +116,9 @@ export default function useQueue({ since, until } = {}) {
     stats, tasks, todo, assigned, inProgress, qa, completed, deployed, blocked, failed, deploying, deployFailed,
     loading, transitioning, dispatch, updateTask, deleteTask, applyStatusChange,
     projects, selectedProject, setSelectedProject,
-    apps, selectedApp, setSelectedApp: (val) => {
+    apps, selectedApp, setSelectedApp: useCallback((val) => {
       setSelectedApp(val);
       try { localStorage.setItem("selected-app", val); } catch {}
-    },
+    }, []),
   };
 }
