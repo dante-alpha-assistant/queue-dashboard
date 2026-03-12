@@ -115,6 +115,11 @@ export default function App() {
     navigate("/", { replace: true });
   }, [navigate]);
 
+  const handleTaskStatusChange = useCallback(async (id, updates) => {
+    await updateTask(id, updates);
+    setSelectedTask(prev => prev ? { ...prev, ...updates } : null);
+  }, [updateTask]);
+
 
   // Batch deploy modal
   const [showBatchDeploy, setShowBatchDeploy] = useState(false);
@@ -374,7 +379,7 @@ export default function App() {
           <TaskDetailModal
             task={selectedTask}
             onClose={handleCloseTask}
-            onStatusChange={async (id, updates) => { await updateTask(id, updates); setSelectedTask(prev => prev ? { ...prev, ...updates } : null); }}
+            onStatusChange={handleTaskStatusChange}
             apps={apps}
             isMobile={isMobile}
             progress={selectedTask ? taskProgress[selectedTask.id] : null}
@@ -567,7 +572,7 @@ export default function App() {
         <TaskDetailModal
           task={selectedTask}
           onClose={handleCloseTask}
-          onStatusChange={async (id, updates) => { await updateTask(id, updates); setSelectedTask(prev => prev ? { ...prev, ...updates } : null); }}
+          onStatusChange={handleTaskStatusChange}
           isMobile={false}
           isTablet={isTablet}
           apps={apps}
