@@ -45,7 +45,7 @@ export function filterTasksByTime(tasks, timeRange, customFrom, customTo) {
   if (!from && !to) return tasks; // all time
   return tasks.filter(t => {
     if (ACTIVE_STATUSES.has(t.status)) return true;
-    const d = new Date(t.created_at);
+    const d = new Date(t.updated_at || t.completed_at || t.created_at);
     if (from && d < from) return false;
     if (to && d > to) return false;
     return true;
