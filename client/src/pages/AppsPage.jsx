@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Package, Plus, Pencil, Archive, RotateCcw, X, Loader2, Search, XCircle, ChevronLeft, Save, BarChart3, ExternalLink, Clock, CheckCircle2, XOctagon, Rocket, Activity } from "lucide-react";
 
 const DEPLOY_TARGETS = ["kubernetes", "vercel", "none"];
@@ -699,10 +700,11 @@ function AppCard({ app, stats, onSelect, onEdit, onArchive }) {
 }
 
 /* ── New App Card ────────────────────────────────────────── */
-function NewAppCard({ onClick }) {
+function NewAppCard() {
+  const navigate = useNavigate();
   return (
     <div
-      onClick={onClick}
+      onClick={() => navigate("/apps/new")}
       style={{
         borderRadius: 16, border: "2px dashed var(--md-surface-variant, #E7E0EC)",
         overflow: "hidden", transition: "all 200ms", cursor: "pointer",
@@ -733,6 +735,7 @@ function NewAppCard({ onClick }) {
 
 /* ── Apps Page ────────────────────────────────────────────── */
 export default function AppsPage() {
+  const navigate = useNavigate();
   const [apps, setApps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [bulkStats, setBulkStats] = useState({});
@@ -858,7 +861,7 @@ export default function AppsPage() {
             Manage applications, repos, and deploy targets
           </p>
         </div>
-        <button onClick={() => setFormApp({})} style={{
+        <button onClick={() => navigate("/apps/new")} style={{
           padding: "10px 20px", borderRadius: 100, border: "none",
           background: "var(--md-primary, #6750A4)", color: "#fff",
           cursor: "pointer", fontSize: 13, fontWeight: 600,
@@ -927,7 +930,7 @@ export default function AppsPage() {
             onArchive={handleArchive}
           />
         ))}
-        {statusFilter !== "archived" && <NewAppCard onClick={() => setFormApp({})} />}
+        {statusFilter !== "archived" && <NewAppCard />}
       </div>
 
       {filteredApps.length === 0 && !searchQuery && statusFilter === "active" && (

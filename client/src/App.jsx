@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import SpeedLoader from "./components/SpeedLoader";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Routes, Route } from "react-router-dom";
 import useQueue from "./hooks/useQueue";
 import useBreakpoint from "./hooks/useBreakpoint";
 import useTaskEvents from "./hooks/useTaskEvents";
@@ -14,8 +14,8 @@ import BatchDeployModal from "./components/BatchDeployModal";
 import Pingboard from "./pages/Pingboard";
 import HealthDashboard from "./pages/HealthDashboard";
 import AppsPage from "./pages/AppsPage";
+import AppOnboardingWizard from "./pages/onboarding/AppOnboardingWizard";
 import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
-import AppCreationWizard from "./components/AppCreationWizard";
 import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Package, Plus, Rocket, Search, XCircle, Zap } from 'lucide-react';
 
 const MOBILE_TABS = [
@@ -43,7 +43,18 @@ const BOTTOM_TABS = [
 
 ];
 
-export default function App() {
+function AppRouter() {
+  return (
+    <Routes>
+      <Route path="/apps/new" element={<AppOnboardingWizard />} />
+      <Route path="*" element={<AppMain />} />
+    </Routes>
+  );
+}
+
+export default AppRouter;
+
+function AppMain() {
   const [timeFilter, setTimeFilter] = useState({ range: "today", customFrom: "", customTo: "" });
 
   // Fetch all tasks (no server-side time filter) — time filtering is done client-side
@@ -122,10 +133,8 @@ export default function App() {
   }, [updateTask]);
 
 
-  // App creation wizard
-  const [showAppWizard, setShowAppWizard] = useState(false);
-  const handleAppWizardClose = useCallback(() => setShowAppWizard(false), []);
-  const handleAppCreated = useCallback(() => { setShowAppWizard(false); }, []);
+  // App creation — navigate to full-page wizard
+  const handleNewApp = useCallback(() => navigate("/apps/new"), [navigate]);
 
   // Batch deploy modal
   const [showBatchDeploy, setShowBatchDeploy] = useState(false);
@@ -465,7 +474,7 @@ export default function App() {
               <option value="">All</option>
               {apps.map(a => <option key={a.id} value={a.id}>{a.icon ? a.icon + ' ' : ''}{a.name}</option>)}
             </select>
-            <button onClick={() => setShowAppWizard(true)} title="Create new app" style={{
+            <button onClick={handleNewApp} title="Create new app" style={{
               width: 28, height: 28, borderRadius: 8, border: "1px solid var(--md-surface-variant)",
               background: "var(--md-surface)", color: "var(--md-primary, #6750A4)",
               cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
@@ -618,6 +627,5 @@ export default function App() {
       )}
     </div>
       {showBatchDeploy && <BatchDeployModal tasks={filterByType(completed)} onDeploy={() => { setShowBatchDeploy(false); }} onClose={() => setShowBatchDeploy(false)} />}
-      {showAppWizard && <AppCreationWizard onClose={handleAppWizardClose} onCreated={handleAppCreated} />}
   </>);
 }
