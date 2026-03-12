@@ -13,8 +13,9 @@ import TaskDetailModal from "./components/TaskDetailModal";
 import BatchDeployModal from "./components/BatchDeployModal";
 import Pingboard from "./pages/Pingboard";
 import HealthDashboard from "./pages/HealthDashboard";
+import AppsPage from "./pages/AppsPage";
 import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
-import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Rocket, Search, XCircle, Zap } from 'lucide-react';
+import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Package, Rocket, Search, XCircle, Zap } from 'lucide-react';
 
 const MOBILE_TABS = [
   { key: "todo", label: "Todo", icon: "📋" },
@@ -144,9 +145,10 @@ export default function App() {
     { key: "board", label: "Board", Icon: ClipboardList },
     { key: "pingboard", label: "Pingboard", Icon: Bot },
     { key: "health", label: "Health", Icon: HeartPulse },
+    { key: "apps", label: "Apps", Icon: Package },
   ];
 
-  if (view === "pingboard" || view === "health") {
+  if (view === "pingboard" || view === "health" || view === "apps") {
     return (
       <div style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
         <div className="header-glass" style={{
@@ -171,7 +173,7 @@ export default function App() {
           ))}
         </div>
         <div style={{ paddingTop: 42 }}>
-          {view === "pingboard" ? <Pingboard /> : <HealthDashboard />}
+          {view === "pingboard" ? <Pingboard /> : view === "apps" ? <AppsPage /> : <HealthDashboard />}
         </div>
       </div>
     );
@@ -246,7 +248,8 @@ export default function App() {
   };
 
   const renderCards = (tasks) =>
-    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={handleSelectTask} isMobile={isMobile} progress={taskProgress[t.id]} monitor={taskMonitor[t.id]} transitioning={!!transitioning[t.id]} />);
+    tasks.map(t => <TaskCard key={t.id} task={t} onStatusChange={updateTask} onCardClick={handleSelectTask} apps={apps}
+            isMobile={isMobile} progress={taskProgress[t.id]} monitor={taskMonitor[t.id]} transitioning={!!transitioning[t.id]} />);
 
   // MOBILE LAYOUT
   if (isMobile) {
@@ -274,6 +277,9 @@ export default function App() {
               </button>
               <button onClick={() => setView("health")} className="nav-tab" style={{ padding: "4px 8px" }}>
                 <HeartPulse size={16} strokeWidth={1.8} />
+              </button>
+              <button onClick={() => setView("apps")} className="nav-tab" style={{ padding: "4px 8px" }}>
+                <Package size={16} strokeWidth={1.8} />
               </button>
             </div>
           </div>
@@ -363,12 +369,13 @@ export default function App() {
           })}
         </div>
 
-        <NewTaskChat isMobile={isMobile} />
+        <NewTaskChat isMobile={isMobile} apps={apps} selectedApp={selectedApp} />
         {selectedTask && !selectedTask._notFound && (
           <TaskDetailModal
             task={selectedTask}
             onClose={handleCloseTask}
             onStatusChange={async (id, updates) => { await updateTask(id, updates); setSelectedTask(prev => prev ? { ...prev, ...updates } : null); }}
+            apps={apps}
             isMobile={isMobile}
             progress={selectedTask ? taskProgress[selectedTask.id] : null}
             monitor={selectedTask ? taskMonitor[selectedTask.id] : null}
@@ -554,7 +561,7 @@ export default function App() {
         </Column>
       </div>
 
-      <NewTaskChat isMobile={false} />
+      <NewTaskChat isMobile={false} apps={apps} selectedApp={selectedApp} />
 
       {selectedTask && !selectedTask._notFound && (
         <TaskDetailModal
@@ -563,6 +570,7 @@ export default function App() {
           onStatusChange={async (id, updates) => { await updateTask(id, updates); setSelectedTask(prev => prev ? { ...prev, ...updates } : null); }}
           isMobile={false}
           isTablet={isTablet}
+          apps={apps}
           progress={selectedTask ? taskProgress[selectedTask.id] : null}
           monitor={selectedTask ? taskMonitor[selectedTask.id] : null}
         />
