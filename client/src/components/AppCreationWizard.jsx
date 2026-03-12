@@ -1,5 +1,6 @@
-import { useReducer, useEffect, useRef, useCallback, useState } from "react";
-import { X, ChevronLeft, ChevronRight, Search, ExternalLink, Check, Loader2, Package, GitBranch, Server, Key, ClipboardList } from "lucide-react";
+import { useReducer, useEffect, useRef, useCallback, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { X, ChevronLeft, ChevronRight, Search, ExternalLink, Check, Loader2, Package, GitBranch, Server, Key, ClipboardList, Sparkles } from "lucide-react";
 
 /* ── Constants ─────────────────────────────────────────── */
 const STEPS = [
@@ -58,6 +59,7 @@ const initialState = {
   supabaseRef: "",
   submitting: false,
   error: null,
+  createSuccess: null,
 };
 
 function reducer(state, action) {
@@ -118,6 +120,7 @@ function reducer(state, action) {
 /* ── Component ─────────────────────────────────────────── */
 export default function AppCreationWizard({ onClose, onCreated }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const navigate = useNavigate();
   const searchTimer = useRef(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [agentCapabilities, setAgentCapabilities] = useState([]);
@@ -232,9 +235,11 @@ export default function AppCreationWizard({ onClose, onCreated }) {
         repos: state.repos.map(r => r.full_name),
         deploy_target: state.deployTarget,
         deploy_config: deployConfig,
+        supabase_project_ref: state.supabaseRef.trim() || null,
+        required_credentials: state.reqCredentials,
+        required_qa_credentials: state.qaCredentials,
         env_keys: state.reqCredentials,
         qa_env_keys: state.qaCredentials,
-        supabase_project_ref: state.supabaseRef.trim() || null,
       };
 
       const resp = await fetch("/api/apps", {
@@ -249,7 +254,9 @@ export default function AppCreationWizard({ onClose, onCreated }) {
       }
 
       const created = await resp.json();
+      dispatch({ type: "SET_FIELD", field: "createSuccess", value: created });
       onCreated(created);
+      setTimeout(() => navigate("/apps/" + created.id), 2000);
     } catch (e) {
       dispatch({ type: "SET_FIELD", field: "error", value: e.message });
     } finally {
@@ -786,7 +793,68 @@ export default function AppCreationWizard({ onClose, onCreated }) {
   };
 
   const renderReview = () => {
-    const dtCfg = DEPLOY_TARGETS.find(t => t.value === state.deployTarget);
+    const deployTargetBadge = (target, repoName) => {
+      const badges = {
+        kubernetes: { bg: "#E8F5E9", color: "#2E7D32", text: "☸️ K8s" },
+        vercel: { bg: "#E3F2FD", color: "#1565C0", text: "▲ Vercel" },
+        none: { bg: "#F5F5F5", color: "#616161", text: "⏭️ None" },
+      };
+      const b = badges[target] || badges.none;
+      const configSummary = target === "kubernetes"
+        ? `${state.k8sNamespace}/${state.k8sService || repoName}`
+        : target === "vercel"
+        ? (state.vercelProject || repoName)
+        : null;
+      return (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+          <span style={{
+            fontSize: 10, padding: "2px 8px", borderRadius: 4,
+            background: b.bg, color: b.color, fontWeight: 700,
+          }}>{b.text}</span>
+          {configSummary && (
+            <span style={{ fontSize: 10, color: "var(--md-on-surface-variant)", fontFamily: "'JetBrains Mono', monospace" }}>
+              {configSummary}
+            </span>
+          )}
+        </div>
+      );
+    };
+
+    const editLink = (stepIdx) => (
+      <button
+        onClick={() => dispatch({ type: "SET_FIELD", field: "step", value: stepIdx })}
+        style={{
+          background: "none", border: "none", cursor: "pointer",
+          color: "var(--md-primary, #6750A4)", fontSize: 11, fontWeight: 600,
+          padding: "2px 6px", borderRadius: 4, textDecoration: "underline",
+          fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+        }}
+      >Edit</button>
+    );
+
+    const credPill = (key, variant) => {
+      const styles = {
+        coding: { background: "rgba(103,80,164,0.1)", color: "var(--md-primary, #6750A4)" },
+        qa: { background: "rgba(34,197,94,0.1)", color: "#15803D" },
+      };
+      const s = styles[variant] || styles.coding;
+      return (
+        <span key={key} style={{
+          display: "inline-flex", alignItems: "center",
+          padding: "2px 8px", borderRadius: 4,
+          fontSize: 11, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace",
+          ...s,
+        }}>{key}</span>
+      );
+    };
+
+    const compatibleAgents = agentCapabilities.filter(agent => {
+      if (agent.disabled) return false;
+      const available = agent.available_credentials || [];
+      const required = agent.capabilities?.includes("qa") ? state.qaCredentials : state.reqCredentials;
+      return required.every(c => available.includes(c));
+    });
+
     return (
       <div style={{
         display: "flex", flexDirection: "column", gap: 0,
@@ -794,77 +862,113 @@ export default function AppCreationWizard({ onClose, onCreated }) {
       }}>
         {/* App info */}
         <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--md-surface-variant, #E7E0EC)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center",
-              background: "var(--md-surface-container, #F5F0FB)", fontSize: 20,
-            }}>
-              {state.icon || state.name[0]?.toUpperCase() || "📦"}
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center",
+                background: "var(--md-surface-container, #F5F0FB)", fontSize: 20, flexShrink: 0,
+              }}>
+                {state.icon || state.name[0]?.toUpperCase() || "📦"}
+              </div>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "var(--md-on-surface)" }}>{state.name}</div>
+                <div style={{ fontSize: 11, color: "var(--md-on-surface-variant)", fontFamily: "'JetBrains Mono', monospace" }}>{state.slug}</div>
+              </div>
             </div>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "var(--md-on-surface)" }}>{state.name}</div>
-              <div style={{ fontSize: 11, color: "var(--md-on-surface-variant)", fontFamily: "'JetBrains Mono', monospace" }}>{state.slug}</div>
-            </div>
+            {editLink(0)}
           </div>
           {state.description && (
-            <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)", lineHeight: 1.5 }}>{state.description}</div>
+            <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)", lineHeight: 1.5, marginTop: 8 }}>{state.description}</div>
           )}
         </div>
 
         {/* Repos */}
         <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--md-surface-variant, #E7E0EC)" }}>
-          <div style={{ ...labelStyle, marginBottom: 8 }}>Repositories ({state.repos.length})</div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <div style={{ ...labelStyle, margin: 0 }}>Repositories ({state.repos.length})</div>
+            {editLink(1)}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {state.repos.map(r => (
-              <span key={r.full_name} style={{
-                fontSize: 11, padding: "4px 10px", borderRadius: 6,
+              <div key={r.full_name} style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "8px 12px", borderRadius: 8,
                 background: "var(--md-surface-container, #F5F0FB)",
-                color: "var(--md-on-surface-variant)", fontFamily: "'JetBrains Mono', monospace",
-              }}>{r.full_name}</span>
+                flexWrap: "wrap", gap: 6,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 12 }}>🔗</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace", color: "var(--md-on-surface)" }}>{r.full_name}</span>
+                </div>
+                {deployTargetBadge(state.deployTarget, r.name)}
+              </div>
             ))}
           </div>
         </div>
 
-        {/* Deploy */}
+        {/* Supabase */}
         <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--md-surface-variant, #E7E0EC)" }}>
-          <div style={{ ...labelStyle, marginBottom: 8 }}>Deploy Target</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 16 }}>{dtCfg?.icon}</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--md-on-surface)" }}>{dtCfg?.label}</span>
-            {state.deployTarget === "kubernetes" && (
-              <span style={{ fontSize: 11, color: "var(--md-on-surface-variant)", fontFamily: "'JetBrains Mono', monospace" }}>
-                {state.k8sNamespace}/{state.k8sService || state.repos[0]?.name}
-              </span>
-            )}
-            {state.deployTarget === "vercel" && (
-              <span style={{ fontSize: 11, color: "var(--md-on-surface-variant)", fontFamily: "'JetBrains Mono', monospace" }}>
-                {state.vercelProject || state.repos[0]?.name}
-              </span>
-            )}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <div style={{ ...labelStyle, margin: 0 }}>Supabase</div>
+            {editLink(2)}
           </div>
+          {state.supabaseRef ? (
+            <a
+              href={`https://supabase.com/dashboard/project/${state.supabaseRef}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 5,
+                fontSize: 12, fontFamily: "'JetBrains Mono', monospace",
+                color: "var(--md-primary, #6750A4)", fontWeight: 600,
+              }}
+            >
+              {state.supabaseRef}
+              <ExternalLink size={11} />
+            </a>
+          ) : (
+            <span style={{ fontSize: 12, color: "var(--md-on-surface-variant)" }}>No Supabase project</span>
+          )}
         </div>
 
         {/* Credentials */}
-        <div style={{ padding: "12px 20px", borderBottom: state.supabaseRef ? "1px solid var(--md-surface-variant, #E7E0EC)" : "none" }}>
-          <div style={{ ...labelStyle, marginBottom: 8 }}>Credentials</div>
-          <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)", marginBottom: 4 }}>
-            <strong>Required:</strong> {state.reqCredentials.join(", ") || "—"}
+        <div style={{ padding: "12px 20px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <div style={{ ...labelStyle, margin: 0 }}>Credentials</div>
+            {editLink(3)}
           </div>
-          <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)" }}>
-            <strong>QA:</strong> {state.qaCredentials.join(", ") || "—"}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 600, color: "var(--md-on-surface-variant)", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.05em" }}>Coding Agent</div>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {state.reqCredentials.length > 0
+                  ? state.reqCredentials.map(c => credPill(c, "coding"))
+                  : <span style={{ fontSize: 12, color: "var(--md-on-surface-variant)" }}>—</span>}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 600, color: "var(--md-on-surface-variant)", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.05em" }}>QA Agent</div>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {state.qaCredentials.length > 0
+                  ? state.qaCredentials.map(c => credPill(c, "qa"))
+                  : <span style={{ fontSize: 12, color: "var(--md-on-surface-variant)" }}>—</span>}
+              </div>
+            </div>
+            {compatibleAgents.length > 0 && (
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 600, color: "var(--md-on-surface-variant)", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.05em" }}>Compatible Agents</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  {compatibleAgents.map(a => (
+                    <div key={a.id || a.name} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <Check size={12} color="#22C55E" strokeWidth={3} />
+                      <span style={{ fontSize: 12, color: "var(--md-on-surface)", fontWeight: 500 }}>{a.name || a.id}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Supabase */}
-        {state.supabaseRef && (
-          <div style={{ padding: "12px 20px" }}>
-            <div style={{ ...labelStyle, marginBottom: 4 }}>Supabase Project</div>
-            <span style={{
-              fontSize: 12, fontFamily: "'JetBrains Mono', monospace",
-              color: "var(--md-on-surface-variant)",
-            }}>{state.supabaseRef}</span>
-          </div>
-        )}
       </div>
     );
   };
@@ -953,55 +1057,150 @@ export default function AppCreationWizard({ onClose, onCreated }) {
           display: "flex", justifyContent: "space-between", alignItems: "center",
           flexShrink: 0,
         }}>
-          <button
-            onClick={() => dispatch({ type: "PREV_STEP" })}
-            disabled={state.step === 0}
-            style={{
-              padding: "10px 20px", borderRadius: 100,
-              border: "1px solid var(--md-surface-variant)",
-              background: "transparent", color: state.step === 0 ? "var(--md-surface-variant)" : "var(--md-on-surface)",
-              cursor: state.step === 0 ? "not-allowed" : "pointer",
-              fontSize: 13, fontWeight: 600, fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
-              display: "flex", alignItems: "center", gap: 6, opacity: state.step === 0 ? 0.5 : 1,
-            }}
-          >
-            <ChevronLeft size={16} /> Back
-          </button>
-
-          {state.step < STEPS.length - 1 ? (
-            <button
-              onClick={() => dispatch({ type: "NEXT_STEP" })}
-              disabled={!canNext()}
-              style={{
-                padding: "10px 24px", borderRadius: 100, border: "none",
-                background: canNext() ? "var(--md-primary, #6750A4)" : "var(--md-surface-variant)",
-                color: canNext() ? "#fff" : "var(--md-on-surface-variant)",
-                cursor: canNext() ? "pointer" : "not-allowed",
-                fontSize: 13, fontWeight: 600, fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
-                display: "flex", alignItems: "center", gap: 6,
-              }}
-            >
-              Next <ChevronRight size={16} />
-            </button>
+          {state.createSuccess ? (
+            /* ── Success State ────────────────────────────────── */
+            <div style={{
+              width: "100%", display: "flex", flexDirection: "column",
+              alignItems: "center", gap: 8, padding: "4px 0",
+            }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: "50%",
+                background: "rgba(34,197,94,0.15)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <Check size={28} color="#22C55E" strokeWidth={3} />
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "var(--md-on-surface)", textAlign: "center" }}>
+                {state.name} created successfully! 🎉
+              </div>
+              <div style={{ fontSize: 11, color: "var(--md-on-surface-variant)" }}>Redirecting in 2 seconds…</div>
+              <button
+                onClick={() => navigate("/apps/" + state.createSuccess.id)}
+                style={{
+                  marginTop: 4, padding: "8px 20px", borderRadius: 100, border: "none",
+                  background: "#22C55E", color: "#fff",
+                  cursor: "pointer", fontSize: 13, fontWeight: 600,
+                  fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                  display: "flex", alignItems: "center", gap: 6,
+                }}
+              >
+                Go to App <ChevronRight size={14} />
+              </button>
+            </div>
           ) : (
-            <button
-              onClick={handleSubmit}
-              disabled={state.submitting}
-              style={{
-                padding: "10px 24px", borderRadius: 100, border: "none",
-                background: state.submitting ? "var(--md-outline)" : "var(--md-primary, #6750A4)",
-                color: "#fff", cursor: state.submitting ? "not-allowed" : "pointer",
-                fontSize: 13, fontWeight: 600, fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
-                display: "flex", alignItems: "center", gap: 6,
-                boxShadow: state.submitting ? "none" : "0 2px 8px rgba(103,80,164,0.3)",
-              }}
-            >
-              {state.submitting && <Loader2 size={14} style={{ animation: "spin 0.8s linear infinite" }} />}
-              Create App
-            </button>
+            <>
+              <button
+                onClick={() => dispatch({ type: "PREV_STEP" })}
+                disabled={state.step === 0}
+                style={{
+                  padding: "10px 20px", borderRadius: 100,
+                  border: "1px solid var(--md-surface-variant)",
+                  background: "transparent", color: state.step === 0 ? "var(--md-surface-variant)" : "var(--md-on-surface)",
+                  cursor: state.step === 0 ? "not-allowed" : "pointer",
+                  fontSize: 13, fontWeight: 600, fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                  display: "flex", alignItems: "center", gap: 6, opacity: state.step === 0 ? 0.5 : 1,
+                }}
+              >
+                <ChevronLeft size={16} /> Back
+              </button>
+
+              {state.step < STEPS.length - 1 ? (
+                <button
+                  onClick={() => dispatch({ type: "NEXT_STEP" })}
+                  disabled={!canNext()}
+                  style={{
+                    padding: "10px 24px", borderRadius: 100, border: "none",
+                    background: canNext() ? "var(--md-primary, #6750A4)" : "var(--md-surface-variant)",
+                    color: canNext() ? "#fff" : "var(--md-on-surface-variant)",
+                    cursor: canNext() ? "pointer" : "not-allowed",
+                    fontSize: 13, fontWeight: 600, fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                    display: "flex", alignItems: "center", gap: 6,
+                  }}
+                >
+                  Next <ChevronRight size={16} />
+                </button>
+              ) : (
+                <button
+                  onClick={handleSubmit}
+                  disabled={state.submitting}
+                  style={{
+                    padding: "10px 24px", borderRadius: 100, border: "none",
+                    background: state.submitting ? "var(--md-outline, #79747E)" : "var(--md-primary, #6750A4)",
+                    color: "#fff", cursor: state.submitting ? "not-allowed" : "pointer",
+                    fontSize: 13, fontWeight: 600, fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                    display: "flex", alignItems: "center", gap: 6,
+                    boxShadow: state.submitting ? "none" : "0 2px 8px rgba(103,80,164,0.3)",
+                    transition: "background 200ms",
+                  }}
+                >
+                  {state.submitting
+                    ? <><Loader2 size={14} style={{ animation: "spin 0.8s linear infinite" }} /> Creating…</>
+                    : <><Sparkles size={14} /> Create App</>
+                  }
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
+
+      {/* Confetti overlay */}
+      {state.createSuccess && <ConfettiOverlay />}
     </div>
+  );
+}
+
+/* ── Confetti ───────────────────────────────────────────── */
+const CONFETTI_COLORS = ["#6750A4", "#22C55E", "#F59E0B", "#EF4444", "#3B82F6", "#EC4899", "#14B8A6", "#F97316"];
+const CONFETTI_PARTICLES = [
+  { left: "5%",  delay: "0s",    size: 9,  round: true  },
+  { left: "12%", delay: "0.1s",  size: 7,  round: false },
+  { left: "20%", delay: "0.05s", size: 10, round: false },
+  { left: "28%", delay: "0.2s",  size: 8,  round: true  },
+  { left: "35%", delay: "0s",    size: 6,  round: true  },
+  { left: "42%", delay: "0.15s", size: 11, round: false },
+  { left: "50%", delay: "0.08s", size: 8,  round: true  },
+  { left: "57%", delay: "0.25s", size: 9,  round: false },
+  { left: "64%", delay: "0.03s", size: 7,  round: true  },
+  { left: "71%", delay: "0.18s", size: 10, round: false },
+  { left: "78%", delay: "0.12s", size: 8,  round: true  },
+  { left: "85%", delay: "0.07s", size: 11, round: false },
+  { left: "92%", delay: "0.22s", size: 9,  round: true  },
+  { left: "8%",  delay: "0.3s",  size: 7,  round: false },
+  { left: "16%", delay: "0.35s", size: 8,  round: true  },
+  { left: "24%", delay: "0.28s", size: 10, round: false },
+  { left: "33%", delay: "0.4s",  size: 6,  round: true  },
+  { left: "46%", delay: "0.33s", size: 9,  round: false },
+  { left: "60%", delay: "0.38s", size: 11, round: true  },
+  { left: "75%", delay: "0.45s", size: 7,  round: false },
+];
+
+function ConfettiOverlay() {
+  return (
+    <>
+      <style>{`
+        @keyframes confettiFall {
+          0%   { transform: translateY(-20px) rotate(0deg);   opacity: 1; }
+          100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+      `}</style>
+      {CONFETTI_PARTICLES.map((p, i) => (
+        <span
+          key={i}
+          style={{
+            position: "fixed",
+            left: p.left,
+            top: "-20px",
+            zIndex: 2000,
+            width: p.size,
+            height: p.size,
+            borderRadius: p.round ? "50%" : "2px",
+            background: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+            animation: `confettiFall 2s ease-in ${p.delay} forwards`,
+            pointerEvents: "none",
+          }}
+        />
+      ))}
+    </>
   );
 }
