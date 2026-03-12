@@ -84,11 +84,10 @@ export default function App() {
     // when realtime updates cause task arrays to change and strip _full flag)
     setSelectedTask(prev => {
       if (prev && prev.id === deepLinkId) return prev;
-      const allLoaded = [...todo, ...assigned, ...inProgress, ...blocked, ...qa, ...completed, ...deploying, ...deployed, ...deployFailed, ...failed];
-      const found = allLoaded.find(t => t.id === deepLinkId);
+      const found = tasks.find(t => t.id === deepLinkId);
       return found || { _notFound: true, id: deepLinkId };
     });
-  }, [deepLinkId, loading, todo, assigned, inProgress, blocked, qa, completed, deploying, deployed, deployFailed, failed]);
+  }, [deepLinkId, loading, tasks]);
 
   // Fetch full task data when selected (list uses light columns without description/result/qa_result)
   useEffect(() => {
