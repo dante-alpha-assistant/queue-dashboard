@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 
 // Lightweight columns for list view — exclude heavy JSON blobs
 const LIST_COLUMNS = "id,title,status,type,priority,assigned_agent,created_at,updated_at,error,deploy_target,pull_request_url,deployment_url,started_at,completed_at,paused,blocked_reason,stage,repository_url,project_id,repository_id,app_id,project:agent_projects(id,name,slug),repository:agent_repositories(id,name,url,provider),app:apps(id,name,slug,icon)";
@@ -101,16 +101,18 @@ export default function useQueue({ since, until } = {}) {
     fetchAll();
   }, [fetchAll]);
 
-  const todo = tasks.filter(t => t.status === "todo");
-  const assigned = [];
-  const inProgress = tasks.filter(t => t.status === "in_progress");
-  const qa = tasks.filter(t => t.status === "qa" || t.status === "qa_testing");
-  const completed = tasks.filter(t => t.status === "completed");
-  const blocked = tasks.filter(t => t.status === "blocked");
-  const failed = tasks.filter(t => t.status === "failed");
-  const deployed = tasks.filter(t => t.status === "deployed");
-  const deploying = tasks.filter(t => t.status === "deploying");
-  const deployFailed = tasks.filter(t => t.status === "deploy_failed");
+  const { todo, assigned, inProgress, qa, completed, blocked, failed, deployed, deploying, deployFailed } = useMemo(() => ({
+    todo: tasks.filter(t => t.status === "todo"),
+    assigned: [],
+    inProgress: tasks.filter(t => t.status === "in_progress"),
+    qa: tasks.filter(t => t.status === "qa" || t.status === "qa_testing"),
+    completed: tasks.filter(t => t.status === "completed"),
+    blocked: tasks.filter(t => t.status === "blocked"),
+    failed: tasks.filter(t => t.status === "failed"),
+    deployed: tasks.filter(t => t.status === "deployed"),
+    deploying: tasks.filter(t => t.status === "deploying"),
+    deployFailed: tasks.filter(t => t.status === "deploy_failed"),
+  }), [tasks]);
 
   return {
     stats, tasks, todo, assigned, inProgress, qa, completed, deployed, blocked, failed, deploying, deployFailed,
