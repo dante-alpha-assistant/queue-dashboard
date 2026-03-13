@@ -16,6 +16,7 @@ import HealthDashboard from "./pages/HealthDashboard";
 import AppsPage from "./pages/AppsPage";
 import AppOnboardingWizard from "./pages/onboarding/AppOnboardingWizard";
 import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
+import AppFilter from "./components/AppFilter";
 import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Package, Plus, Rocket, Search, XCircle, Zap } from 'lucide-react';
 
 const MOBILE_TABS = [
@@ -307,15 +308,9 @@ function AppMain() {
 
         {/* Filter bar - wrapping */}
         <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--md-surface-variant)" }}>
-          <select value={selectedApp} onChange={e => setSelectedApp(e.target.value)} style={{
-            width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--md-surface-variant)",
-            background: "var(--md-surface)", color: "var(--md-on-background)", fontSize: 13,
-            fontWeight: 500, fontFamily: "'Inter', system-ui, -apple-system, sans-serif", outline: "none",
-            marginBottom: 8, minHeight: 44,
-          }}>
-            <option value="">All Apps</option>
-            {apps.map(a => <option key={a.id} value={a.id}>{a.icon ? a.icon + ' ' : ''}{a.name}</option>)}
-          </select>
+          <div style={{ marginBottom: 8 }}>
+            <AppFilter apps={apps} value={selectedApp} onChange={setSelectedApp} />
+          </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {activeTypes.map(type => (
               <button key={type} onClick={() => setTypeFilter(type)} className={`filter-chip ${typeFilter === type ? "active" : ""}`} style={{ minHeight: 36, padding: "6px 14px" }}>{type}</button>
@@ -465,15 +460,7 @@ function AppMain() {
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: "var(--md-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.5px" }}>App</span>
-            <select value={selectedApp} onChange={e => setSelectedApp(e.target.value)} style={{
-              padding: "6px 12px", borderRadius: 8, border: "1px solid var(--md-surface-variant)",
-              background: "var(--md-surface)", color: "var(--md-on-background)", fontSize: 13,
-              fontWeight: 500, fontFamily: "'Inter', system-ui, -apple-system, sans-serif", outline: "none",
-              cursor: "pointer", minWidth: 160,
-            }}>
-              <option value="">All</option>
-              {apps.map(a => <option key={a.id} value={a.id}>{a.icon ? a.icon + ' ' : ''}{a.name}</option>)}
-            </select>
+            <AppFilter apps={apps} value={selectedApp} onChange={setSelectedApp} />
             <button onClick={handleNewApp} title="Create new app" style={{
               width: 28, height: 28, borderRadius: 8, border: "1px solid var(--md-surface-variant)",
               background: "var(--md-surface)", color: "var(--md-primary, #6750A4)",
