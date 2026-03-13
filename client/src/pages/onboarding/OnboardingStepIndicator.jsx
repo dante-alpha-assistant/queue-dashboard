@@ -32,12 +32,12 @@ export default function OnboardingStepIndicator({ currentStep }) {
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: 13, fontWeight: 700,
                 background: isDone
-                  ? "var(--md-primary, #6750A4)"
+                  ? "#7C3AED"
                   : isActive
-                    ? "var(--md-primary, #6750A4)"
-                    : "var(--md-surface-container, #F4F4F5)",
-                color: isDone || isActive ? "#fff" : "var(--md-on-surface-variant)",
-                border: isActive ? "3px solid rgba(103,80,164,0.3)" : "none",
+                    ? "#7C3AED"
+                    : "#1E293B",
+                color: isDone || isActive ? "#fff" : "#475569",
+                border: isActive ? "3px solid rgba(124,58,237,0.35)" : "none",
                 transition: "all 300ms ease-out",
                 animation: isActive ? "pulse-dot 2s ease-in-out infinite" : "none",
               }}>
@@ -45,7 +45,7 @@ export default function OnboardingStepIndicator({ currentStep }) {
               </div>
               <span style={{
                 fontSize: 10, fontWeight: isActive ? 700 : 500,
-                color: isActive ? "var(--md-primary, #6750A4)" : isDone ? "var(--md-on-surface)" : "var(--md-on-surface-variant)",
+                color: isActive ? "#A78BFA" : isDone ? "#94A3B8" : "#475569",
                 whiteSpace: "nowrap", transition: "all 300ms",
                 position: "absolute", top: 40, textAlign: "center",
               }}>
@@ -57,7 +57,7 @@ export default function OnboardingStepIndicator({ currentStep }) {
             {i < STEPS.length - 1 && (
               <div style={{
                 flex: 1, height: 3, borderRadius: 2, margin: "0 8px",
-                background: "var(--md-surface-variant, #E7E0EC)",
+                background: "#1E293B",
                 position: "relative", overflow: "hidden",
                 marginTop: -14,
               }}>

@@ -291,7 +291,7 @@ export default function AppOnboardingWizard() {
       <div style={{
         minHeight: "100vh", display: "flex", flexDirection: "column",
         alignItems: "center", justifyContent: "center",
-        background: "linear-gradient(135deg, #F8F7FF 0%, #F0EEFF 50%, #E8E5FF 100%)",
+        background: "linear-gradient(135deg, #060B18 0%, #0A1020 100%)",
         fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
       }}>
         <div className="success-scale-up" style={{
@@ -301,9 +301,9 @@ export default function AppOnboardingWizard() {
           {/* Success checkmark */}
           <div className="success-checkmark" style={{
             width: 80, height: 80, borderRadius: "50%",
-            background: "var(--md-primary, #6750A4)",
+            background: "#7C3AED",
             display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 8px 32px rgba(103,80,164,0.3)",
+            boxShadow: "0 8px 32px rgba(124,58,237,0.4)",
           }}>
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12" className="checkmark-draw" />
@@ -311,16 +311,16 @@ export default function AppOnboardingWizard() {
           </div>
 
           <div>
-            <h1 style={{ margin: "0 0 8px", fontSize: 28, fontWeight: 800, color: "var(--md-on-surface)" }}>
+            <h1 style={{ margin: "0 0 8px", fontSize: 28, fontWeight: 800, color: "#F1F5F9" }}>
               App Created! 🎉
             </h1>
-            <p style={{ margin: 0, fontSize: 16, color: "var(--md-on-surface-variant)" }}>
-              <strong>{createdApp?.name}</strong> is ready to go
+            <p style={{ margin: 0, fontSize: 16, color: "#94A3B8" }}>
+              <strong style={{ color: "#F1F5F9" }}>{createdApp?.name}</strong> is ready to go
             </p>
           </div>
 
           <div style={{
-            fontSize: 13, color: "var(--md-on-surface-variant)", opacity: 0.7,
+            fontSize: 13, color: "#94A3B8", opacity: 0.8,
             display: "flex", alignItems: "center", gap: 6,
           }}>
             <Loader2 size={14} style={{ animation: "spin 0.8s linear infinite" }} />
@@ -354,33 +354,33 @@ export default function AppOnboardingWizard() {
       onKeyDown={handleKeyDown}
       style={{
         minHeight: "100vh", display: "flex", flexDirection: "column",
-        background: "linear-gradient(135deg, #FAFAFE 0%, #F5F3FF 50%, #F0EEFF 100%)",
+        background: "#060B18",
         fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
       }}
     >
       {/* Top bar */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "16px 24px", borderBottom: "1px solid rgba(0,0,0,0.06)",
-        background: "rgba(255,255,255,0.8)", backdropFilter: "blur(12px)",
+        padding: "16px 24px", borderBottom: "1px solid #1E293B",
+        background: "rgba(6,11,24,0.9)", backdropFilter: "blur(12px)",
         position: "sticky", top: 0, zIndex: 10,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{
-            width: 30, height: 30, background: "var(--md-primary)", color: "var(--md-on-primary)",
+            width: 30, height: 30, background: "#7C3AED", color: "#fff",
             borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
             fontWeight: 700, fontSize: 16,
           }}>d</div>
-          <span style={{ fontWeight: 600, fontSize: 15, letterSpacing: "-0.02em", color: "var(--md-on-background)" }}>
+          <span style={{ fontWeight: 600, fontSize: 15, letterSpacing: "-0.02em", color: "#F1F5F9" }}>
             Create New App
           </span>
         </div>
         <button onClick={handleClose} title="Close (Esc)" style={{
           width: 36, height: 36, borderRadius: 10,
-          border: "1px solid var(--md-surface-variant)",
-          background: "var(--md-surface)", cursor: "pointer",
+          border: "1px solid #1E293B",
+          background: "#0F172A", cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center",
-          color: "var(--md-on-surface-variant)", transition: "all 150ms",
+          color: "#94A3B8", transition: "all 150ms",
         }}>
           <X size={18} />
         </button>
@@ -405,14 +405,14 @@ export default function AppOnboardingWizard() {
           {/* Step title */}
           <h2 style={{
             margin: "0 0 24px", fontSize: 22, fontWeight: 700,
-            color: "var(--md-on-surface)", textAlign: "center",
+            color: "#F1F5F9", textAlign: "center",
           }}>
             {["Name & Description", "Connect Repositories", "Deploy Targets", "Credentials", "Review & Create"][state.step]}
           </h2>
 
           <Suspense fallback={
             <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
-              <Loader2 size={24} style={{ animation: "spin 0.8s linear infinite", color: "var(--md-primary)" }} />
+              <Loader2 size={24} style={{ animation: "spin 0.8s linear infinite", color: "#7C3AED" }} />
             </div>
           }>
             <StepComponent state={state} dispatch={dispatch} />
@@ -431,8 +431,8 @@ export default function AppOnboardingWizard() {
       {/* Bottom bar */}
       <div style={{
         position: "fixed", bottom: 0, left: 0, right: 0,
-        padding: "16px 24px", borderTop: "1px solid rgba(0,0,0,0.06)",
-        background: "rgba(255,255,255,0.9)", backdropFilter: "blur(12px)",
+        padding: "16px 24px", borderTop: "1px solid #1E293B",
+        background: "rgba(6,11,24,0.95)", backdropFilter: "blur(12px)",
         display: "flex", alignItems: "center", justifyContent: "space-between",
         zIndex: 10,
       }}>
@@ -441,9 +441,9 @@ export default function AppOnboardingWizard() {
           disabled={state.step === 0}
           style={{
             padding: "12px 24px", borderRadius: 100,
-            border: "1px solid var(--md-surface-variant)",
+            border: "1px solid #1E293B",
             background: "transparent",
-            color: state.step === 0 ? "var(--md-surface-variant)" : "var(--md-on-surface)",
+            color: state.step === 0 ? "#334155" : "#F1F5F9",
             cursor: state.step === 0 ? "not-allowed" : "pointer",
             fontSize: 14, fontWeight: 600, fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
             display: "flex", alignItems: "center", gap: 8,
@@ -456,7 +456,7 @@ export default function AppOnboardingWizard() {
 
         {/* Progress text */}
         <span style={{
-          fontSize: 13, fontWeight: 600, color: "var(--md-on-surface-variant)",
+          fontSize: 13, fontWeight: 600, color: "#475569",
         }}>
           Step {state.step + 1} of {STEP_COUNT}
         </span>
@@ -469,8 +469,8 @@ export default function AppOnboardingWizard() {
               title={hint || ""}
               style={{
                 padding: "12px 28px", borderRadius: 100, border: "none",
-                background: canProceed(state) ? "var(--md-primary, #6750A4)" : "var(--md-surface-variant)",
-                color: canProceed(state) ? "#fff" : "var(--md-on-surface-variant)",
+                background: canProceed(state) ? "#7C3AED" : "#1E293B",
+                color: canProceed(state) ? "#fff" : "#475569",
                 cursor: canProceed(state) ? "pointer" : "not-allowed",
                 fontSize: 14, fontWeight: 600, fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
                 display: "flex", alignItems: "center", gap: 8,
