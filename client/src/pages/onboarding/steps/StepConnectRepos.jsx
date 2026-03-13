@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from "react";
-import { Search, ExternalLink, Check, Loader2, Github, FolderPlus } from "lucide-react";
+import { Check, Loader2, Github, FolderPlus, Info } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
 const inputStyle = {
@@ -11,6 +11,14 @@ const inputStyle = {
   outline: "none", boxSizing: "border-box",
   transition: "border-color 200ms, box-shadow 200ms",
 };
+
+/** Slugify an app name into a repo-safe string */
+function slugify(str) {
+  return (str || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "my-app";
+}
 
 /** Shared checkbox repo list */
 function RepoList({ repos, isSelected, onToggle, loading, emptyMsg }) {
@@ -99,35 +107,41 @@ function RepoList({ repos, isSelected, onToggle, loading, emptyMsg }) {
 }
 
 export default function StepConnectRepos({ state, dispatch }) {
-  const searchTimer = useRef(null);
   const userSearchTimer = useRef(null);
+  const userEditedScratchName = useRef(false);
   const [oauthError, setOauthError] = useState(null);
   const [connectingOAuth, setConnectingOAuth] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // ── Org repos (scratch mode) ─────────────────────────────
-  const searchOrgRepos = useCallback(async (q) => {
-    dispatch({ type: "SET_FIELD", field: "repoLoading", value: true });
-    try {
-      const resp = await fetch(`/api/github/repos?q=${encodeURIComponent(q)}`);
-      if (!resp.ok) throw new Error("Search failed");
-      dispatch({ type: "SET_FIELD", field: "repoResults", value: await resp.json() });
-    } catch {
-      dispatch({ type: "SET_FIELD", field: "repoResults", value: [] });
-    } finally {
-      dispatch({ type: "SET_FIELD", field: "repoLoading", value: false });
+  // ── Scratch repo name local state ─────────────────────────
+  const [scratchRepoName, setScratchRepoName] = useState(() => slugify(state.name));
+
+  // Sync scratchRepoName when app name changes (unless user manually edited it)
+  useEffect(() => {
+    if (!userEditedScratchName.current) {
+      setScratchRepoName(slugify(state.name));
     }
-  }, [dispatch]);
+  }, [state.name]);
 
+  // Whenever scratchRepoName changes, update wizard repos state (scratch mode only)
   useEffect(() => {
-    clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => searchOrgRepos(state.repoSearch), 300);
-    return () => clearTimeout(searchTimer.current);
-  }, [state.repoSearch, searchOrgRepos]);
+    if (state.repoSource === "scratch") {
+      const name = scratchRepoName || "my-app";
+      dispatch({
+        type: "SET_FIELD",
+        field: "repos",
+        value: [{ full_name: `dante-alpha-assistant/${name}`, name }],
+      });
+    }
+  }, [scratchRepoName, state.repoSource, dispatch]);
 
+  // Reset userEdited flag when switching back to scratch mode
   useEffect(() => {
-    if (state.repoSource === "scratch") searchOrgRepos("");
-  }, [state.repoSource, searchOrgRepos]);
+    if (state.repoSource === "scratch") {
+      userEditedScratchName.current = false;
+      setScratchRepoName(slugify(state.name));
+    }
+  }, [state.repoSource]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── User repos (github OAuth mode) ───────────────────────
   const searchUserRepos = useCallback(async (q) => {
@@ -252,12 +266,12 @@ export default function StepConnectRepos({ state, dispatch }) {
 
       {/* Mode selector */}
       <div className="step-field" style={{ "--field-index": 0, display: "flex", gap: 12 }}>
-        {modeCard("scratch", <FolderPlus size={20} />, "Create from scratch", "Use repos from the dante-alpha-assistant GitHub account")}
+        {modeCard("scratch", <FolderPlus size={20} />, "Create from scratch", "We'll create a new repository in dante-alpha-assistant automatically")}
         {modeCard("github", <Github size={20} />, "Connect with your GitHub", "Browse and select from your personal repos")}
       </div>
 
-      {/* Selected repos pills */}
-      {state.repos.length > 0 && (
+      {/* Selected repos pills — only shown in github mode */}
+      {state.repoSource === "github" && state.repos.length > 0 && (
         <div className="step-field" style={{ "--field-index": 1, display: "flex", gap: 8, flexWrap: "wrap" }}>
           {state.repos.map(r => (
             <span key={r.full_name} style={{
@@ -278,56 +292,92 @@ export default function StepConnectRepos({ state, dispatch }) {
 
       {/* ── Create from scratch mode ─────────────────────── */}
       {state.repoSource === "scratch" && (
-        <>
-          {/* Search */}
-          <div className="step-field" style={{ "--field-index": 2, position: "relative" }}>
-            <Search size={16} style={{ position: "absolute", left: 14, top: 14, color: "#475569", pointerEvents: "none", zIndex: 1 }} />
-            <input
-              value={state.repoSearch}
-              onChange={e => dispatch({ type: "SET_FIELD", field: "repoSearch", value: e.target.value })}
-              placeholder="Search dante-alpha-assistant repos..."
-              style={inputStyle}
-              onFocus={e => {
-                e.target.style.borderColor = "#7C3AED";
-                e.target.style.boxShadow = "0 0 0 3px rgba(124,58,237,0.15)";
-              }}
-              onBlur={e => {
-                e.target.style.borderColor = "#1E293B";
-                e.target.style.boxShadow = "none";
-              }}
-            />
-            {state.repoLoading && (
-              <Loader2 size={16} style={{ position: "absolute", right: 14, top: 14, animation: "spin 0.8s linear infinite", color: "#475569" }} />
-            )}
-          </div>
+        <div className="step-field" style={{ "--field-index": 2 }}>
+          {/* Confirmation panel */}
+          <div style={{
+            padding: "20px 22px",
+            borderRadius: 16,
+            border: "1px solid rgba(124,58,237,0.3)",
+            background: "rgba(124,58,237,0.06)",
+            display: "flex", flexDirection: "column", gap: 16,
+          }}>
+            {/* Info message */}
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                background: "rgba(124,58,237,0.15)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <Info size={18} color="#A78BFA" />
+              </div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#F1F5F9", marginBottom: 4 }}>
+                  A new repository will be created automatically
+                </div>
+                <div style={{ fontSize: 13, color: "#94A3B8", lineHeight: 1.6 }}>
+                  We'll create this repo under the <span style={{ color: "#A78BFA", fontWeight: 600 }}>dante-alpha-assistant</span> GitHub organization when you deploy your app. You can rename it below if needed.
+                </div>
+              </div>
+            </div>
 
-          <div className="step-field" style={{ "--field-index": 3 }}>
-            <RepoList
-              repos={state.repoResults}
-              isSelected={isSelected}
-              onToggle={onToggle}
-              loading={state.repoLoading}
-              emptyMsg={state.repoSearch ? "No repos found" : "Loading repos..."}
-            />
-          </div>
-
-          <div className="step-field" style={{ "--field-index": 4 }}>
-            <a
-              href="https://github.com/organizations/dante-alpha-assistant/repositories/new"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 6,
-                fontSize: 12, color: "#475569", fontWeight: 500, textDecoration: "none",
-                transition: "color 150ms",
+            {/* Editable repo name */}
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#94A3B8", marginBottom: 8, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                Repository name
+              </div>
+              <div style={{
+                display: "flex", alignItems: "center",
+                border: "1px solid #1E293B",
+                borderRadius: 12, overflow: "hidden",
+                background: "#0F172A",
+                fontFamily: "'JetBrains Mono', monospace",
+                transition: "border-color 200ms, box-shadow 200ms",
               }}
-              onMouseEnter={e => { e.currentTarget.style.color = "#7C3AED"; }}
-              onMouseLeave={e => { e.currentTarget.style.color = "#475569"; }}
-            >
-              <ExternalLink size={12} /> Create new repo on GitHub
-            </a>
+                onFocusCapture={e => {
+                  e.currentTarget.style.borderColor = "#7C3AED";
+                  e.currentTarget.style.boxShadow = "0 0 0 3px rgba(124,58,237,0.15)";
+                }}
+                onBlurCapture={e => {
+                  e.currentTarget.style.borderColor = "#1E293B";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                <span style={{
+                  padding: "12px 14px",
+                  fontSize: 13, color: "#475569", flexShrink: 0,
+                  borderRight: "1px solid #1E293B",
+                  background: "#0A1020",
+                  userSelect: "none",
+                }}>
+                  dante-alpha-assistant /
+                </span>
+                <input
+                  value={scratchRepoName}
+                  onChange={e => {
+                    userEditedScratchName.current = true;
+                    setScratchRepoName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-+/, ""));
+                  }}
+                  onBlur={e => {
+                    // Clean trailing hyphens on blur
+                    const cleaned = e.target.value.replace(/^-+|-+$/g, "") || slugify(state.name) || "my-app";
+                    setScratchRepoName(cleaned);
+                  }}
+                  placeholder="my-app"
+                  style={{
+                    flex: 1, padding: "12px 14px",
+                    border: "none", outline: "none",
+                    background: "transparent",
+                    color: "#F1F5F9", fontSize: 13,
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}
+                />
+              </div>
+              <div style={{ fontSize: 11, color: "#334155", marginTop: 6 }}>
+                github.com/dante-alpha-assistant/{scratchRepoName || "my-app"}
+              </div>
+            </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* ── Connect with your GitHub mode ───────────────── */}
@@ -425,7 +475,11 @@ export default function StepConnectRepos({ state, dispatch }) {
 
               {/* User repo search */}
               <div className="step-field" style={{ "--field-index": 3, position: "relative" }}>
-                <Search size={16} style={{ position: "absolute", left: 14, top: 14, color: "#475569", pointerEvents: "none", zIndex: 1 }} />
+                <div style={{ position: "absolute", left: 14, top: 14, color: "#475569", pointerEvents: "none", zIndex: 1 }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  </svg>
+                </div>
                 <input
                   value={state.userRepoSearch || ""}
                   onChange={e => dispatch({ type: "SET_FIELD", field: "userRepoSearch", value: e.target.value })}
