@@ -25,15 +25,15 @@ describe('NewTaskChat redesign — sidebar removed, header icons added', () => {
     expect(code).toMatch(/title=["']Clear conversation["']/);
   });
 
-  it('has a HistoryDropdown component', () => {
-    expect(code).toContain('HistoryDropdown');
+  it('has a HistoryView component (formerly HistoryDropdown)', () => {
+    expect(code).toContain('HistoryView');
   });
 
   it('renders a Neo avatar for assistant messages', () => {
     expect(code).toMatch(/NeoAvatar|neo-avatar|neoAvatar/i);
   });
 
-  it('history dropdown shows recent conversations text', () => {
-    expect(code).toContain('Recent Conversations');
+  it('history view shows conversations text', () => {
+    expect(code).toContain('Conversations');
   });
 });
