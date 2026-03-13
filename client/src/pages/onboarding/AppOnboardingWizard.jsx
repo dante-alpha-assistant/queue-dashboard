@@ -261,6 +261,30 @@ export default function AppOnboardingWizard() {
     }
   };
 
+  const handleKeyDown = useCallback((e) => {
+    if (e.key !== "Enter") return;
+    // Don't intercept Enter inside textareas (they need newlines)
+    if (e.target.tagName === "TEXTAREA") return;
+    // Don't intercept if a button was the target (avoid double-trigger)
+    if (e.target.tagName === "BUTTON") return;
+    if (animating) return;
+
+    if (state.step === STEP_COUNT - 1) {
+      // Final step → trigger Create (only if not already submitting)
+      if (!state.submitting) {
+        e.preventDefault();
+        handleSubmit();
+      }
+    } else {
+      // Any other step → advance if valid
+      if (canProceed(state)) {
+        e.preventDefault();
+        handleNext();
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, animating, handleNext]);
+
   // Success screen
   if (success) {
     return (
@@ -325,11 +349,15 @@ export default function AppOnboardingWizard() {
   const StepComponent = STEP_COMPONENTS[state.step];
 
   return (
-    <div style={{
-      minHeight: "100vh", display: "flex", flexDirection: "column",
-      background: "linear-gradient(135deg, #FAFAFE 0%, #F5F3FF 50%, #F0EEFF 100%)",
-      fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
-    }}>
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+    <div
+      onKeyDown={handleKeyDown}
+      style={{
+        minHeight: "100vh", display: "flex", flexDirection: "column",
+        background: "linear-gradient(135deg, #FAFAFE 0%, #F5F3FF 50%, #F0EEFF 100%)",
+        fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+      }}
+    >
       {/* Top bar */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
