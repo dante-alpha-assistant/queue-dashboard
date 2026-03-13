@@ -1,5 +1,5 @@
-import { useEffect, useRef, useCallback, useState } from "react";
-import { Check, Loader2, Github, FolderPlus, Info } from "lucide-react";
+import { useEffect, useCallback, useState } from "react";
+import { Check, Loader2, Github, FolderPlus, Sparkles } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
 const inputStyle = {
@@ -11,14 +11,6 @@ const inputStyle = {
   outline: "none", boxSizing: "border-box",
   transition: "border-color 200ms, box-shadow 200ms",
 };
-
-/** Slugify an app name into a repo-safe string */
-function slugify(str) {
-  return (str || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "my-app";
-}
 
 /** Shared checkbox repo list */
 function RepoList({ repos, isSelected, onToggle, loading, emptyMsg }) {
@@ -54,12 +46,12 @@ function RepoList({ repos, isSelected, onToggle, loading, emptyMsg }) {
               border: selected
                 ? "2px solid #7C3AED"
                 : hovered
-                  ? "2px solid #1E293B"
+                  ? "2px solid #334155"
                   : "2px solid transparent",
               background: selected
                 ? "rgba(124,58,237,0.12)"
                 : hovered
-                  ? "rgba(139,92,246,0.05)"
+                  ? "rgba(139,92,246,0.06)"
                   : "transparent",
               cursor: "pointer", textAlign: "left", width: "100%",
               fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
@@ -79,7 +71,7 @@ function RepoList({ repos, isSelected, onToggle, loading, emptyMsg }) {
               <div style={{ fontSize: 14, fontWeight: 600, color: "#F1F5F9" }}>{r.name}</div>
               {r.description && (
                 <div style={{
-                  fontSize: 12, color: "#94A3B8", marginTop: 2,
+                  fontSize: 12, color: "#64748B", marginTop: 2,
                   overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                 }}>{r.description}</div>
               )}
@@ -107,41 +99,10 @@ function RepoList({ repos, isSelected, onToggle, loading, emptyMsg }) {
 }
 
 export default function StepConnectRepos({ state, dispatch }) {
-  const userSearchTimer = useRef(null);
-  const userEditedScratchName = useRef(false);
+  const userSearchTimer = useState(null)[0];
   const [oauthError, setOauthError] = useState(null);
   const [connectingOAuth, setConnectingOAuth] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
-
-  // ── Scratch repo name local state ─────────────────────────
-  const [scratchRepoName, setScratchRepoName] = useState(() => slugify(state.name));
-
-  // Sync scratchRepoName when app name changes (unless user manually edited it)
-  useEffect(() => {
-    if (!userEditedScratchName.current) {
-      setScratchRepoName(slugify(state.name));
-    }
-  }, [state.name]);
-
-  // Whenever scratchRepoName changes, update wizard repos state (scratch mode only)
-  useEffect(() => {
-    if (state.repoSource === "scratch") {
-      const name = scratchRepoName || "my-app";
-      dispatch({
-        type: "SET_FIELD",
-        field: "repos",
-        value: [{ full_name: `dante-alpha-assistant/${name}`, name }],
-      });
-    }
-  }, [scratchRepoName, state.repoSource, dispatch]);
-
-  // Reset userEdited flag when switching back to scratch mode
-  useEffect(() => {
-    if (state.repoSource === "scratch") {
-      userEditedScratchName.current = false;
-      setScratchRepoName(slugify(state.name));
-    }
-  }, [state.repoSource]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── User repos (github OAuth mode) ───────────────────────
   const searchUserRepos = useCallback(async (q) => {
@@ -165,9 +126,14 @@ export default function StepConnectRepos({ state, dispatch }) {
   }, [state.repoSource, state.githubToken, searchUserRepos]);
 
   useEffect(() => {
-    clearTimeout(userSearchTimer.current);
-    userSearchTimer.current = setTimeout(() => searchUserRepos(state.userRepoSearch || ""), 300);
-    return () => clearTimeout(userSearchTimer.current);
+    if (!userSearchTimer) return;
+    clearTimeout(userSearchTimer);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Debounce user search
+  useEffect(() => {
+    const t = setTimeout(() => searchUserRepos(state.userRepoSearch || ""), 300);
+    return () => clearTimeout(t);
   }, [state.userRepoSearch, searchUserRepos]);
 
   // ── Handle OAuth callback (code in URL) ──────────────────
@@ -176,7 +142,6 @@ export default function StepConnectRepos({ state, dispatch }) {
     const oauthState = searchParams.get("state");
     if (!code) return;
 
-    // Only handle if we're in github mode (user chose it before OAuth redirect)
     setConnectingOAuth(true);
     setOauthError(null);
     fetch(`/api/github/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(oauthState || "")}`)
@@ -185,9 +150,7 @@ export default function StepConnectRepos({ state, dispatch }) {
         if (data.error) throw new Error(data.error);
         dispatch({ type: "SET_FIELD", field: "githubToken", value: data.token });
         dispatch({ type: "SET_FIELD", field: "githubUser", value: { login: data.login, avatar_url: data.avatar_url } });
-        // Ensure we're in github mode after successful OAuth
         dispatch({ type: "SET_FIELD", field: "repoSource", value: "github" });
-        // Clean code/state from URL
         const params = new URLSearchParams(searchParams);
         params.delete("code");
         params.delete("state");
@@ -266,7 +229,7 @@ export default function StepConnectRepos({ state, dispatch }) {
 
       {/* Mode selector */}
       <div className="step-field" style={{ "--field-index": 0, display: "flex", gap: 12 }}>
-        {modeCard("scratch", <FolderPlus size={20} />, "Create from scratch", "We'll create a new repository in dante-alpha-assistant automatically")}
+        {modeCard("scratch", <FolderPlus size={20} />, "Create from scratch", "AI will analyze your app and create the optimal repo structure")}
         {modeCard("github", <Github size={20} />, "Connect with your GitHub", "Browse and select from your personal repos")}
       </div>
 
@@ -290,91 +253,66 @@ export default function StepConnectRepos({ state, dispatch }) {
         </div>
       )}
 
-      {/* ── Create from scratch mode ─────────────────────── */}
+      {/* ── Create from scratch mode — AI info card ──────── */}
       {state.repoSource === "scratch" && (
         <div className="step-field" style={{ "--field-index": 2 }}>
-          {/* Confirmation panel */}
           <div style={{
-            padding: "20px 22px",
+            padding: "24px 22px",
             borderRadius: 16,
-            border: "1px solid rgba(124,58,237,0.3)",
-            background: "rgba(124,58,237,0.06)",
-            display: "flex", flexDirection: "column", gap: 16,
+            border: "1px solid rgba(124,58,237,0.35)",
+            background: "linear-gradient(135deg, rgba(124,58,237,0.08) 0%, rgba(139,92,246,0.04) 100%)",
+            display: "flex", flexDirection: "column", gap: 18,
           }}>
-            {/* Info message */}
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
               <div style={{
-                width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                background: "rgba(124,58,237,0.15)",
+                width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                background: "rgba(124,58,237,0.2)",
+                border: "1px solid rgba(124,58,237,0.3)",
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}>
-                <Info size={18} color="#A78BFA" />
+                <Sparkles size={20} color="#A78BFA" />
               </div>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#F1F5F9", marginBottom: 4 }}>
-                  A new repository will be created automatically
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#F1F5F9", marginBottom: 6 }}>
+                  AI will design your repo structure
                 </div>
-                <div style={{ fontSize: 13, color: "#94A3B8", lineHeight: 1.6 }}>
-                  We'll create this repo under the <span style={{ color: "#A78BFA", fontWeight: 600 }}>dante-alpha-assistant</span> GitHub organization when you deploy your app. You can rename it below if needed.
+                <div style={{ fontSize: 13, color: "#94A3B8", lineHeight: 1.65 }}>
+                  Our AI will analyze your app description and create the optimal repository structure —
+                  this could be a single repo, or separate frontend + backend repos, depending on what makes sense for your project.
                 </div>
               </div>
             </div>
 
-            {/* Editable repo name */}
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#94A3B8", marginBottom: 8, letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                Repository name
+            {/* Architecture options preview */}
+            <div style={{
+              display: "flex", flexDirection: "column", gap: 8,
+              padding: "14px 16px",
+              borderRadius: 12,
+              border: "1px solid rgba(124,58,237,0.2)",
+              background: "rgba(15,23,42,0.6)",
+            }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#7C3AED", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>
+                Possible outcomes
               </div>
-              <div style={{
-                display: "flex", alignItems: "center",
-                border: "1px solid #1E293B",
-                borderRadius: 12, overflow: "hidden",
-                background: "#0F172A",
-                fontFamily: "'JetBrains Mono', monospace",
-                transition: "border-color 200ms, box-shadow 200ms",
-              }}
-                onFocusCapture={e => {
-                  e.currentTarget.style.borderColor = "#7C3AED";
-                  e.currentTarget.style.boxShadow = "0 0 0 3px rgba(124,58,237,0.15)";
-                }}
-                onBlurCapture={e => {
-                  e.currentTarget.style.borderColor = "#1E293B";
-                  e.currentTarget.style.boxShadow = "none";
-                }}
-              >
-                <span style={{
-                  padding: "12px 14px",
-                  fontSize: 13, color: "#475569", flexShrink: 0,
-                  borderRight: "1px solid #1E293B",
-                  background: "#0A1020",
-                  userSelect: "none",
-                }}>
-                  dante-alpha-assistant /
-                </span>
-                <input
-                  value={scratchRepoName}
-                  onChange={e => {
-                    userEditedScratchName.current = true;
-                    setScratchRepoName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-+/, ""));
-                  }}
-                  onBlur={e => {
-                    // Clean trailing hyphens on blur
-                    const cleaned = e.target.value.replace(/^-+|-+$/g, "") || slugify(state.name) || "my-app";
-                    setScratchRepoName(cleaned);
-                  }}
-                  placeholder="my-app"
-                  style={{
-                    flex: 1, padding: "12px 14px",
-                    border: "none", outline: "none",
-                    background: "transparent",
-                    color: "#F1F5F9", fontSize: 13,
-                    fontFamily: "'JetBrains Mono', monospace",
-                  }}
-                />
-              </div>
-              <div style={{ fontSize: 11, color: "#334155", marginTop: 6 }}>
-                github.com/dante-alpha-assistant/{scratchRepoName || "my-app"}
-              </div>
+              {[
+                { icon: "📦", label: "Monorepo", desc: "Simple apps — one repo for everything" },
+                { icon: "🔀", label: "Frontend + Backend", desc: "Full-stack apps — separate UI and API repos" },
+                { icon: "⚙️", label: "Multi-Service", desc: "Complex apps — frontend, API, worker repos" },
+              ].map(({ icon, label, desc }) => (
+                <div key={label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 16 }}>{icon}</span>
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "#C4B5FD" }}>{label}</span>
+                    <span style={{ fontSize: 12, color: "#64748B", marginLeft: 8 }}>{desc}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ fontSize: 12, color: "#475569", display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ color: "#7C3AED" }}>✦</span>
+              A preview of the proposed architecture will be shown in the Review step before you confirm.
             </div>
           </div>
         </div>

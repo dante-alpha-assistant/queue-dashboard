@@ -59,6 +59,50 @@ appsRouter.get("/stats/bulk", async (req, res) => {
   }
 });
 
+// POST /api/apps/propose-architecture — return AI-proposed repo structure (MUST be before /:id)
+appsRouter.post("/propose-architecture", (req, res) => {
+  const { name, description } = req.body || {};
+  const slug = (name || "my-app")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "my-app";
+
+  const desc = (description || "").toLowerCase();
+
+  let result;
+  if (/microservice|microservices|distributed|multiple services/.test(desc)) {
+    result = {
+      type: "multi-service",
+      label: "Multi-Service",
+      repos: [
+        { name: `${slug}-frontend`, role: "Frontend" },
+        { name: `${slug}-api`, role: "Backend API" },
+        { name: `${slug}-worker`, role: "Background Worker" },
+      ],
+      reason: "Complex architecture detected — frontend, API, and background worker repos",
+    };
+  } else if (/frontend|backend|api|rest api|server|client.?side|web app|full.?stack/.test(desc)) {
+    result = {
+      type: "fullstack",
+      label: "Full-Stack",
+      repos: [
+        { name: `${slug}-frontend`, role: "Frontend" },
+        { name: `${slug}-api`, role: "Backend API" },
+      ],
+      reason: "Full-stack app detected — separate frontend and API repos",
+    };
+  } else {
+    result = {
+      type: "monorepo",
+      label: "Monorepo",
+      repos: [{ name: slug, role: "Monorepo" }],
+      reason: "Simple app — single repository",
+    };
+  }
+
+  res.json(result);
+});
+
 // GET /api/apps/:id — get single app by id or slug
 appsRouter.get("/:id", async (req, res) => {
   try {
@@ -81,7 +125,7 @@ appsRouter.get("/:id", async (req, res) => {
 // POST /api/apps — create app
 appsRouter.post("/", async (req, res) => {
   try {
-    const { name, slug, description, repos, supabase_project_ref, deploy_target, deploy_config, env_keys, icon, qa_env_keys, required_credentials, required_qa_credentials } = req.body;
+    const { name, slug, description, repos, repo_source, repo_architecture, supabase_project_ref, deploy_target, deploy_config, env_keys, icon, qa_env_keys, required_credentials, required_qa_credentials } = req.body;
     if (!name) return res.status(400).json({ error: "name required" });
     if (!slug) return res.status(400).json({ error: "slug required" });
 
@@ -131,6 +175,8 @@ appsRouter.post("/", async (req, res) => {
         icon: icon || null,
         qa_env_keys: qa_env_keys || [],
         required_credentials: { coding: codingCreds, qa: qaCreds },
+        repo_source: repo_source || "scratch",
+        repo_architecture: repo_architecture || null,
       })
       .select()
       .single();

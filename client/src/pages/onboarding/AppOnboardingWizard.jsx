@@ -2,6 +2,7 @@ import { useReducer, useState, useCallback, useEffect, useRef, lazy, Suspense } 
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, X, Loader2, Sparkles } from "lucide-react";
 import OnboardingStepIndicator from "./OnboardingStepIndicator";
+import { computeProposedArchitecture } from "./repoArchitecture";
 import "./onboarding.css";
 
 /* ── Lazy-loaded steps ─────────────────────────────────── */
@@ -114,7 +115,7 @@ function getStepHint(state) {
       if (!state.slug.trim()) return "Slug is required";
       return null;
     case 1:
-      if (state.repos.length === 0) return "Select at least one repository";
+      if (state.repoSource !== "scratch" && state.repos.length === 0) return "Select at least one repository";
       return null;
     default:
       return null;
@@ -221,13 +222,23 @@ export default function AppOnboardingWizard() {
         deployConfig.project = state.vercelProject || state.repos[0]?.name || "";
       }
 
+      // For scratch mode, compute the proposed architecture from the app description
+      let reposForBody = state.repos.map(r => r.full_name);
+      let repoArchitecture = null;
+      if (state.repoSource === "scratch") {
+        const proposed = computeProposedArchitecture(state.name, state.description);
+        repoArchitecture = proposed;
+        reposForBody = proposed.map(r => `dante-alpha-assistant/${r.name}`);
+      }
+
       const body = {
         name: state.name.trim(),
         slug: state.slug.trim(),
         description: state.description.trim() || null,
         icon: state.icon || null,
-        repos: state.repos.map(r => r.full_name),
+        repos: reposForBody,
         repo_source: state.repoSource || "scratch",
+        repo_architecture: repoArchitecture,
         deploy_target: state.deployTarget,
         deploy_config: deployConfig,
         env_keys: state.reqCredentials,
