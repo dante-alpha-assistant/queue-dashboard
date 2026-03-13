@@ -98,3 +98,9 @@
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* ── Repo list custom scrollbar ─────────────────────────── */
+.repo-list-scroll::-webkit-scrollbar { width: 4px; }
+.repo-list-scroll::-webkit-scrollbar-track { background: transparent; }
+.repo-list-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+.repo-list-scroll::-webkit-scrollbar-thumb:hover { background: #475569; }

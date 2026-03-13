@@ -3,10 +3,10 @@ import { Search, ExternalLink, Check, Loader2, Github, FolderPlus } from "lucide
 import { useSearchParams } from "react-router-dom";
 
 const inputStyle = {
-  width: "100%", padding: "12px 16px", borderRadius: 12,
-  border: "1px solid var(--md-surface-variant, #E7E0EC)",
-  background: "var(--md-surface, #FFFBFE)",
-  color: "var(--md-on-surface, #1C1B1F)", fontSize: 14,
+  width: "100%", padding: "12px 16px 12px 42px", borderRadius: 12,
+  border: "1px solid #1E293B",
+  background: "#0F172A",
+  color: "#F1F5F9", fontSize: 14,
   fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
   outline: "none", boxSizing: "border-box",
   transition: "border-color 200ms, box-shadow 200ms",
@@ -14,31 +14,45 @@ const inputStyle = {
 
 /** Shared checkbox repo list */
 function RepoList({ repos, isSelected, onToggle, loading, emptyMsg }) {
+  const [hoveredRepo, setHoveredRepo] = useState(null);
   return (
     <div style={{
-      maxHeight: 300, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6,
-      border: "1px solid var(--md-surface-variant, #E7E0EC)", borderRadius: 14, padding: 8,
+      maxHeight: 300, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4,
+      border: "1px solid #1E293B", borderRadius: 14, padding: 8,
+      background: "#0F172A",
     }}>
       {repos.length === 0 && !loading && (
-        <div style={{ padding: 24, textAlign: "center", color: "var(--md-on-surface-variant)", fontSize: 13 }}>
+        <div style={{ padding: 24, textAlign: "center", color: "#475569", fontSize: 13 }}>
           {emptyMsg}
         </div>
       )}
       {loading && repos.length === 0 && (
         <div style={{ padding: 24, textAlign: "center" }}>
-          <Loader2 size={20} style={{ animation: "spin 0.8s linear infinite", color: "var(--md-primary)" }} />
+          <Loader2 size={20} style={{ animation: "spin 0.8s linear infinite", color: "#7C3AED" }} />
         </div>
       )}
       {repos.map(r => {
         const selected = isSelected(r);
+        const hovered = hoveredRepo === r.full_name;
         return (
           <button
             key={r.full_name}
             onClick={() => onToggle(r)}
+            onMouseEnter={() => setHoveredRepo(r.full_name)}
+            onMouseLeave={() => setHoveredRepo(null)}
             style={{
               display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px",
-              borderRadius: 12, border: `2px solid ${selected ? "var(--md-primary, #6750A4)" : "transparent"}`,
-              background: selected ? "rgba(103,80,164,0.06)" : "transparent",
+              borderRadius: 12,
+              border: selected
+                ? "2px solid #7C3AED"
+                : hovered
+                  ? "2px solid #1E293B"
+                  : "2px solid transparent",
+              background: selected
+                ? "rgba(124,58,237,0.12)"
+                : hovered
+                  ? "rgba(139,92,246,0.05)"
+                  : "transparent",
               cursor: "pointer", textAlign: "left", width: "100%",
               fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
               transition: "all 150ms",
@@ -46,32 +60,33 @@ function RepoList({ repos, isSelected, onToggle, loading, emptyMsg }) {
           >
             <div style={{
               width: 22, height: 22, borderRadius: 7, flexShrink: 0, marginTop: 1,
-              border: `2px solid ${selected ? "var(--md-primary, #6750A4)" : "var(--md-surface-variant, #E7E0EC)"}`,
-              background: selected ? "var(--md-primary, #6750A4)" : "transparent",
+              border: `2px solid ${selected ? "#7C3AED" : "#334155"}`,
+              background: selected ? "#7C3AED" : "#1E293B",
               display: "flex", alignItems: "center", justifyContent: "center",
               transition: "all 150ms",
             }}>
               {selected && <Check size={13} color="#fff" strokeWidth={3} />}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--md-on-surface)" }}>{r.name}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#F1F5F9" }}>{r.name}</div>
               {r.description && (
                 <div style={{
-                  fontSize: 12, color: "var(--md-on-surface-variant)", marginTop: 2,
+                  fontSize: 12, color: "#94A3B8", marginTop: 2,
                   overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                 }}>{r.description}</div>
               )}
               <div style={{ display: "flex", gap: 6, marginTop: 4, alignItems: "center" }}>
                 {r.language && (
                   <span style={{
-                    fontSize: 10, padding: "2px 8px", borderRadius: 4,
-                    background: "var(--md-surface-container, #F5F0FB)", color: "var(--md-on-surface-variant)",
+                    fontSize: 11, padding: "2px 8px", borderRadius: 6,
+                    background: "rgba(139,92,246,0.15)", color: "#A78BFA", fontWeight: 600,
+                    border: "1px solid rgba(139,92,246,0.25)", letterSpacing: "0.03em",
                   }}>{r.language}</span>
                 )}
                 {r.private && (
                   <span style={{
                     fontSize: 10, padding: "2px 8px", borderRadius: 4,
-                    background: "rgba(103,80,164,0.08)", color: "var(--md-primary)",
+                    background: "rgba(124,58,237,0.12)", color: "#A78BFA",
                   }}>private</span>
                 )}
               </div>
@@ -196,9 +211,9 @@ export default function StepConnectRepos({ state, dispatch }) {
         onClick={() => dispatch({ type: "SET_REPO_SOURCE", value: id })}
         style={{
           flex: 1, padding: "20px 18px", borderRadius: 16, cursor: "pointer", textAlign: "left",
-          border: `2px solid ${active ? "var(--md-primary, #6750A4)" : "var(--md-surface-variant, #E7E0EC)"}`,
-          background: active ? "rgba(103,80,164,0.06)" : "var(--md-surface, #FFFBFE)",
-          boxShadow: active ? "0 2px 12px rgba(103,80,164,0.15)" : "none",
+          border: `2px solid ${active ? "#7C3AED" : "#1E293B"}`,
+          background: active ? "rgba(124,58,237,0.1)" : "#0F172A",
+          boxShadow: active ? "0 2px 12px rgba(124,58,237,0.2)" : "none",
           transition: "all 200ms",
           display: "flex", flexDirection: "column", gap: 8,
           fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
@@ -207,9 +222,9 @@ export default function StepConnectRepos({ state, dispatch }) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{
             width: 40, height: 40, borderRadius: 12,
-            background: active ? "var(--md-primary, #6750A4)" : "var(--md-surface-container, #F5F0FB)",
+            background: active ? "#7C3AED" : "#1E293B",
             display: "flex", alignItems: "center", justifyContent: "center",
-            color: active ? "#fff" : "var(--md-on-surface-variant)",
+            color: active ? "#fff" : "#475569",
             transition: "all 200ms",
           }}>
             {icon}
@@ -217,7 +232,7 @@ export default function StepConnectRepos({ state, dispatch }) {
           {active && (
             <div style={{
               width: 22, height: 22, borderRadius: "50%",
-              background: "var(--md-primary, #6750A4)",
+              background: "#7C3AED",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
               <Check size={13} color="#fff" strokeWidth={3} />
@@ -225,8 +240,8 @@ export default function StepConnectRepos({ state, dispatch }) {
           )}
         </div>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "var(--md-on-surface)", marginBottom: 3 }}>{title}</div>
-          <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)", lineHeight: 1.5 }}>{subtitle}</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#F1F5F9", marginBottom: 3 }}>{title}</div>
+          <div style={{ fontSize: 12, color: "#94A3B8", lineHeight: 1.5 }}>{subtitle}</div>
         </div>
       </button>
     );
@@ -248,12 +263,12 @@ export default function StepConnectRepos({ state, dispatch }) {
             <span key={r.full_name} style={{
               display: "inline-flex", alignItems: "center", gap: 8,
               padding: "6px 14px", borderRadius: 100,
-              background: "var(--md-primary, #6750A4)", color: "#fff",
+              background: "#7C3AED", color: "#fff",
               fontSize: 13, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace",
             }}>
               {r.name}
               <button onClick={() => dispatch({ type: "TOGGLE_REPO", repo: r })} style={{
-                background: "none", border: "none", color: "rgba(255,255,255,0.8)",
+                background: "none", border: "none", color: "rgba(255,255,255,0.7)",
                 cursor: "pointer", padding: 0, display: "flex", fontSize: 16, lineHeight: 1,
               }}>×</button>
             </span>
@@ -266,15 +281,23 @@ export default function StepConnectRepos({ state, dispatch }) {
         <>
           {/* Search */}
           <div className="step-field" style={{ "--field-index": 2, position: "relative" }}>
-            <Search size={16} style={{ position: "absolute", left: 14, top: 14, color: "var(--md-on-surface-variant)", pointerEvents: "none", zIndex: 1 }} />
+            <Search size={16} style={{ position: "absolute", left: 14, top: 14, color: "#475569", pointerEvents: "none", zIndex: 1 }} />
             <input
               value={state.repoSearch}
               onChange={e => dispatch({ type: "SET_FIELD", field: "repoSearch", value: e.target.value })}
               placeholder="Search dante-alpha-assistant repos..."
-              style={{ ...inputStyle, paddingLeft: 40 }}
+              style={inputStyle}
+              onFocus={e => {
+                e.target.style.borderColor = "#7C3AED";
+                e.target.style.boxShadow = "0 0 0 3px rgba(124,58,237,0.15)";
+              }}
+              onBlur={e => {
+                e.target.style.borderColor = "#1E293B";
+                e.target.style.boxShadow = "none";
+              }}
             />
             {state.repoLoading && (
-              <Loader2 size={16} style={{ position: "absolute", right: 14, top: 14, animation: "spin 0.8s linear infinite", color: "var(--md-on-surface-variant)" }} />
+              <Loader2 size={16} style={{ position: "absolute", right: 14, top: 14, animation: "spin 0.8s linear infinite", color: "#475569" }} />
             )}
           </div>
 
@@ -295,10 +318,13 @@ export default function StepConnectRepos({ state, dispatch }) {
               rel="noopener noreferrer"
               style={{
                 display: "inline-flex", alignItems: "center", gap: 6,
-                fontSize: 13, color: "var(--md-primary, #6750A4)", fontWeight: 600, textDecoration: "none",
+                fontSize: 12, color: "#475569", fontWeight: 500, textDecoration: "none",
+                transition: "color 150ms",
               }}
+              onMouseEnter={e => { e.currentTarget.style.color = "#7C3AED"; }}
+              onMouseLeave={e => { e.currentTarget.style.color = "#475569"; }}
             >
-              <ExternalLink size={13} /> Create new repo on GitHub
+              <ExternalLink size={12} /> Create new repo on GitHub
             </a>
           </div>
         </>
@@ -312,22 +338,22 @@ export default function StepConnectRepos({ state, dispatch }) {
               "--field-index": 2,
               display: "flex", flexDirection: "column", alignItems: "center",
               gap: 14, padding: "32px 24px",
-              border: "1px solid var(--md-surface-variant, #E7E0EC)",
-              borderRadius: 16, background: "var(--md-surface, #FFFBFE)",
+              border: "1px solid #1E293B",
+              borderRadius: 16, background: "#0F172A",
               textAlign: "center",
             }}>
               <div style={{
                 width: 56, height: 56, borderRadius: 16,
-                background: "var(--md-surface-container, #F5F0FB)",
+                background: "#1E293B",
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}>
-                <Github size={28} color="var(--md-on-surface-variant)" />
+                <Github size={28} color="#475569" />
               </div>
               <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "var(--md-on-surface)", marginBottom: 4 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#F1F5F9", marginBottom: 4 }}>
                   Connect your GitHub account
                 </div>
-                <div style={{ fontSize: 13, color: "var(--md-on-surface-variant)", lineHeight: 1.6 }}>
+                <div style={{ fontSize: 13, color: "#94A3B8", lineHeight: 1.6 }}>
                   We'll request read-only access to your repositories.<br />
                   You can revoke access at any time in GitHub settings.
                 </div>
@@ -335,8 +361,8 @@ export default function StepConnectRepos({ state, dispatch }) {
               {oauthError && (
                 <div style={{
                   padding: "10px 16px", borderRadius: 10,
-                  background: "rgba(179,38,30,0.08)", color: "#B3261E",
-                  fontSize: 13, fontWeight: 500, border: "1px solid rgba(179,38,30,0.15)",
+                  background: "rgba(179,38,30,0.08)", color: "#F87171",
+                  fontSize: 13, fontWeight: 500, border: "1px solid rgba(179,38,30,0.2)",
                   width: "100%", boxSizing: "border-box",
                 }}>
                   {oauthError}
@@ -348,12 +374,12 @@ export default function StepConnectRepos({ state, dispatch }) {
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 10,
                   padding: "12px 24px", borderRadius: 100, border: "none",
-                  background: connectingOAuth ? "var(--md-surface-variant)" : "#24292F",
-                  color: connectingOAuth ? "var(--md-on-surface-variant)" : "#fff",
+                  background: connectingOAuth ? "#1E293B" : "#24292F",
+                  color: connectingOAuth ? "#475569" : "#fff",
                   cursor: connectingOAuth ? "not-allowed" : "pointer",
                   fontSize: 14, fontWeight: 700,
                   fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
-                  boxShadow: connectingOAuth ? "none" : "0 2px 10px rgba(0,0,0,0.2)",
+                  boxShadow: connectingOAuth ? "none" : "0 2px 10px rgba(0,0,0,0.3)",
                   transition: "all 150ms",
                 }}
               >
@@ -369,15 +395,15 @@ export default function StepConnectRepos({ state, dispatch }) {
               <div className="step-field" style={{
                 "--field-index": 2,
                 display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
-                borderRadius: 12, background: "rgba(103,80,164,0.06)",
-                border: "1px solid rgba(103,80,164,0.2)",
+                borderRadius: 12, background: "rgba(124,58,237,0.1)",
+                border: "1px solid rgba(124,58,237,0.25)",
               }}>
                 {state.githubUser?.avatar_url && (
                   <img src={state.githubUser.avatar_url} alt="" style={{ width: 28, height: 28, borderRadius: "50%" }} />
                 )}
                 <div style={{ flex: 1 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--md-on-surface)" }}>
-                    Connected as <span style={{ color: "var(--md-primary)" }}>@{state.githubUser?.login || "you"}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#F1F5F9" }}>
+                    Connected as <span style={{ color: "#A78BFA" }}>@{state.githubUser?.login || "you"}</span>
                   </span>
                 </div>
                 <button
@@ -388,7 +414,7 @@ export default function StepConnectRepos({ state, dispatch }) {
                     dispatch({ type: "SET_FIELD", field: "repos", value: [] });
                   }}
                   style={{
-                    fontSize: 12, color: "var(--md-on-surface-variant)", background: "none",
+                    fontSize: 12, color: "#475569", background: "none",
                     border: "none", cursor: "pointer", padding: "4px 8px", borderRadius: 6,
                     fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
                   }}
@@ -399,15 +425,23 @@ export default function StepConnectRepos({ state, dispatch }) {
 
               {/* User repo search */}
               <div className="step-field" style={{ "--field-index": 3, position: "relative" }}>
-                <Search size={16} style={{ position: "absolute", left: 14, top: 14, color: "var(--md-on-surface-variant)", pointerEvents: "none", zIndex: 1 }} />
+                <Search size={16} style={{ position: "absolute", left: 14, top: 14, color: "#475569", pointerEvents: "none", zIndex: 1 }} />
                 <input
                   value={state.userRepoSearch || ""}
                   onChange={e => dispatch({ type: "SET_FIELD", field: "userRepoSearch", value: e.target.value })}
                   placeholder={`Search @${state.githubUser?.login || "your"} repos...`}
-                  style={{ ...inputStyle, paddingLeft: 40 }}
+                  style={inputStyle}
+                  onFocus={e => {
+                    e.target.style.borderColor = "#7C3AED";
+                    e.target.style.boxShadow = "0 0 0 3px rgba(124,58,237,0.15)";
+                  }}
+                  onBlur={e => {
+                    e.target.style.borderColor = "#1E293B";
+                    e.target.style.boxShadow = "none";
+                  }}
                 />
                 {state.userRepoLoading && (
-                  <Loader2 size={16} style={{ position: "absolute", right: 14, top: 14, animation: "spin 0.8s linear infinite", color: "var(--md-on-surface-variant)" }} />
+                  <Loader2 size={16} style={{ position: "absolute", right: 14, top: 14, animation: "spin 0.8s linear infinite", color: "#475569" }} />
                 )}
               </div>
 
