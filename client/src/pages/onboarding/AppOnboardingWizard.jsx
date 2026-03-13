@@ -30,10 +30,18 @@ const initialState = {
   slugManual: false,
   description: "",
   icon: "",
+  // Repo picker
+  repoSource: "scratch",       // "scratch" | "github"
   repos: [],
   repoSearch: "",
   repoResults: [],
   repoLoading: false,
+  // GitHub OAuth (Connect with your GitHub)
+  githubToken: null,
+  githubUser: null,
+  userRepoSearch: "",
+  userRepoResults: [],
+  userRepoLoading: false,
   deployTarget: "kubernetes",
   k8sNamespace: "infra",
   k8sService: "",
@@ -55,6 +63,17 @@ function reducer(state, action) {
       const s = { ...state, name: action.value };
       if (!s.slugManual) s.slug = slugify(action.value);
       return s;
+    }
+    case "SET_REPO_SOURCE": {
+      // Clear selected repos when switching modes
+      return {
+        ...state,
+        repoSource: action.value,
+        repos: [],
+        repoSearch: "",
+        userRepoSearch: "",
+        userRepoResults: [],
+      };
     }
     case "TOGGLE_REPO": {
       const idx = state.repos.findIndex(r => r.full_name === action.repo.full_name);
@@ -208,6 +227,7 @@ export default function AppOnboardingWizard() {
         description: state.description.trim() || null,
         icon: state.icon || null,
         repos: state.repos.map(r => r.full_name),
+        repo_source: state.repoSource || "scratch",
         deploy_target: state.deployTarget,
         deploy_config: deployConfig,
         env_keys: state.reqCredentials,

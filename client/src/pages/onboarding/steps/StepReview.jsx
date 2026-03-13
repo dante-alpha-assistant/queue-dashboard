@@ -44,7 +44,18 @@ export default function StepReview({ state }) {
 
         {/* Repos */}
         <div className="step-field" style={{ "--field-index": 1, padding: "16px 24px", borderBottom: "1px solid var(--md-surface-variant, #E7E0EC)" }}>
-          <div style={labelStyle}>Repositories ({state.repos.length})</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <span style={labelStyle}>Repositories ({state.repos.length})</span>
+            <span style={{
+              fontSize: 11, padding: "3px 10px", borderRadius: 100, fontWeight: 600,
+              background: state.repoSource === "github" ? "#24292F" : "var(--md-surface-container, #F5F0FB)",
+              color: state.repoSource === "github" ? "#fff" : "var(--md-on-surface-variant)",
+            }}>
+              {state.repoSource === "github"
+                ? `✦ GitHub: @${state.githubUser?.login || "you"}`
+                : "dante-alpha-assistant"}
+            </span>
+          </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {state.repos.map(r => (
               <a key={r.full_name} href={`https://github.com/${r.full_name}`} target="_blank" rel="noopener noreferrer" style={{
