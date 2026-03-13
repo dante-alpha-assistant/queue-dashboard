@@ -671,8 +671,28 @@ router.get("/tasks/:id/comments", async (req, res) => {
 
 router.post("/tasks/:id/comments", async (req, res) => {
   try {
-    const { body, author, author_type, mentions } = req.body;
+    const { body, author, author_type } = req.body;
+    let { mentions } = req.body;
     if (!body || !body.trim()) return res.status(400).json({ error: "body is required" });
+
+    // Auto-parse @mentions from comment body (case-insensitive)
+    // This ensures mentions are always detected server-side, even if client doesn't send them
+    const rawMentions = (body.match(/@([a-zA-Z0-9_-]+)/g) || [])
+      .map(m => m.slice(1).toLowerCase());
+    if (rawMentions.length > 0) {
+      // Resolve names to agent IDs via agent_cards (id field = agent name for all agents)
+      const { data: agentRows } = await supabase
+        .from("agent_cards")
+        .select("id")
+        .in("id", rawMentions);
+      const resolvedIds = (agentRows || []).map(a => a.id);
+      // Merge with any explicitly provided mentions (dedup)
+      const explicitMentions = Array.isArray(mentions) ? mentions : [];
+      mentions = [...new Set([...resolvedIds, ...explicitMentions])];
+    } else if (!Array.isArray(mentions)) {
+      mentions = [];
+    }
+
     const insertPayload = {
       task_id: req.params.id,
       author: author || "dante",
@@ -690,12 +710,9 @@ router.post("/tasks/:id/comments", async (req, res) => {
       .single();
     if (error) throw error;
 
-    // If agents were mentioned, send webhooks with full task context
-    if (mentions && mentions.length > 0) {
-      notifyMentionedAgents(req.params.id, data, mentions).catch(e => {
-        console.error(`[MENTION] Failed to notify agents for task ${req.params.id}:`, e.message);
-      });
-    }
+    // NOTE: @mention hook routing is handled by the task-dispatcher via Supabase Realtime
+    // (dispatcher subscribes to task_comments INSERT events and sends hooks to mentioned agents)
+    // The dashboard only stores the comment + populates the mentions array in the DB.
 
     res.json(data);
   } catch (e) {
