@@ -34,8 +34,8 @@ describe('Chat expand panel feature', () => {
     expect(code).toContain('Clear conversation');
   });
 
-  it('has history dropdown component', () => {
-    expect(code).toContain('HistoryDropdown');
+  it('has history view component (formerly HistoryDropdown)', () => {
+    expect(code).toContain('HistoryView');
     expect(code).toContain('historyOpen');
   });
 });
