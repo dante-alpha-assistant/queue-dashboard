@@ -676,9 +676,12 @@ router.post("/tasks/:id/comments", async (req, res) => {
     if (!body || !body.trim()) return res.status(400).json({ error: "body is required" });
 
     // Auto-parse @mentions from comment body (case-insensitive)
+    // Supports both @agent-name and @[agent-name] formats
     // This ensures mentions are always detected server-side, even if client doesn't send them
-    const rawMentions = (body.match(/@([a-zA-Z0-9_-]+)/g) || [])
-      .map(m => m.slice(1).toLowerCase());
+    const rawMentions = [
+      ...(body.match(/@\[([a-zA-Z0-9_-]+)\]/g) || []).map(m => m.slice(2, -1).toLowerCase()),
+      ...(body.match(/@([a-zA-Z0-9_-]+)(?!\])/g) || []).map(m => m.slice(1).toLowerCase()),
+    ];
     if (rawMentions.length > 0) {
       // Resolve names to agent IDs via agent_cards (id field = agent name for all agents)
       const { data: agentRows } = await supabase
