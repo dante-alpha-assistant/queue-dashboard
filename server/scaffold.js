@@ -262,7 +262,10 @@ export async function runScaffoldPipeline(app) {
     if ((deploy_target === "vercel" || !deploy_target) && VERCEL_TOKEN) {
       console.log(`[SCAFFOLD] Creating Vercel project for "${slug}"`);
       try {
-        await emitStep(id, "vercel_setup", "in_progress");
+        // Wait 3s for GitHub to fully initialize the repo
+        await new Promise((r) => setTimeout(r, 3000));
+
+        await steps.start("scaffolding");
         const vercelResult = await createVercelProject({
           slug,
           repoFullName: fullName,
@@ -274,7 +277,7 @@ export async function runScaffoldPipeline(app) {
         vercelUrl = vercelResult.previewUrl;
 
         console.log(`[SCAFFOLD] Vercel project created: id=${vercelProjectId} url=${vercelUrl}`);
-        await emitStep(id, "vercel_setup", "done");
+        await steps.complete("scaffolding");
 
         // 4b. Trigger initial deployment explicitly.
         // Vercel only auto-deploys on NEW pushes. Since the GitHub repo was created from
@@ -296,6 +299,7 @@ export async function runScaffoldPipeline(app) {
           .eq("id", id);
         await emitStep(id, "vercel_deploy", "in_progress");
 
+        await steps.start("setting_up_vercel");
         try {
           if (!githubRepoId) {
             throw new Error("GitHub repo ID not available — cannot trigger Vercel deployment");
@@ -329,22 +333,23 @@ export async function runScaffoldPipeline(app) {
           if (deployStatus.readyState === "READY") {
             vercelUrl = vercelDeployedUrl || vercelUrl;
             console.log(`[SCAFFOLD] Deployment READY: ${vercelUrl}`);
-            await emitStep(id, "vercel_deploy", "done");
+            await steps.complete("setting_up_vercel");
           } else {
             console.warn(`[SCAFFOLD] Deployment ended with state ${deployStatus.readyState} — will not set live URL`);
-            await emitStep(id, "vercel_deploy", "failed", `Deployment ended with state ${deployStatus.readyState}`);
+            await steps.fail("setting_up_vercel", `Vercel deployment ended with state: ${deployStatus.readyState}`);
           }
         } catch (deployErr) {
           // Non-fatal: log warning, deployment failed but pipeline continues
           console.warn(`[SCAFFOLD] Initial Vercel deployment failed (non-fatal): ${deployErr.message}`);
           vercelDeployStatus = "error";
-          await emitStep(id, "vercel_deploy", "failed", deployErr.message);
+          await steps.fail("setting_up_vercel", deployErr.message);
         }
 
         // 5. Add custom subdomain: {slug}.dante.id → cname.vercel-dns.com
         let customDomain = null;
         try {
           const subdomain = `${slug}.dante.id`;
+          await steps.start("deploying");
 
           // 5a. Create CNAME record in DigitalOcean DNS
           if (DO_TOKEN) {
@@ -360,9 +365,11 @@ export async function runScaffoldPipeline(app) {
 
           customDomain = subdomain;
           console.log(`[SCAFFOLD] Custom subdomain ready: https://${subdomain}`);
+          await steps.complete("deploying");
         } catch (domainErr) {
           // Non-fatal: log warning, do not crash the pipeline
           console.warn(`[SCAFFOLD] Custom subdomain setup failed (non-fatal): ${domainErr.message}`);
+          await steps.fail("deploying", domainErr.message).catch(() => {});
         }
 
         // Only set vercel_preview_url if the deployment actually succeeded
@@ -399,6 +406,7 @@ export async function runScaffoldPipeline(app) {
 
     if (shouldProvisionDb) {
       console.log(`[SCAFFOLD] Provisioning Supabase for "${slug}"...`);
+      await steps.start("first_deployment");
       try {
         // 6a. Create schema + AI-generated tables + RLS policies
         const dbResult = await provisionSupabase(slug, description || "");
@@ -433,10 +441,15 @@ export async function runScaffoldPipeline(app) {
           .eq("id", id);
 
         hasDatabase = true;
+        await steps.complete("first_deployment");
       } catch (dbErr) {
         // Non-fatal: log warning, continue with task creation
         console.warn(`[SCAFFOLD] Supabase provisioning failed (non-fatal): ${dbErr.message}`);
+        await steps.fail("first_deployment", dbErr.message).catch(() => {});
       }
+    } else {
+      // No DB needed — mark first_deployment as done (skipped)
+      await steps.complete("first_deployment");
     }
 
     // 7. Auto-create coding task
@@ -459,10 +472,11 @@ export async function runScaffoldPipeline(app) {
 
     // 7. AI customization pass — generate pages, API routes, components, navigation
     console.log(`[SCAFFOLD] Starting AI codegen pass for "${name}" (task=${task.id})`);
-    await emitStep(id, "ai_codegen", "in_progress");
+    await steps.start("ai_generating");
     try {
       const { prUrl, fileCount } = await generateAppCode(name, description, fullName, task.id);
       console.log(`[SCAFFOLD] AI codegen done — ${fileCount} files, PR: ${prUrl}`);
+      await steps.complete("ai_generating");
 
       await emitStep(id, "ai_codegen", "done");
       // Mark coding task as qa_testing and store the PR URL
@@ -481,7 +495,7 @@ export async function runScaffoldPipeline(app) {
     } catch (codegenErr) {
       // Non-fatal: log the error, leave task in 'todo' for manual pickup
       console.warn(`[SCAFFOLD] AI codegen failed (non-fatal): ${codegenErr.message}`);
-      await emitStep(id, "ai_codegen", "failed", codegenErr.message);
+      await steps.fail("ai_generating", codegenErr.message).catch(() => {});
       await supabase
         .from("agent_tasks")
         .update({
@@ -492,6 +506,9 @@ export async function runScaffoldPipeline(app) {
         .eq("id", task.id)
         .catch(() => {});
     }
+
+    // Mark pipeline as live
+    await steps.complete("live");
 
     console.log(`[SCAFFOLD] Pipeline complete for "${slug}" — status=building, task=${task.id}`);
   } catch (err) {
@@ -505,5 +522,13 @@ export async function runScaffoldPipeline(app) {
       })
       .eq("id", id)
       .catch((e) => console.error("[SCAFFOLD] Failed to update status to failed:", e.message));
+    // Mark current in-progress step as failed
+    try {
+      const { data: appRow } = await supabase.from("apps").select("build_steps").eq("id", id).single();
+      const bs = appRow?.build_steps;
+      if (bs?.current_step) {
+        await steps.fail(bs.current_step, err.message);
+      }
+    } catch {}
   }
 }

@@ -491,6 +491,10 @@ appsRouter.get("/:id/build-events", async (req, res) => {
     appId = appRow.id;
   }
 
+  // Initial snapshot — send current app row (includes build_steps)
+  const { data: initApp } = await supabase.from("apps").select("*").eq("id", appId).single();
+  if (initApp) send("app_update", initApp);
+
   // Initial snapshot — send current tasks
   const { data: initTasks } = await supabase
     .from("agent_tasks")
@@ -523,7 +527,7 @@ appsRouter.get("/:id/build-events", async (req, res) => {
     try { res.write(":ping\n\n"); } catch {}
   }, 15000);
 
-  // Realtime channel for task status changes
+  // Realtime channel for task status changes AND app build_steps updates
   const channelName = `build-${appId}-${Date.now()}`;
   const channel = supabase.channel(channelName)
     .on(
@@ -531,6 +535,13 @@ appsRouter.get("/:id/build-events", async (req, res) => {
       { event: "*", schema: "public", table: "agent_tasks", filter: `app_id=eq.${appId}` },
       (payload) => {
         if (payload.new) send("task_update", payload.new);
+      }
+    )
+    .on(
+      "postgres_changes",
+      { event: "UPDATE", schema: "public", table: "apps", filter: `id=eq.${appId}` },
+      (payload) => {
+        if (payload.new) send("app_update", payload.new);
       }
     )
     .subscribe();
