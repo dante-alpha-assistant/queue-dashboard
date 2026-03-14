@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Package, Plus, Pencil, Archive, RotateCcw, X, Loader2, Search, XCircle, ChevronLeft, Save, BarChart3, ExternalLink, Clock, CheckCircle2, XOctagon, Rocket, Activity } from "lucide-react";
+import { Package, Plus, Pencil, Archive, RotateCcw, X, Loader2, Search, XCircle, ChevronLeft, Save, BarChart3, ExternalLink, Clock, CheckCircle2, XOctagon, Rocket, Activity, Copy, Globe, Zap } from "lucide-react";
 
 const DEPLOY_TARGETS = ["kubernetes", "vercel", "none"];
 const DEPLOY_TARGET_CONFIG = {
@@ -30,6 +30,34 @@ const APP_STATUS_CONFIG = {
   failed:      { label: "Failed",      color: "#BA1A1A", bg: "#BA1A1A14" },
   archived:    { label: "Archived",    color: "#79747E", bg: "#79747E14" },
 };
+
+// Deployment status config — covers both app-level and vercel states
+const DEPLOY_STATUS_CONFIG = {
+  live:      { label: "Live",      color: "#00897B", bg: "#00897B14", icon: "🟢" },
+  deployed:  { label: "Live",      color: "#00897B", bg: "#00897B14", icon: "🟢" },
+  ready:     { label: "Live",      color: "#00897B", bg: "#00897B14", icon: "🟢" },
+  active:    { label: "Live",      color: "#00897B", bg: "#00897B14", icon: "🟢" },
+  building:  { label: "Building",  color: "#E8A317", bg: "#E8A31714", icon: "🟡" },
+  scaffolding: { label: "Building", color: "#E8A317", bg: "#E8A31714", icon: "🟡" },
+  deploying: { label: "Deploying", color: "#E65100", bg: "#E6510014", icon: "🟠" },
+  failed:    { label: "Failed",    color: "#BA1A1A", bg: "#BA1A1A14", icon: "🔴" },
+  error:     { label: "Failed",    color: "#BA1A1A", bg: "#BA1A1A14", icon: "🔴" },
+  canceled:  { label: "Canceled",  color: "#79747E", bg: "#79747E14", icon: "⚪" },
+};
+
+// Derive a unified deployment status from app record fields
+function deriveDeployStatus(app) {
+  const ds = app.deployment_status;
+  const vs = app.vercel_deploy_status;
+  const as = app.status;
+  // Prefer explicit deployment_status, then vercel, then app status
+  return ds || vs || as || null;
+}
+
+// Is the deployment "live" (URL is openable)?
+function isLive(status) {
+  return ["live", "deployed", "ready", "active"].includes(status);
+}
 
 function slugify(str) {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -213,6 +241,105 @@ function AppFormModal({ app, onSave, onClose }) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ── Deployment Status Card ──────────────────────────────── */
+function DeploymentCard({ app, onUpdated }) {
+  const rawStatus = deriveDeployStatus(app);
+  const cfg = DEPLOY_STATUS_CONFIG[rawStatus] || null;
+  const deployUrl = app.deployment_url || null;
+  const lastDeployed = app.last_deployed_at || null;
+  const live = isLive(rawStatus);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = (e) => {
+    e.preventDefault();
+    if (!deployUrl) return;
+    navigator.clipboard.writeText(deployUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
+  };
+
+  return (
+    <div style={{
+      background: "var(--md-surface, #FFFBFE)", borderRadius: 16,
+      border: live ? "1px solid rgba(0,137,123,0.3)" : "1px solid var(--md-surface-variant, #E7E0EC)",
+      padding: "20px 24px", marginBottom: 20,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Globe size={16} style={{ color: live ? "#00897B" : "var(--md-on-surface-variant)" }} />
+          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--md-on-surface)" }}>Deployment</span>
+        </div>
+        {cfg && (
+          <span style={{
+            fontSize: 10, fontWeight: 700, padding: "4px 12px", borderRadius: 100,
+            background: cfg.bg, color: cfg.color, textTransform: "uppercase", letterSpacing: "0.05em",
+            display: "inline-flex", alignItems: "center", gap: 5,
+          }}>
+            <Zap size={10} /> {cfg.label}
+          </span>
+        )}
+        {!cfg && (
+          <span style={{
+            fontSize: 10, fontWeight: 600, padding: "4px 12px", borderRadius: 100,
+            background: "var(--md-surface-container, #F5F0FB)", color: "var(--md-on-surface-variant)",
+            textTransform: "uppercase", letterSpacing: "0.05em",
+          }}>No deployment data</span>
+        )}
+      </div>
+
+      {deployUrl ? (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.04em" }}>Live URL</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <a href={deployUrl} target="_blank" rel="noopener noreferrer" style={{
+              fontSize: 13, color: "#0070F3", fontFamily: "'JetBrains Mono', monospace",
+              textDecoration: "none", wordBreak: "break-all", flex: 1,
+            }}
+              onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
+              onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
+            >{deployUrl}</a>
+            <button onClick={handleCopy} title="Copy URL" style={{
+              background: copied ? "rgba(0,137,123,0.12)" : "var(--md-surface-container, #F5F0FB)",
+              border: "none", borderRadius: 8, cursor: "pointer", padding: "5px 8px",
+              color: copied ? "#00897B" : "var(--md-on-surface-variant)", display: "flex", alignItems: "center", gap: 4,
+              fontSize: 11, fontWeight: 600, transition: "all 150ms", flexShrink: 0,
+            }}>
+              <Copy size={12} /> {copied ? "Copied!" : "Copy"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ marginBottom: 14, fontSize: 12, color: "var(--md-on-surface-variant)", fontStyle: "italic" }}>
+          No deployment URL yet
+        </div>
+      )}
+
+      {lastDeployed && (
+        <div style={{ fontSize: 11, color: "var(--md-on-surface-variant)", display: "flex", alignItems: "center", gap: 5, marginBottom: deployUrl && live ? 14 : 0 }}>
+          <Clock size={11} /> Last deployed: {timeAgo(lastDeployed)}
+        </div>
+      )}
+
+      {deployUrl && live && (
+        <a href={deployUrl} target="_blank" rel="noopener noreferrer" style={{
+          display: "inline-flex", alignItems: "center", gap: 8,
+          padding: "10px 20px", borderRadius: 100, border: "none",
+          background: "#00897B", color: "#fff", textDecoration: "none",
+          fontSize: 13, fontWeight: 700, cursor: "pointer",
+          boxShadow: "0 2px 10px rgba(0,137,123,0.3)", transition: "all 150ms",
+          marginTop: lastDeployed ? 0 : 0,
+        }}
+          onMouseEnter={e => e.currentTarget.style.background = "#00695C"}
+          onMouseLeave={e => e.currentTarget.style.background = "#00897B"}
+        >
+          <ExternalLink size={14} /> Open App ↗
+        </a>
+      )}
     </div>
   );
 }
@@ -405,6 +532,9 @@ function AppDetailView({ app, onBack, onSave, onArchive, onRestore }) {
           </div>
         )}
       </div>
+
+      {/* Deployment Status Card */}
+      <DeploymentCard app={app} onUpdated={(updated) => onSave(updated)} />
 
       {/* Stats Cards */}
       {stats && (
@@ -609,13 +739,17 @@ function AppDetailView({ app, onBack, onSave, onArchive, onRestore }) {
 function AppCard({ app, stats, onSelect, onEdit, onArchive }) {
   const dtCfg = DEPLOY_TARGET_CONFIG[app.deploy_target] || DEPLOY_TARGET_CONFIG.none;
   const s = stats || { total: 0, active: 0 };
+  const rawStatus = deriveDeployStatus(app);
+  const deployCfg = rawStatus ? (DEPLOY_STATUS_CONFIG[rawStatus] || null) : null;
+  const deployUrl = app.deployment_url || null;
+  const live = isLive(rawStatus);
 
   return (
     <div
       onClick={() => onSelect(app)}
       style={{
         background: "var(--md-surface, #FFFBFE)", borderRadius: 16,
-        border: "1px solid var(--md-surface-variant, #E7E0EC)",
+        border: live ? "1px solid rgba(0,137,123,0.25)" : "1px solid var(--md-surface-variant, #E7E0EC)",
         overflow: "hidden", transition: "all 200ms", cursor: "pointer",
         transform: "translateY(0)",
       }}
@@ -654,6 +788,23 @@ function AppCard({ app, stats, onSelect, onEdit, onArchive }) {
           }}>{dtCfg.icon} {dtCfg.label}</span>
         </div>
 
+        {/* Deployment URL under name */}
+        {deployUrl && (
+          <div style={{ marginBottom: 8 }} onClick={e => e.stopPropagation()}>
+            <a href={deployUrl} target="_blank" rel="noopener noreferrer" style={{
+              fontSize: 11, color: live ? "#00897B" : "#0070F3",
+              fontFamily: "'JetBrains Mono', monospace",
+              textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3,
+              opacity: 0.85,
+            }}
+              onMouseEnter={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.textDecoration = "underline"; }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = "0.85"; e.currentTarget.style.textDecoration = "none"; }}
+            >
+              {deployUrl.replace(/^https?:\/\//, "")} <ExternalLink size={9} />
+            </a>
+          </div>
+        )}
+
         {/* Description */}
         {app.description && (
           <p style={{
@@ -682,7 +833,15 @@ function AppCard({ app, stats, onSelect, onEdit, onArchive }) {
           display: "flex", alignItems: "center", justifyContent: "space-between",
           paddingTop: 10, borderTop: "1px solid var(--md-surface-variant, #E7E0EC)",
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {deployCfg && (
+              <span style={{
+                fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 100,
+                background: deployCfg.bg, color: deployCfg.color,
+                textTransform: "uppercase", letterSpacing: "0.04em",
+                display: "inline-flex", alignItems: "center", gap: 3,
+              }}>{deployCfg.label}</span>
+            )}
             <span style={{ fontSize: 12, color: "var(--md-on-surface-variant)", fontWeight: 500 }}>
               <span style={{ color: "#E8A317", fontWeight: 700 }}>{s.active}</span> active / {s.total} total
             </span>
@@ -694,6 +853,16 @@ function AppCard({ app, stats, onSelect, onEdit, onArchive }) {
               </span>
             )}
             <div style={{ display: "flex", gap: 2 }} onClick={e => e.stopPropagation()}>
+              {deployUrl && live && (
+                <a href={deployUrl} target="_blank" rel="noopener noreferrer" title="Open live app" style={{
+                  background: "rgba(0,137,123,0.1)", border: "none", borderRadius: 8, cursor: "pointer",
+                  color: "#00897B", padding: "5px 6px", display: "flex", alignItems: "center",
+                  textDecoration: "none", transition: "background 150ms",
+                }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(0,137,123,0.2)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "rgba(0,137,123,0.1)"}
+                ><ExternalLink size={12} /></a>
+              )}
               <button onClick={() => onEdit(app)} title="Edit" style={{
                 background: "none", border: "none", cursor: "pointer",
                 color: "var(--md-on-surface-variant)", padding: 5, borderRadius: 8,
