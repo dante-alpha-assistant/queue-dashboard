@@ -68,6 +68,17 @@ const PRIORITY_COLORS = {
   low: '#757575',
 };
 
+const ERROR_CATEGORY_CONFIG = {
+  merge_conflict: { label: 'Merge Conflict', color: '#E65100', icon: '🔀' },
+  ci_failure:     { label: 'CI Failure',     color: '#D32F2F', icon: '🔴' },
+  timeout:        { label: 'Timeout',        color: '#F57C00', icon: '⏱️' },
+  session_lost:   { label: 'Session Lost',   color: '#FF9800', icon: '💀' },
+  qa_rejection:   { label: 'QA Rejection',   color: '#7B1FA2', icon: '🧪' },
+  auth_error:     { label: 'Auth Error',     color: '#C62828', icon: '🔑' },
+  resource_error: { label: 'Resource Error', color: '#4E342E', icon: '💾' },
+  unknown:        { label: 'Unknown',        color: '#757575', icon: '❓' },
+};
+
 /* ── Helpers ──────────────────────────────────────────────── */
 
 /** Rename "system" to a friendlier label */
@@ -126,6 +137,30 @@ function ExpandableValue({ value, color }) {
       title={isLong && !expanded ? 'Click to expand' : undefined}
     >
       {displayVal}
+    </span>
+  );
+}
+
+/* ── Error Category Badge ─────────────────────────────────── */
+
+function ErrorCategoryBadge({ category }) {
+  if (!category) return null;
+  const config = ERROR_CATEGORY_CONFIG[category] || ERROR_CATEGORY_CONFIG.unknown;
+  return (
+    <span
+      title={`Error category: ${config.label}`}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 3,
+        fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4,
+        background: `${config.color}14`,
+        color: config.color,
+        border: `1px solid ${config.color}30`,
+        verticalAlign: 'middle',
+        marginLeft: 4,
+      }}
+    >
+      <span style={{ fontSize: 10 }}>{config.icon}</span>
+      {config.label}
     </span>
   );
 }
@@ -190,6 +225,7 @@ function ActivityEntry({ entry, isLast }) {
           <span style={{ fontSize: 11, color: 'var(--md-on-surface-variant, #49454F)' }}>
             {isCreation ? 'created this task' : entry.field === 'comment' ? 'added a comment' : `changed ${label.toLowerCase()}`}
           </span>
+          {entry.error_category && <ErrorCategoryBadge category={entry.error_category} />}
           <span style={{
             fontSize: 9, color: 'var(--md-outline, #79747E)',
             fontFamily: "'Roboto Mono', monospace",
