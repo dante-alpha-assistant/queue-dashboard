@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 
+// Stages are ordered to match the actual pipeline execution sequence in scaffold.js:
+//   app_created → github_repo → vercel_setup → vercel_deploy → first_deploy → scaffold → ai_codegen → live
+// This ensures sequential halt logic works correctly (a failed step blocks all subsequent steps).
 const STAGES = [
   {
     id: "app_created",
@@ -13,18 +16,6 @@ const STAGES = [
     label: "Creating GitHub Repo",
     icon: "🐙",
     match: /github|repo/i,
-  },
-  {
-    id: "scaffold",
-    label: "Scaffolding Template",
-    icon: "🏗️",
-    match: /scaffold|template|next\.?js|boilerplate/i,
-  },
-  {
-    id: "ai_codegen",
-    label: "AI Generating Code",
-    icon: "🤖",
-    match: /generat|codegen|ai.+code|pages|api.+route/i,
   },
   {
     id: "vercel_setup",
@@ -42,7 +33,19 @@ const STAGES = [
     id: "first_deploy",
     label: "First Deployment",
     icon: "⚙️",
-    match: /deploy|build/i,
+    match: null, // derived from vercel_deploy_status = "ready"
+  },
+  {
+    id: "scaffold",
+    label: "Scaffolding Template",
+    icon: "🏗️",
+    match: /scaffold|template|next\.?js|boilerplate/i,
+  },
+  {
+    id: "ai_codegen",
+    label: "AI Generating Code",
+    icon: "🤖",
+    match: /generat|codegen|ai.+code|pages|api.+route/i,
   },
   {
     id: "live",
@@ -55,7 +58,7 @@ const STAGES = [
 function getStageStatus(stage, tasks, app) {
   if (stage.id === "app_created") return "completed";
 
-  // Vercel initial deployment tracking
+  // Vercel deployment setup — derived from app.vercel_deploy_status
   if (stage.id === "vercel_deploy") {
     const ds = app?.vercel_deploy_status;
     if (ds === "ready") return "completed";
@@ -64,15 +67,23 @@ function getStageStatus(stage, tasks, app) {
     return "pending";
   }
 
-  if (stage.id === "live") {
-    // Only show Live if the Vercel deployment is confirmed ready (or legacy app with no deploy tracking)
+  // First deployment: completed only when Vercel is fully READY
+  if (stage.id === "first_deploy") {
     const ds = app?.vercel_deploy_status;
-    if (ds === "error" || ds === "canceled") return "failed";
+    if (ds === "ready") return "completed";
+    if (ds === "deploying") return "in_progress";
+    // error/canceled/not-set → pending (sequential halt handles failure propagation)
+    return "pending";
+  }
+
+  if (stage.id === "live") {
+    // Only "completed" when we have a confirmed preview URL or a deployed task
     if (app?.vercel_preview_url) return "completed";
     if (tasks.some((t) => t.status === "deployed")) return "completed";
     return "pending";
   }
 
+  // Task-based stages: derive from matching tasks
   const matching = tasks.filter(
     (t) => stage.match && stage.match.test(t.title || "")
   );
@@ -89,6 +100,21 @@ function getStageStatus(stage, tasks, app) {
   return "pending";
 }
 
+/**
+ * Compute all stage statuses with sequential halt logic.
+ * Once a stage fails, all subsequent stages are forced to "pending".
+ * This prevents contradictory states like Failed + Running after it.
+ */
+function getSequentialStatuses(stages, tasks, app) {
+  let halted = false;
+  return stages.map((stage) => {
+    if (halted) return "pending";
+    const status = getStageStatus(stage, tasks, app);
+    if (status === "failed") halted = true;
+    return status;
+  });
+}
+
 // Truncate long comment text to one line
 function trimComment(text) {
   if (!text) return "";
@@ -96,8 +122,9 @@ function trimComment(text) {
   return single.length > 90 ? single.slice(0, 87) + "…" : single;
 }
 
-function StageRow({ stage, tasks, app, comments }) {
-  const status = getStageStatus(stage, tasks, app);
+// StageRow accepts a pre-computed `status` prop (from getSequentialStatuses)
+// so that sequential halt logic is applied before rendering.
+function StageRow({ stage, status, tasks, comments }) {
   const matchingTasks = stage.match
     ? tasks.filter((t) => stage.match.test(t.title || ""))
     : [];
@@ -353,10 +380,13 @@ export default function AppBuildProgress() {
     return () => clearInterval(appInterval);
   }, [fetchApp]);
 
-  // Determine if the app is live
-  const liveStatus = app
-    ? getStageStatus(STAGES[STAGES.length - 1], tasks, app)
-    : "pending";
+  // Compute all stage statuses with sequential halt (once a stage fails, all subsequent = pending)
+  const stageStatuses = app ? getSequentialStatuses(STAGES, tasks, app) : STAGES.map(() => "pending");
+
+  // Derived state from sequential statuses
+  const liveStatus = stageStatuses[STAGES.length - 1];
+  const anyStepFailed = stageStatuses.includes("failed");
+  const hasFatalFailure = app?.status === "failed" || anyStepFailed;
 
   // Start countdown when live
   useEffect(() => {
@@ -378,9 +408,7 @@ export default function AppBuildProgress() {
     return () => clearTimeout(countdownRef.current);
   }, [countdown, navigate]);
 
-  const completedCount = app
-    ? STAGES.filter((s) => getStageStatus(s, tasks, app) === "completed").length
-    : 0;
+  const completedCount = stageStatuses.filter((s) => s === "completed").length;
   const progressPct = Math.round((completedCount / STAGES.length) * 100);
 
   if (loading) {
@@ -469,7 +497,7 @@ export default function AppBuildProgress() {
             }}
           >
             App Factory
-            {/* Live / connecting indicator */}
+            {/* SSE connection indicator — shows data feed status, NOT app live status */}
             <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
               <span
                 style={{
@@ -487,7 +515,7 @@ export default function AppBuildProgress() {
                   color: sseConnected ? "#1B5E20" : "#E65100",
                 }}
               >
-                {sseConnected ? "Live" : "Connecting…"}
+                {sseConnected ? "Connected" : "Connecting…"}
               </span>
             </span>
           </div>
@@ -496,14 +524,16 @@ export default function AppBuildProgress() {
               fontSize: "28px",
               fontWeight: "700",
               margin: "0 0 8px",
-              color: "var(--md-on-surface, #1C1B1F)",
+              color: hasFatalFailure ? "#BA1A1A" : "var(--md-on-surface, #1C1B1F)",
             }}
           >
             {liveStatus === "completed"
               ? `🎉 ${appName} is live!`
+              : hasFatalFailure
+              ? `⚠️ ${appName} — build failed`
               : `Building ${appName}…`}
           </h1>
-          {liveStatus !== "completed" && (
+          {liveStatus !== "completed" && !hasFatalFailure && (
             <p
               style={{
                 color: "var(--md-on-surface-variant, #49454F)",
@@ -533,6 +563,8 @@ export default function AppBuildProgress() {
               background:
                 liveStatus === "completed"
                   ? "linear-gradient(90deg, #2E7D32, #1B5E20)"
+                  : hasFatalFailure
+                  ? "linear-gradient(90deg, #BA1A1A, #9C1717)"
                   : "linear-gradient(90deg, #6750A4, #9C4AE2)",
               borderRadius: "8px",
               transition: "width 0.6s ease",
@@ -550,47 +582,51 @@ export default function AppBuildProgress() {
             marginBottom: "24px",
           }}
         >
-          {STAGES.map((stage) => (
+          {STAGES.map((stage, idx) => (
             <StageRow
               key={stage.id}
               stage={stage}
+              status={stageStatuses[idx]}
               tasks={tasks}
-              app={app}
               comments={comments}
             />
           ))}
         </div>
 
-        {/* Vercel deployment error banner */}
-        {(app?.vercel_deploy_status === "error" || app?.vercel_deploy_status === "canceled") && !app?.vercel_preview_url && (
+        {/* Pipeline failure banner — shown when any step has failed */}
+        {hasFatalFailure && (
           <div
             style={{
-              background: "rgba(127, 29, 29, 0.3)",
-              border: "1px solid rgba(239, 68, 68, 0.4)",
+              background: "rgba(127, 29, 29, 0.08)",
+              border: "1px solid rgba(186, 26, 26, 0.4)",
               borderRadius: "12px",
               padding: "20px 24px",
               marginBottom: "24px",
             }}
           >
             <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
-              <span style={{ fontSize: "22px" }}>⚠️</span>
+              <span style={{ fontSize: "22px" }}>💥</span>
               <div>
-                <div style={{ color: "#fca5a5", fontWeight: "600", marginBottom: "6px" }}>
-                  Initial Vercel deployment {app?.vercel_deploy_status === "canceled" ? "was canceled" : "failed"}
+                <div style={{ color: "#BA1A1A", fontWeight: "600", marginBottom: "6px" }}>
+                  Pipeline failed
+                  {app?.vercel_deploy_status === "canceled" ? " — deployment was canceled" : ""}
                 </div>
-                <div style={{ color: "#f87171", fontSize: "14px", lineHeight: "1.5" }}>
-                  The scaffold triggered a deployment but it did not succeed. The AI code agent task
-                  is still running — its final push to GitHub will trigger a new Vercel deployment automatically.
-                  Check the{" "}
-                  <a
-                    href={`https://vercel.com/lautaro450/${app?.slug}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color: "#93c5fd" }}
-                  >
-                    Vercel dashboard
-                  </a>
-                  {" "}for build logs.
+                <div style={{ color: "#BA1A1A", fontSize: "14px", lineHeight: "1.5" }}>
+                  The build pipeline has stopped. No further steps will run.{" "}
+                  {(app?.vercel_deploy_status === "error" || app?.vercel_deploy_status === "canceled") && (
+                    <>
+                      Check the{" "}
+                      <a
+                        href={`https://vercel.com/lautaro450/${app?.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: "#9C1717" }}
+                      >
+                        Vercel dashboard
+                      </a>
+                      {" "}for deployment logs.
+                    </>
+                  )}
                 </div>
               </div>
             </div>
