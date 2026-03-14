@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import AppChatInterface from "../components/AppChatInterface";
 
 const STAGES = [
   {
@@ -617,8 +618,11 @@ export default function AppBuildProgress() {
           </div>
         )}
 
+        {/* Conversational Chat Interface */}
+        <AppChatInterface appId={id} />
+
         {/* Footer */}
-        <div style={{ textAlign: "center" }}>
+        <div style={{ textAlign: "center", marginTop: "24px" }}>
           <Link
             to="/"
             style={{
