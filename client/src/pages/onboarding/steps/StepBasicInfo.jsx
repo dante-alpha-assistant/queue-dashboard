@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import TemplateGallery, { TEMPLATES } from "./TemplateGallery";
 
 const inputStyle = {
   width: "100%", padding: "12px 16px", borderRadius: 12,
@@ -15,18 +16,57 @@ const labelStyle = {
   marginBottom: 6, display: "block", textTransform: "uppercase", letterSpacing: "0.04em",
 };
 
+const sectionHeaderStyle = {
+  fontSize: 13, fontWeight: 700, color: "#374151",
+  marginBottom: 12, display: "flex", alignItems: "center", gap: 8,
+};
+
 export default function StepBasicInfo({ state, dispatch }) {
   const nameRef = useRef(null);
 
   useEffect(() => {
-    // Focus name input with a small delay to allow animation
-    const timer = setTimeout(() => nameRef.current?.focus(), 350);
-    return () => clearTimeout(timer);
-  }, []);
+    // Focus name input with a small delay to allow animation — only on scratch
+    if (!state.selectedTemplate) {
+      const timer = setTimeout(() => nameRef.current?.focus(), 350);
+      return () => clearTimeout(timer);
+    }
+  }, [state.selectedTemplate]);
+
+  function handleTemplateSelect(templateId) {
+    dispatch({ type: "SET_FIELD", field: "selectedTemplate", value: templateId });
+    if (templateId === null) {
+      // Scratch: clear the prefilled fields (but only if they were auto-filled)
+      dispatch({ type: "SET_NAME", value: "" });
+      dispatch({ type: "SET_FIELD", field: "description", value: "" });
+      dispatch({ type: "SET_FIELD", field: "icon", value: "" });
+    } else {
+      const tpl = TEMPLATES.find(t => t.id === templateId);
+      if (tpl) {
+        dispatch({ type: "SET_NAME", value: tpl.defaultName });
+        dispatch({ type: "SET_FIELD", field: "description", value: tpl.defaultDescription });
+        dispatch({ type: "SET_FIELD", field: "icon", value: tpl.emoji });
+      }
+    }
+  }
 
   return (
     <div className="step-fields-stagger">
+      {/* Template gallery */}
       <div className="step-field" style={{ "--field-index": 0 }}>
+        <div style={sectionHeaderStyle}>
+          <span>Choose a starting point</span>
+        </div>
+        <TemplateGallery
+          selectedTemplate={state.selectedTemplate ?? null}
+          onSelect={handleTemplateSelect}
+        />
+      </div>
+
+      {/* Divider */}
+      <div className="step-field" style={{ "--field-index": 1, height: 1, background: "#F3F4F6", margin: "4px 0" }} />
+
+      {/* App name */}
+      <div className="step-field" style={{ "--field-index": 2 }}>
         <label style={labelStyle}>App Name *</label>
         <input
           ref={nameRef}
@@ -45,7 +85,7 @@ export default function StepBasicInfo({ state, dispatch }) {
         />
       </div>
 
-      <div className="step-field" style={{ "--field-index": 1 }}>
+      <div className="step-field" style={{ "--field-index": 3 }}>
         <label style={labelStyle}>Slug</label>
         <input
           value={state.slug}
@@ -67,7 +107,7 @@ export default function StepBasicInfo({ state, dispatch }) {
         </span>
       </div>
 
-      <div className="step-field" style={{ "--field-index": 2 }}>
+      <div className="step-field" style={{ "--field-index": 4 }}>
         <label style={labelStyle}>Description (optional)</label>
         <textarea
           value={state.description}
@@ -86,7 +126,7 @@ export default function StepBasicInfo({ state, dispatch }) {
         />
       </div>
 
-      <div className="step-field" style={{ "--field-index": 3 }}>
+      <div className="step-field" style={{ "--field-index": 5 }}>
         <label style={labelStyle}>Icon / Emoji (optional)</label>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{
