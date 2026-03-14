@@ -312,8 +312,18 @@ appsRouter.post("/", async (req, res) => {
     // Invalidate GitHub repo cache — new app may reference a new repo
     invalidateGithubRepoCache();
 
-    // Auto-create Vercel project when deploy_target=vercel
-    if (primaryDeployTarget === "vercel") {
+    // Trigger scaffold pipeline async (non-blocking) for scratch apps with no existing repos.
+    // scaffold.js handles: GitHub repo from template, Vercel project, coding task, status updates.
+    if (repo_source === "scratch" && (!reposArray || reposArray.length === 0)) {
+      import("../scaffold.js").then(({ runScaffoldPipeline }) => {
+        runScaffoldPipeline(data).catch((e) => {
+          console.error("[SCAFFOLD] Unhandled pipeline error:", e.message);
+        });
+      }).catch((e) => {
+        console.error("[SCAFFOLD] Failed to import scaffold module:", e.message);
+      });
+    } else if (primaryDeployTarget === "vercel") {
+      // Auto-create Vercel project for apps with existing repos targeting Vercel
       try {
         const vercelToken = process.env.VERCEL_TOKEN;
         if (vercelToken) {
