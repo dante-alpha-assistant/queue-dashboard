@@ -312,11 +312,15 @@ appsRouter.post("/", async (req, res) => {
     // Invalidate GitHub repo cache — new app may reference a new repo
     invalidateGithubRepoCache();
 
-    // Trigger scaffold pipeline async (non-blocking) for scratch apps with no existing repos.
-    // scaffold.js handles: GitHub repo from template, Vercel project, coding task, status updates.
-    if (repo_source === "scratch" && (!reposArray || reposArray.length === 0)) {
+    // Trigger scaffold pipeline async (non-blocking) for ALL scratch apps.
+    // scaffold.js handles: GitHub repo from nextjs-template, Vercel project, coding task, status updates.
+    // Note: the wizard always sends computed repo names in the body even for scratch mode (they don't
+    // exist yet on GitHub). We pass the app record with repos cleared so scaffold.js creates the
+    // real repo from the template and then updates the DB with the actual repo URL.
+    if (repo_source === "scratch") {
+      const appDataForScaffold = { ...data, repos: [], repos_config: [] };
       import("../scaffold.js").then(({ runScaffoldPipeline }) => {
-        runScaffoldPipeline(data).catch((e) => {
+        runScaffoldPipeline(appDataForScaffold).catch((e) => {
           console.error("[SCAFFOLD] Unhandled pipeline error:", e.message);
         });
       }).catch((e) => {
