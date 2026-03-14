@@ -21,7 +21,7 @@ import { createVercelProject, triggerVercelDeployment, waitForDeployment, addCus
 import { createDnsRecord } from "./digitalocean.js";
 import {
   detectNeedsDatabase,
-  provisionSupabase,
+  createAppSupabaseProject,
   injectVercelEnvVars,
   pushFileToGitHub,
 } from "./supabase-provision.js";
@@ -157,9 +157,9 @@ async function createGitHubRepo(slug, description) {
  * Auto-create a coding task for the new app.
  * The task will be picked up by neo-worker to build the custom pages.
  */
-async function createCodingTask({ appId, appName, appDescription, repoFullName, deployTarget, hasDatabase }) {
+async function createCodingTask({ appId, appName, appDescription, repoFullName, deployTarget, hasDatabase, supabaseUrl }) {
   const dbNote = hasDatabase
-    ? `\n## Database\nSupabase has been auto-provisioned for this app:\n- Schema: \`${repoFullName.split('/')[1]}\`\n- Client: \`/src/lib/supabase.ts\` (already pushed to repo)\n- Env vars: injected into Vercel automatically\n- Use \`supabase\` from \`@/lib/supabase\` for data access\n`
+    ? `\n## Database\nA dedicated Supabase project has been auto-provisioned for this app:\n- Project URL: \`${supabaseUrl || 'See app credentials'}\`\n- Client: \`/src/lib/supabase.ts\` (already pushed to repo)\n- Env vars: \`NEXT_PUBLIC_SUPABASE_URL\`, \`NEXT_PUBLIC_SUPABASE_ANON_KEY\`, \`SUPABASE_SERVICE_ROLE_KEY\` injected into Vercel\n- Use \`supabase\` from \`@/lib/supabase\` for data access\n- AI has generated domain-specific tables with RLS policies\n`
     : '';
 
   const taskDescription = `Build the initial version of the ${appName} app.
@@ -218,14 +218,15 @@ ${deployTarget || "vercel"}
 
 const INITIAL_BUILD_STEPS = {
   steps: [
-    { id: "app_created",       label: "App Created",          status: "done",    started_at: new Date().toISOString(), completed_at: new Date().toISOString() },
-    { id: "creating_repo",     label: "Creating GitHub Repo", status: "pending" },
-    { id: "scaffolding",       label: "Scaffolding Template", status: "pending" },
-    { id: "ai_generating",     label: "AI Generating Code",   status: "pending" },
-    { id: "setting_up_vercel", label: "Setting Up Vercel",    status: "pending" },
-    { id: "deploying",         label: "Deploying to Vercel",  status: "pending" },
-    { id: "first_deployment",  label: "First Deployment",     status: "pending" },
-    { id: "live",              label: "Live!",                 status: "pending" },
+    { id: "app_created",           label: "App Created",              status: "done",    started_at: new Date().toISOString(), completed_at: new Date().toISOString() },
+    { id: "creating_repo",         label: "Creating GitHub Repo",     status: "pending" },
+    { id: "scaffolding",           label: "Scaffolding Template",     status: "pending" },
+    { id: "ai_generating",         label: "AI Generating Code",       status: "pending" },
+    { id: "setting_up_vercel",     label: "Setting Up Vercel",        status: "pending" },
+    { id: "deploying",             label: "Deploying to Vercel",      status: "pending" },
+    { id: "supabase_provisioning", label: "Provisioning Database",    status: "pending" },
+    { id: "first_deployment",      label: "First Deployment",         status: "pending" },
+    { id: "live",                  label: "Live!",                    status: "pending" },
   ],
   current_step: "creating_repo",
   failed_step: null,
@@ -516,22 +517,38 @@ export async function runScaffoldPipeline(app) {
       }
     }
 
-    // 6. Supabase auto-provisioning (if needs_database or detected from description)
+    // 6. Supabase per-app project provisioning (if needs_database or detected from description)
     const shouldProvisionDb = needs_database || detectNeedsDatabase(description || "");
     let hasDatabase = false;
+    let supabaseProjectRef = null;
+    let supabaseUrl = null;
+    let supabaseAnonKey = null;
+    let supabaseServiceRoleKey = null;
 
     if (shouldProvisionDb) {
-      console.log(`[SCAFFOLD] Provisioning Supabase for "${slug}"...`);
-      await steps.start("first_deployment");
-      try {
-        // 6a. Create schema + AI-generated tables + RLS policies
-        const dbResult = await provisionSupabase(slug, description || "");
-        console.log(`[SCAFFOLD] Supabase provisioned: schema=${dbResult.schema}, tables=[${dbResult.tables.join(", ")}]`);
+      console.log(`[SCAFFOLD] Provisioning dedicated Supabase project for "${slug}"...`);
+      await steps.start("supabase_provisioning");
 
-        // 6b. Inject env vars into Vercel project
+      // Mark provisioning started in app record
+      await supabase
+        .from("apps")
+        .update({ supabase_db_status: "provisioning", updated_at: new Date().toISOString() })
+        .eq("id", id);
+
+      try {
+        // 6a. Create dedicated Supabase project + AI schema + RLS + E2E tests
+        const dbResult = await createAppSupabaseProject(slug, description || "");
+        supabaseProjectRef = dbResult.ref;
+        supabaseUrl = dbResult.url;
+        supabaseAnonKey = dbResult.anonKey;
+        supabaseServiceRoleKey = dbResult.serviceRoleKey;
+
+        console.log(`[SCAFFOLD] Supabase project ready: ref=${supabaseProjectRef}, url=${supabaseUrl}, tables=[${dbResult.tables.join(", ")}]`);
+
+        // 6b. Inject per-app env vars into Vercel project
         if (vercelProjectId && VERCEL_TOKEN) {
-          await injectVercelEnvVars(vercelProjectId, VERCEL_TOKEN, slug);
-          console.log(`[SCAFFOLD] Vercel env vars injected for "${slug}"`);
+          await injectVercelEnvVars(vercelProjectId, VERCEL_TOKEN, supabaseUrl, supabaseAnonKey, supabaseServiceRoleKey);
+          console.log(`[SCAFFOLD] Vercel env vars injected for "${slug}" (per-app Supabase credentials)`);
         }
 
         // 6c. Push /src/lib/supabase.ts to GitHub repo
@@ -546,25 +563,50 @@ export async function runScaffoldPipeline(app) {
           console.log(`[SCAFFOLD] /src/lib/supabase.ts pushed to ${fullName}`);
         }
 
-        // 6d. Update app record: mark needs_database + supabase_project_ref
+        // 6d. Update app record: store per-app Supabase credentials + project info
+        // Credentials are stored in the credentials JSONB column for security
+        const { data: currentApp } = await supabase.from("apps").select("credentials").eq("id", id).single();
+        const existingCreds = currentApp?.credentials || {};
+
         await supabase
           .from("apps")
           .update({
             needs_database: true,
-            supabase_project_ref: "lessxkxujvcmublgwdaa",
+            supabase_project_ref: supabaseProjectRef,
+            supabase_db_status: "ready",
+            supabase_table_count: dbResult.tables.length,
+            supabase_tables: dbResult.tables,
+            credentials: {
+              ...existingCreds,
+              supabase_url: supabaseUrl,
+              supabase_anon_key: supabaseAnonKey,
+              supabase_service_role_key: supabaseServiceRoleKey,
+            },
             updated_at: new Date().toISOString(),
           })
           .eq("id", id);
 
         hasDatabase = true;
+        await steps.complete("supabase_provisioning");
         await steps.complete("first_deployment");
+
+        if (dbResult.e2eResults) {
+          console.log(`[SCAFFOLD] E2E test results: ${dbResult.e2eResults.passed} passed, ${dbResult.e2eResults.failed} failed`);
+        }
       } catch (dbErr) {
         // Non-fatal: log warning, continue with task creation
         console.warn(`[SCAFFOLD] Supabase provisioning failed (non-fatal): ${dbErr.message}`);
-        await steps.fail("first_deployment", dbErr.message).catch(() => {});
+        await supabase
+          .from("apps")
+          .update({ supabase_db_status: "error", updated_at: new Date().toISOString() })
+          .eq("id", id)
+          .catch(() => {});
+        await steps.fail("supabase_provisioning", dbErr.message).catch(() => {});
+        await steps.complete("first_deployment");
       }
     } else {
-      // No DB needed — mark first_deployment as done (skipped)
+      // No DB needed — mark both steps as done (skipped)
+      await steps.complete("supabase_provisioning");
       await steps.complete("first_deployment");
     }
 
@@ -577,6 +619,7 @@ export async function runScaffoldPipeline(app) {
       repoFullName: fullName,
       deployTarget: deploy_target || "vercel",
       hasDatabase,
+      supabaseUrl,
     });
     console.log(`[SCAFFOLD] Coding task created: ${task.id}`);
 

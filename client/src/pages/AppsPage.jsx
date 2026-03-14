@@ -533,6 +533,75 @@ export function AppDetailView({ app, onBack, onSave, onArchive, onRestore }) {
         )}
       </div>
 
+      {/* Supabase Database Card */}
+      {(app.supabase_project_ref || app.supabase_db_status) && app.supabase_db_status !== 'none' && (
+        <div style={{
+          borderRadius: 16,
+          border: "1px solid #22c55e44",
+          padding: "16px 20px",
+          marginBottom: 16,
+          background: "linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 18 }}>🟢</span>
+              <span style={{ fontWeight: 700, fontSize: 14, color: "var(--md-on-surface)" }}>Supabase Database</span>
+              <span style={{
+                fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 12,
+                background: app.supabase_db_status === 'ready' ? '#dcfce7' :
+                            app.supabase_db_status === 'provisioning' ? '#fef9c3' :
+                            app.supabase_db_status === 'error' ? '#fee2e2' : '#f3f4f6',
+                color: app.supabase_db_status === 'ready' ? '#16a34a' :
+                       app.supabase_db_status === 'provisioning' ? '#ca8a04' :
+                       app.supabase_db_status === 'error' ? '#dc2626' : '#6b7280',
+              }}>
+                {app.supabase_db_status || 'unknown'}
+              </span>
+            </div>
+            {app.supabase_project_ref && (
+              <a
+                href={`https://supabase.com/dashboard/project/${app.supabase_project_ref}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  fontSize: 12, fontWeight: 600, padding: "6px 14px", borderRadius: 8,
+                  background: "#22c55e", color: "#fff", textDecoration: "none",
+                  display: "flex", alignItems: "center", gap: 4,
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "#16a34a"}
+                onMouseLeave={e => e.currentTarget.style.background = "#22c55e"}
+              >
+                Open Supabase Dashboard →
+              </a>
+            )}
+          </div>
+          {app.credentials?.supabase_url && (
+            <div style={{ fontSize: 12, color: "#16a34a", fontFamily: "'JetBrains Mono', monospace", marginBottom: 6, wordBreak: "break-all" }}>
+              🔗 {app.credentials.supabase_url}
+            </div>
+          )}
+          {app.supabase_table_count > 0 && (
+            <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)" }}>
+              📊 <strong>{app.supabase_table_count}</strong> tables:{" "}
+              {Array.isArray(app.supabase_tables) ? app.supabase_tables.map(t => (
+                <code key={t} style={{ fontSize: 11, background: "#f0fdf4", padding: "1px 5px", borderRadius: 4, marginRight: 4, border: "1px solid #bbf7d0" }}>{t}</code>
+              )) : null}
+            </div>
+          )}
+          {app.supabase_db_status === 'provisioning' && (
+            <div style={{ fontSize: 12, color: "#ca8a04", marginTop: 6 }}>
+              ⏳ Provisioning database... This may take 2-3 minutes.
+            </div>
+          )}
+          {app.supabase_db_status === 'error' && (
+            <div style={{ fontSize: 12, color: "#dc2626", marginTop: 6 }}>
+              ❌ Database provisioning failed. Check the build logs for details.
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Deployment Status Card */}
       <DeploymentCard app={app} onUpdated={(updated) => onSave(updated)} />
 
