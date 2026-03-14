@@ -25,6 +25,7 @@ import {
   injectVercelEnvVars,
   pushFileToGitHub,
 } from "./supabase-provision.js";
+import { generateAppCode } from "./ai-codegen.js";
 
 const GH_API = "https://api.github.com";
 const GH_TOKEN = process.env.GH_TOKEN;
@@ -134,14 +135,23 @@ https://github.com/${repoFullName}
 - Ensure the app builds successfully (npm run build)
 - Create a PR when done
 ${dbNote}
+## What the AI generates (automated pass)
+The App Factory AI codegen pass will also run automatically to:
+- Create domain-specific pages and routes based on the app description
+- Generate /src/app/api/ endpoints for CRUD operations
+- Build a sidebar/header navigation layout
+- Create reusable domain-specific components using shadcn/ui
+
 ## Deploy Target
 ${deployTarget || "vercel"}
 
 ## Notes
 - The repo was scaffolded from ${TEMPLATE_OWNER}/${TEMPLATE_REPO}
-- shadcn/ui is already initialized (new-york style, zinc color)
+- Stack: Next.js 15 + TypeScript + Tailwind CSS v4 + shadcn/ui (new-york style, zinc)
 - Pre-installed components: button, card, input, label, dialog, table, badge
-- Supabase client is set up in /src/lib/supabase.ts (env vars pre-configured in Vercel)`;
+- Supabase client is set up in /src/lib/supabase.ts (env vars pre-configured in Vercel)
+- AI codegen runs immediately after scaffold — a PR will be opened automatically
+- If AI codegen fails, this task remains in 'todo' for manual pickup`;
 
   const { data, error } = await supabase
     .from("agent_tasks")
@@ -320,6 +330,39 @@ export async function runScaffoldPipeline(app) {
       .from("apps")
       .update({ status: "building", updated_at: new Date().toISOString() })
       .eq("id", id);
+
+    // 7. AI customization pass — generate pages, API routes, components, navigation
+    console.log(`[SCAFFOLD] Starting AI codegen pass for "${name}" (task=${task.id})`);
+    try {
+      const { prUrl, fileCount } = await generateAppCode(name, description, fullName, task.id);
+      console.log(`[SCAFFOLD] AI codegen done — ${fileCount} files, PR: ${prUrl}`);
+
+      // Mark coding task as qa_testing and store the PR URL
+      await supabase
+        .from("agent_tasks")
+        .update({
+          status: "qa_testing",
+          pull_request_url: [prUrl],
+          completed_at: new Date().toISOString(),
+          result: {
+            summary: `AI generated ${fileCount} files for ${name}. PR: ${prUrl}`,
+            artifacts: [{ type: "pr", url: prUrl }],
+          },
+        })
+        .eq("id", task.id);
+    } catch (codegenErr) {
+      // Non-fatal: log the error, leave task in 'todo' for manual pickup
+      console.warn(`[SCAFFOLD] AI codegen failed (non-fatal): ${codegenErr.message}`);
+      await supabase
+        .from("agent_tasks")
+        .update({
+          result: {
+            summary: `AI codegen attempted but failed: ${codegenErr.message}. Task left in todo for manual pickup.`,
+          },
+        })
+        .eq("id", task.id)
+        .catch(() => {});
+    }
 
     console.log(`[SCAFFOLD] Pipeline complete for "${slug}" — status=building, task=${task.id}`);
   } catch (err) {
