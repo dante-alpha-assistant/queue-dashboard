@@ -138,10 +138,13 @@ function reducer(state, action) {
 /* ── Validation hints per step ─────────────────────────── */
 function getStepHint(state) {
   switch (state.step) {
-    case 0:
+    case 0: {
       if (!state.name.trim()) return "Enter an app name to continue";
       if (!state.slug.trim()) return "Slug is required";
+      const descLen = (state.description || "").trim().length;
+      if (descLen > 0 && descLen < 50) return "Description must be at least 50 characters (or leave it empty)";
       return null;
+    }
     case 1:
       if (state.repoSource !== "scratch" && state.repos.length === 0) return "Select at least one repository";
       return null;

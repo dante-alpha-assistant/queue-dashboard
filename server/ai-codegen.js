@@ -317,8 +317,8 @@ async function openPR(repoFullName, branchName, defaultBranch, prTitle, prDescri
  */
 export async function generateAppCode(appName, appDescription, repoFullName, taskId) {
   if (!GH_TOKEN) throw new Error("GH_TOKEN not configured");
-  if (!appDescription || appDescription.trim().length < 10) {
-    throw new Error("App description too short for AI generation");
+  if (!appDescription || appDescription.trim().length < 50) {
+    throw new Error("App description too short for AI generation (minimum 50 characters)");
   }
 
   console.log(`[AI-CODEGEN] Starting AI customization for "${appName}" (${repoFullName})`);
