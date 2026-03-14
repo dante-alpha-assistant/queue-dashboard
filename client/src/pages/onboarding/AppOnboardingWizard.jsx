@@ -371,6 +371,24 @@ export default function AppOnboardingWizard() {
             <p style={{ margin: 0, fontSize: 16, color: "#64748B" }}>
               <strong style={{ color: "#0F172A" }}>{createdApp?.name}</strong> is ready to go
             </p>
+            {createdApp?.vercel_preview_url && (
+              <div style={{ marginTop: 12, fontSize: 13 }}>
+                <span>🚀 Preview: </span>
+                <a
+                  href={createdApp.vercel_preview_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ color: "#6750A4", fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}
+                >
+                  {createdApp.vercel_preview_url}
+                </a>
+              </div>
+            )}
+            {createdApp?.vercel_warning && (
+              <div style={{ marginTop: 8, fontSize: 12, color: "#D84315" }}>
+                ⚠️ Vercel project auto-creation failed: {createdApp.vercel_warning}
+              </div>
+            )}
           </div>
 
           <div style={{
