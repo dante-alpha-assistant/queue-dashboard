@@ -122,6 +122,7 @@ async function createGitHubRepo(slug, description) {
       private: false,
       include_all_branches: false,
     }),
+    signal: AbortSignal.timeout(30000),
   });
 
   const data = await resp.json();
@@ -134,6 +135,7 @@ async function createGitHubRepo(slug, description) {
           Authorization: `Bearer ${GH_TOKEN}`,
           Accept: "application/vnd.github+json",
         },
+        signal: AbortSignal.timeout(30000),
       });
       const existingData = await existingResp.json();
       if (existingResp.ok) {
@@ -235,26 +237,46 @@ export async function runScaffoldPipeline(app) {
 
     // 2. Create GitHub repo from template
     await emitStep(id, "github_repo", "in_progress");
-    console.log(`[SCAFFOLD] Creating GitHub repo: ${TEMPLATE_OWNER}/${slug}`);
-    const { id: githubRepoId, fullName, htmlUrl } = await createGitHubRepo(slug, description);
-    console.log(`[SCAFFOLD] Repo created: ${htmlUrl} (id=${githubRepoId})`);
+    let githubRepoId, fullName, htmlUrl;
+    try {
+      console.log(`[SCAFFOLD] Creating GitHub repo: ${TEMPLATE_OWNER}/${slug}`);
+      ({ id: githubRepoId, fullName, htmlUrl } = await createGitHubRepo(slug, description));
+      console.log(`[SCAFFOLD] Repo created: ${htmlUrl} (id=${githubRepoId})`);
 
-    // Verify repo actually exists and is not empty
-    const verifyRepoResp = await fetch(`${GH_API}/repos/${TEMPLATE_OWNER}/${slug}`, {
-      headers: { Authorization: `Bearer ${GH_TOKEN}`, Accept: "application/vnd.github+json" },
-    });
-    if (!verifyRepoResp.ok) {
-      throw new Error(`GitHub repo verification failed: repo not accessible after creation (HTTP ${verifyRepoResp.status})`);
+      // Verify repo actually exists and is not empty
+      const verifyRepoResp = await fetch(`${GH_API}/repos/${TEMPLATE_OWNER}/${slug}`, {
+        headers: { Authorization: `Bearer ${GH_TOKEN}`, Accept: "application/vnd.github+json" },
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!verifyRepoResp.ok) {
+        throw new Error(`GitHub repo verification failed: repo not accessible after creation (HTTP ${verifyRepoResp.status})`);
+      }
+
+      // Retry commits check up to 5 times with 3s delays (GitHub template init is async)
+      let commitsData = null;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        if (attempt > 0) await new Promise(r => setTimeout(r, 3000));
+        const commitsCheckResp = await fetch(`${GH_API}/repos/${TEMPLATE_OWNER}/${slug}/commits?per_page=1`, {
+          headers: { Authorization: `Bearer ${GH_TOKEN}`, Accept: "application/vnd.github+json" },
+          signal: AbortSignal.timeout(15000),
+        });
+        const data = await commitsCheckResp.json();
+        if (Array.isArray(data) && data.length > 0) {
+          commitsData = data;
+          break;
+        }
+        console.log(`[SCAFFOLD] Repo commits not ready yet (attempt ${attempt + 1}/5), retrying...`);
+      }
+      if (!commitsData) {
+        throw new Error(`GitHub repo was created but is empty after 5 attempts — template copy may have failed`);
+      }
+
+      console.log(`[SCAFFOLD] Verified: repo exists and has commits`);
+      await emitStep(id, "github_repo", "done");
+    } catch (githubErr) {
+      await emitStep(id, "github_repo", "failed", githubErr.message);
+      throw githubErr; // re-throw to fail the pipeline
     }
-    const commitsCheckResp = await fetch(`${GH_API}/repos/${TEMPLATE_OWNER}/${slug}/commits?per_page=1`, {
-      headers: { Authorization: `Bearer ${GH_TOKEN}`, Accept: "application/vnd.github+json" },
-    });
-    const commitsData = await commitsCheckResp.json();
-    if (!Array.isArray(commitsData) || commitsData.length === 0) {
-      throw new Error(`GitHub repo was created but is empty — template copy may have failed`);
-    }
-    console.log(`[SCAFFOLD] Verified: repo exists and has commits`);
-    await emitStep(id, "github_repo", "done");
 
     // 3. Update app record with repo_url + repos array
     await supabase
@@ -575,14 +597,32 @@ export async function runScaffoldPipeline(app) {
     console.log(`[SCAFFOLD] Pipeline complete for "${slug}" — status=building, task=${task.id}`);
   } catch (err) {
     console.error(`[SCAFFOLD] Pipeline failed for "${slug}":`, err.message);
-    // Update app status to failed
-    await supabase
-      .from("apps")
-      .update({
-        status: "failed",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .catch((e) => console.error("[SCAFFOLD] Failed to update status to failed:", e.message));
+    try {
+      // Mark any stuck in-progress build steps as failed (prevents UI showing "Running..." forever)
+      const { data: appData } = await supabase
+        .from("apps")
+        .select("build_steps")
+        .eq("id", id)
+        .single();
+      const steps = Array.isArray(appData?.build_steps) ? appData.build_steps : [];
+      const now = new Date().toISOString();
+      const updatedSteps = steps.map(s =>
+        s.status === "in_progress"
+          ? { ...s, status: "failed", completed_at: now, error: err.message.slice(0, 500) }
+          : s
+      );
+      await supabase
+        .from("apps")
+        .update({ build_steps: updatedSteps, status: "failed", updated_at: now })
+        .eq("id", id);
+    } catch (cleanupErr) {
+      console.error("[SCAFFOLD] Failed to mark stuck steps as failed:", cleanupErr.message);
+      // Fallback: at least update status
+      await supabase
+        .from("apps")
+        .update({ status: "failed", updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .catch((e) => console.error("[SCAFFOLD] Failed to update status to failed:", e.message));
+    }
   }
 }
