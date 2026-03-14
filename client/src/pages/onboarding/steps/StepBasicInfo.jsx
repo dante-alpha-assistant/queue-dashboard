@@ -63,7 +63,7 @@ export default function StepBasicInfo({ state, dispatch }) {
           style={{ ...inputStyle, fontFamily: "'JetBrains Mono', monospace", fontSize: 13 }}
         />
         <span style={{ fontSize: 11, color: "var(--md-on-surface-variant)", marginTop: 4, display: "block" }}>
-          Auto-generated from name. Edit to customize.
+          Auto-generated from name with a unique suffix to prevent collisions. Edit to customize.
         </span>
       </div>
 

@@ -129,6 +129,10 @@ appsRouter.post("/", async (req, res) => {
     if (!name) return res.status(400).json({ error: "name required" });
     if (!slug) return res.status(400).json({ error: "slug required" });
 
+    // Explicit slug uniqueness check (returns a friendly 409 before hitting the DB constraint)
+    const { data: existingSlug } = await supabase.from("apps").select("id").eq("slug", slug).maybeSingle();
+    if (existingSlug) return res.status(409).json({ error: `Slug "${slug}" is already taken. Please choose a different name or edit the slug.` });
+
     const validTargets = ["kubernetes", "vercel", "none"];
 
     // Handle per-repo deploy config (new format) vs legacy string array + single deploy_target

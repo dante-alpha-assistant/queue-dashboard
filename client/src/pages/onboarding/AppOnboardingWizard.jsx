@@ -20,6 +20,11 @@ function slugify(str) {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
+/** Generate a 4-char lowercase alphanumeric id (stable per wizard session) */
+function generateShortId() {
+  return Math.random().toString(36).substring(2, 6);
+}
+
 const DEFAULT_REQ_CREDS = ["GH_TOKEN"];
 const DEFAULT_QA_CREDS = ["GH_TOKEN", "SUPABASE_SERVICE_ROLE_KEY"];
 
@@ -28,6 +33,7 @@ const initialState = {
   step: 0,
   name: "",
   slug: "",
+  slugSuffix: generateShortId(), // stable 4-char hash appended to auto-generated slugs
   slugManual: false,
   description: "",
   icon: "",
@@ -62,7 +68,10 @@ function reducer(state, action) {
       return { ...state, [action.field]: action.value };
     case "SET_NAME": {
       const s = { ...state, name: action.value };
-      if (!s.slugManual) s.slug = slugify(action.value);
+      if (!s.slugManual) {
+        const base = slugify(action.value);
+        s.slug = base ? `${base}-${s.slugSuffix}` : "";
+      }
       return s;
     }
     case "SET_REPO_SOURCE": {
