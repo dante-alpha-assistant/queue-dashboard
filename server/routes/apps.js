@@ -1,6 +1,7 @@
 import { Router } from "express";
 import supabase from "../supabase.js";
 import { invalidateGithubRepoCache } from "./github.js";
+import { createVercelProject } from "../vercel.js";
 
 export const appsRouter = Router();
 
@@ -310,6 +311,47 @@ appsRouter.post("/", async (req, res) => {
     }
     // Invalidate GitHub repo cache — new app may reference a new repo
     invalidateGithubRepoCache();
+
+    // Auto-create Vercel project when deploy_target=vercel
+    if (primaryDeployTarget === "vercel") {
+      try {
+        const vercelToken = process.env.VERCEL_TOKEN;
+        if (vercelToken) {
+          // Use the first repo in the array, or derive from slug
+          const firstRepo = reposArray[0] || `dante-alpha-assistant/${slug}`;
+          const repoFullName = firstRepo.includes("/")
+            ? firstRepo
+            : `dante-alpha-assistant/${firstRepo}`;
+
+          const vercelResult = await createVercelProject({
+            slug,
+            repoFullName,
+            envKeys: env_keys || [],
+            vercelToken,
+          });
+
+          // Persist vercel_project_id and preview URL into the app record
+          await supabase
+            .from("apps")
+            .update({
+              vercel_project_id: vercelResult.id,
+              vercel_preview_url: vercelResult.previewUrl,
+            })
+            .eq("id", data.id);
+
+          // Enrich the response object
+          data.vercel_project_id = vercelResult.id;
+          data.vercel_preview_url = vercelResult.previewUrl;
+        } else {
+          console.warn("[Vercel] VERCEL_TOKEN not set — skipping auto-project creation");
+        }
+      } catch (vercelErr) {
+        // Non-fatal: log and attach a warning but don't fail app creation
+        console.error("[Vercel] Failed to auto-create project:", vercelErr.message);
+        data.vercel_warning = vercelErr.message;
+      }
+    }
+
     res.status(201).json(expandCredentials(data));
   } catch (e) {
     res.status(500).json({ error: e.message });
