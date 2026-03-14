@@ -49,8 +49,9 @@ const initialState = {
   userRepoSearch: "",
   userRepoResults: [],
   userRepoLoading: false,
+  aiSuggestions: null,      // null | [{name, deploy_target, namespace, service_name, reasoning}]
   deployTarget: "kubernetes",
-  k8sNamespace: "infra",
+  k8sNamespace: "apps",
   k8sService: "",
   vercelProject: "",
   reqCredentials: [...DEFAULT_REQ_CREDS],
@@ -232,12 +233,45 @@ export default function AppOnboardingWizard() {
       }
 
       // For scratch mode, compute the proposed architecture from the app description
-      let reposForBody = state.repos.map(r => r.full_name);
+      let reposForBody;
       let repoArchitecture = null;
-      if (state.repoSource === "scratch") {
+      let primaryDeployTarget = state.deployTarget;
+
+      if (state.aiSuggestions && state.aiSuggestions.length > 0) {
+        // Use AI-suggested per-repo deploy config
+        repoArchitecture = state.repoSource === "scratch"
+          ? computeProposedArchitecture(state.name, state.description)
+          : null;
+
+        reposForBody = state.aiSuggestions.map(suggestion => {
+          const repoDeplCfg = {};
+          if (suggestion.deploy_target === "kubernetes") {
+            repoDeplCfg.namespace = suggestion.namespace || "apps";
+            repoDeplCfg.service = suggestion.service_name;
+          } else if (suggestion.deploy_target === "vercel") {
+            repoDeplCfg.project = suggestion.service_name;
+          }
+          // Resolve full repo name
+          let repoName;
+          if (state.repoSource === "scratch") {
+            repoName = `dante-alpha-assistant/${suggestion.name}`;
+          } else {
+            const matched = state.repos.find(r => r.name === suggestion.name);
+            repoName = matched?.full_name || `dante-alpha-assistant/${suggestion.name}`;
+          }
+          return {
+            repo: repoName,
+            deploy_target: suggestion.deploy_target || "none",
+            deploy_config: repoDeplCfg,
+          };
+        });
+        primaryDeployTarget = state.aiSuggestions[0]?.deploy_target || state.deployTarget;
+      } else if (state.repoSource === "scratch") {
         const proposed = computeProposedArchitecture(state.name, state.description);
         repoArchitecture = proposed;
         reposForBody = proposed.map(r => `dante-alpha-assistant/${r.name}`);
+      } else {
+        reposForBody = state.repos.map(r => r.full_name);
       }
 
       const body = {
@@ -248,7 +282,7 @@ export default function AppOnboardingWizard() {
         repos: reposForBody,
         repo_source: state.repoSource || "scratch",
         repo_architecture: repoArchitecture,
-        deploy_target: state.deployTarget,
+        deploy_target: primaryDeployTarget,
         deploy_config: deployConfig,
         env_keys: state.reqCredentials,
         qa_env_keys: state.qaCredentials,
