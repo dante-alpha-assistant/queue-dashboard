@@ -216,6 +216,69 @@ ${deployTarget || "vercel"}
   return data;
 }
 
+const INITIAL_BUILD_STEPS = {
+  steps: [
+    { id: "app_created",       label: "App Created",          status: "done",    started_at: new Date().toISOString(), completed_at: new Date().toISOString() },
+    { id: "creating_repo",     label: "Creating GitHub Repo", status: "pending" },
+    { id: "scaffolding",       label: "Scaffolding Template", status: "pending" },
+    { id: "ai_generating",     label: "AI Generating Code",   status: "pending" },
+    { id: "setting_up_vercel", label: "Setting Up Vercel",    status: "pending" },
+    { id: "deploying",         label: "Deploying to Vercel",  status: "pending" },
+    { id: "first_deployment",  label: "First Deployment",     status: "pending" },
+    { id: "live",              label: "Live!",                 status: "pending" },
+  ],
+  current_step: "creating_repo",
+  failed_step: null,
+  error_message: null,
+};
+
+/**
+ * Create a step runner that manages build_steps state machine in the DB.
+ */
+function createStepRunner(appId) {
+  let state = JSON.parse(JSON.stringify(INITIAL_BUILD_STEPS));
+  const now = new Date().toISOString();
+  state.steps[0].started_at = now;
+  state.steps[0].completed_at = now;
+
+  async function flush() {
+    await supabase
+      .from("apps")
+      .update({ build_steps: state, updated_at: new Date().toISOString() })
+      .eq("id", appId);
+  }
+
+  return {
+    async init() {
+      await flush();
+    },
+    async start(stepId) {
+      const step = state.steps.find((s) => s.id === stepId);
+      if (!step) return;
+      step.status = "in_progress";
+      step.started_at = new Date().toISOString();
+      state.current_step = stepId;
+      await flush();
+    },
+    async complete(stepId) {
+      const step = state.steps.find((s) => s.id === stepId);
+      if (!step) return;
+      step.status = "done";
+      step.completed_at = new Date().toISOString();
+      await flush();
+    },
+    async fail(stepId, errorMessage) {
+      const step = state.steps.find((s) => s.id === stepId);
+      if (!step) return;
+      step.status = "failed";
+      step.error = errorMessage;
+      state.failed_step = stepId;
+      state.error_message = errorMessage;
+      await flush();
+    },
+  };
+}
+
 /**
  * Main scaffold pipeline. Runs async after app record is created.
  * @param {object} app - The app record from Supabase (full row)
@@ -232,12 +295,17 @@ export async function runScaffoldPipeline(app) {
       .update({ status: "scaffolding", updated_at: new Date().toISOString() })
       .eq("id", id);
 
+    // Initialize build_steps state machine
+    const steps = createStepRunner(id);
+    await steps.init();
+
     // 2. Create GitHub repo from template
     await emitStep(id, "github_repo", "in_progress");
     console.log(`[SCAFFOLD] Creating GitHub repo: ${TEMPLATE_OWNER}/${slug}`);
+    await steps.start("creating_repo");
     const { id: githubRepoId, fullName, htmlUrl } = await createGitHubRepo(slug, description);
     console.log(`[SCAFFOLD] Repo created: ${htmlUrl} (id=${githubRepoId})`);
-    await emitStep(id, "github_repo", "done");
+    await steps.complete("creating_repo");
 
     // 3. Update app record with repo_url + repos array
     await supabase
