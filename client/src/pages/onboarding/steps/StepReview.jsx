@@ -130,7 +130,18 @@ export default function StepReview({ state }) {
           padding: "16px 24px",
           borderBottom: state.supabaseRef ? "1px solid var(--md-surface-variant, #E7E0EC)" : "none",
         }}>
-          <div style={labelStyle}>Credentials</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+            <span style={labelStyle}>Credentials</span>
+            {isScratch && (
+              <span style={{
+                fontSize: 10, padding: "2px 8px", borderRadius: 100,
+                background: "rgba(124,58,237,0.1)", color: "#7C3AED",
+                fontWeight: 600, letterSpacing: "0.03em",
+              }}>
+                AUTO-SELECTED
+              </span>
+            )}
+          </div>
           <div style={{ fontSize: 13, color: "var(--md-on-surface-variant)", marginBottom: 6 }}>
             <strong>Required:</strong> {state.reqCredentials.join(", ") || "—"}
           </div>

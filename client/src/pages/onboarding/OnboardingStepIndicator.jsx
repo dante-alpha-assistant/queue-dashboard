@@ -1,6 +1,6 @@
 import { Check } from "lucide-react";
 
-const STEPS = [
+const ALL_STEPS = [
   { key: "basic", label: "Name & Description" },
   { key: "repos", label: "Connect Repos" },
   { key: "deploy", label: "Deploy Targets" },
@@ -8,19 +8,32 @@ const STEPS = [
   { key: "review", label: "Review & Create" },
 ];
 
-export default function OnboardingStepIndicator({ currentStep }) {
+export default function OnboardingStepIndicator({ currentStep, repoSource }) {
+  const isScratch = repoSource === "scratch";
+  const steps = isScratch ? ALL_STEPS.filter(s => s.key !== "credentials") : ALL_STEPS;
+
+  // Map wizard step index to display index for scratch mode
+  function toDisplayIndex(wizardStep) {
+    if (!isScratch) return wizardStep;
+    if (wizardStep <= 2) return wizardStep;
+    if (wizardStep === 4) return 3;
+    return wizardStep;
+  }
+
+  const displayCurrent = toDisplayIndex(currentStep);
+
   return (
     <div style={{
       display: "flex", alignItems: "center", justifyContent: "center",
       gap: 0, padding: "24px 20px 20px", width: "100%", maxWidth: 600, margin: "0 auto",
     }}>
-      {STEPS.map((step, i) => {
-        const isActive = i === currentStep;
-        const isDone = i < currentStep;
+      {steps.map((step, i) => {
+        const isActive = i === displayCurrent;
+        const isDone = i < displayCurrent;
         return (
           <div key={step.key} style={{
             display: "flex", alignItems: "center",
-            flex: i < STEPS.length - 1 ? 1 : "none",
+            flex: i < steps.length - 1 ? 1 : "none",
           }}>
             {/* Dot + label */}
             <div style={{
@@ -54,7 +67,7 @@ export default function OnboardingStepIndicator({ currentStep }) {
             </div>
 
             {/* Connecting line */}
-            {i < STEPS.length - 1 && (
+            {i < steps.length - 1 && (
               <div style={{
                 flex: 1, height: 3, borderRadius: 2, margin: "0 8px",
                 background: "#E2E8F0",

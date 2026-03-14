@@ -29,6 +29,21 @@ function generateShortId() {
 const DEFAULT_REQ_CREDS = ["GH_TOKEN"];
 const DEFAULT_QA_CREDS = ["GH_TOKEN", "SUPABASE_SERVICE_ROLE_KEY"];
 
+/** Auto-select credentials for scratch mode based on deploy target */
+function getAutoCredentials(deployTarget) {
+  if (deployTarget === "vercel") {
+    return {
+      req: ["GH_TOKEN", "SUPABASE_SERVICE_ROLE_KEY", "VERCEL_TOKEN"],
+      qa: ["GH_TOKEN", "SUPABASE_SERVICE_ROLE_KEY"],
+    };
+  }
+  // default: kubernetes
+  return {
+    req: ["GH_TOKEN", "SUPABASE_SERVICE_ROLE_KEY", "KUBECONFIG"],
+    qa: ["GH_TOKEN", "SUPABASE_SERVICE_ROLE_KEY"],
+  };
+}
+
 /* ── Reducer ───────────────────────────────────────────── */
 const initialState = {
   step: 0,
@@ -187,6 +202,16 @@ export default function AppOnboardingWizard() {
     return () => window.removeEventListener("popstate", handler);
   }, [state.step]);
 
+  // Auto-select credentials for scratch mode based on deploy target
+  useEffect(() => {
+    if (state.repoSource === "scratch") {
+      const auto = getAutoCredentials(state.deployTarget);
+      dispatch({ type: "SET_FIELD", field: "reqCredentials", value: auto.req });
+      dispatch({ type: "SET_FIELD", field: "qaCredentials", value: auto.qa });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.deployTarget, state.repoSource]);
+
   // Escape key
   useEffect(() => {
     const handler = (e) => {
@@ -213,14 +238,28 @@ export default function AppOnboardingWizard() {
   }, [state.step, animating]);
 
   const handleNext = useCallback(() => {
+    const isScratch = state.repoSource === "scratch";
     if (state.step < STEP_COUNT - 1 && canProceed(state)) {
-      goToStep(state.step + 1);
+      // Skip credentials step (index 3) for scratch mode
+      if (isScratch && state.step === 2) {
+        goToStep(4);
+      } else {
+        goToStep(state.step + 1);
+      }
     }
   }, [state, goToStep]);
 
   const handleBack = useCallback(() => {
-    if (state.step > 0) goToStep(state.step - 1);
-  }, [state.step, goToStep]);
+    const isScratch = state.repoSource === "scratch";
+    if (state.step > 0) {
+      // Skip credentials step (index 3) for scratch mode
+      if (isScratch && state.step === 4) {
+        goToStep(2);
+      } else {
+        goToStep(state.step - 1);
+      }
+    }
+  }, [state.step, state.repoSource, goToStep]);
 
   const handleSubmit = async () => {
     dispatch({ type: "SET_FIELD", field: "submitting", value: true });
@@ -468,7 +507,7 @@ export default function AppOnboardingWizard() {
       </div>
 
       {/* Step indicator */}
-      <OnboardingStepIndicator currentStep={state.step} />
+      <OnboardingStepIndicator currentStep={state.step} repoSource={state.repoSource} />
 
       {/* Step content */}
       <div style={{
@@ -488,7 +527,9 @@ export default function AppOnboardingWizard() {
             margin: "0 0 24px", fontSize: 22, fontWeight: 700,
             color: "#0F172A", textAlign: "center",
           }}>
-            {["Name & Description", "Connect Repositories", "Deploy Targets", "Credentials", "Review & Create"][state.step]}
+            {state.repoSource === "scratch"
+              ? (["Name & Description", "Connect Repositories", "Deploy Targets", null, "Review & Create"][state.step] || "Review & Create")
+              : ["Name & Description", "Connect Repositories", "Deploy Targets", "Credentials", "Review & Create"][state.step]}
           </h2>
 
           <Suspense fallback={
@@ -539,7 +580,9 @@ export default function AppOnboardingWizard() {
         <span style={{
           fontSize: 13, fontWeight: 600, color: "#94A3B8",
         }}>
-          Step {state.step + 1} of {STEP_COUNT}
+          {state.repoSource === "scratch"
+            ? `Step ${state.step === 4 ? 4 : state.step + 1} of 4`
+            : `Step ${state.step + 1} of ${STEP_COUNT}`}
         </span>
 
         {state.step < STEP_COUNT - 1 ? (
