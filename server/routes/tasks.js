@@ -62,6 +62,27 @@ router.get("/tasks/counts-by-period", async (req, res) => {
 
 const DISPATCHER_URL = process.env.DISPATCHER_URL || "http://task-dispatcher.agents.svc.cluster.local:8080";
 
+// Check if task dependencies are met — returns { met, unmet[] }
+async function checkDependencies(taskId) {
+  const { data: deps } = await supabase
+    .from('task_relationships')
+    .select('target_task_id')
+    .eq('source_task_id', taskId)
+    .eq('relationship_type', 'depends_on');
+
+  if (!deps || deps.length === 0) return { met: true, unmet: [] };
+
+  const depIds = deps.map(d => d.target_task_id);
+  const { data: depTasks } = await supabase
+    .from('agent_tasks')
+    .select('id, title, status')
+    .in('id', depIds);
+
+  const completedStatuses = new Set(['completed', 'deployed', 'deploying']);
+  const unmet = (depTasks || []).filter(t => !completedStatuses.has(t.status));
+  return { met: unmet.length === 0, unmet };
+}
+
 // Manual dispatch — proxy to task-dispatcher
 router.post("/dispatch", async (req, res) => {
   try {
@@ -254,6 +275,19 @@ router.patch("/tasks/:id", async (req, res) => {
       }
     }
 
+    // === DEPENDENCY GUARD ===
+    // Block forward transitions when dependencies are unmet
+    if (updates.status === "in_progress" || updates.status === "qa_testing") {
+      const depsResult = await checkDependencies(req.params.id);
+      if (!depsResult.met) {
+        const unmetNames = depsResult.unmet.map(d => `"${d.title}" (${d.status})`).join(', ');
+        return res.status(409).json({
+          error: `Unmet dependencies: ${unmetNames}. Complete dependent tasks first.`,
+          unmet_dependencies: depsResult.unmet,
+        });
+      }
+    }
+
     if (updates.status === "done" || updates.status === "failed") {
       updates.completed_at = new Date().toISOString();
     }
@@ -292,6 +326,18 @@ router.post("/tasks/:id/force-status", async (req, res) => {
     const VALID_STATUSES = ["todo", "in_progress", "qa_testing", "completed", "blocked", "deployed", "failed"];
     if (!status || !VALID_STATUSES.includes(status)) {
       return res.status(400).json({ error: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` });
+    }
+
+    // === DEPENDENCY GUARD (also applies to force-status) ===
+    if (status === "in_progress" || status === "qa_testing") {
+      const depsResult = await checkDependencies(req.params.id);
+      if (!depsResult.met) {
+        const unmetNames = depsResult.unmet.map(d => `"${d.title}" (${d.status})`).join(', ');
+        return res.status(409).json({
+          error: `Unmet dependencies: ${unmetNames}. Complete dependent tasks first.`,
+          unmet_dependencies: depsResult.unmet,
+        });
+      }
     }
 
     // Get current status for activity log
