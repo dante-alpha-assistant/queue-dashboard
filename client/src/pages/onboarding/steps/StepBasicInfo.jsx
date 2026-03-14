@@ -108,22 +108,70 @@ export default function StepBasicInfo({ state, dispatch }) {
       </div>
 
       <div className="step-field" style={{ "--field-index": 4 }}>
-        <label style={labelStyle}>Description (optional)</label>
-        <textarea
-          value={state.description}
-          onChange={e => dispatch({ type: "SET_FIELD", field: "description", value: e.target.value })}
-          placeholder="What does this app do?"
-          rows={3}
-          style={{ ...inputStyle, resize: "vertical", minHeight: 80 }}
-          onFocus={e => {
-            e.target.style.borderColor = "var(--md-primary, #6750A4)";
-            e.target.style.boxShadow = "0 0 0 3px rgba(103,80,164,0.12)";
-          }}
-          onBlur={e => {
-            e.target.style.borderColor = "var(--md-surface-variant, #E7E0EC)";
-            e.target.style.boxShadow = "none";
-          }}
-        />
+        <label style={labelStyle}>Description *</label>
+        {(() => {
+          const descLen = (state.description || "").trim().length;
+          const isTooShort = descLen > 0 && descLen < 50;
+          const isValid = descLen >= 50;
+          const borderColor = isTooShort
+            ? "#F57C00"
+            : isValid
+            ? "var(--md-primary, #6750A4)"
+            : "var(--md-surface-variant, #E7E0EC)";
+          const boxShadow = isTooShort
+            ? "0 0 0 3px rgba(245,124,0,0.12)"
+            : isValid
+            ? "0 0 0 3px rgba(103,80,164,0.12)"
+            : "none";
+          return (
+            <>
+              <textarea
+                value={state.description}
+                onChange={e => dispatch({ type: "SET_FIELD", field: "description", value: e.target.value })}
+                placeholder="What does this app do? Describe the features, purpose, and target users. More detail = better AI-generated code."
+                rows={4}
+                style={{
+                  ...inputStyle,
+                  resize: "vertical",
+                  minHeight: 90,
+                  borderColor,
+                  boxShadow,
+                }}
+                onFocus={e => {
+                  if (!isTooShort) {
+                    e.target.style.borderColor = "var(--md-primary, #6750A4)";
+                    e.target.style.boxShadow = "0 0 0 3px rgba(103,80,164,0.12)";
+                  }
+                }}
+                onBlur={e => {
+                  if (!isTooShort && !isValid) {
+                    e.target.style.borderColor = "var(--md-surface-variant, #E7E0EC)";
+                    e.target.style.boxShadow = "none";
+                  }
+                }}
+              />
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginTop: 4, gap: 8 }}>
+                {isTooShort ? (
+                  <span style={{ fontSize: 11, color: "#F57C00" }}>
+                    Add more detail so the AI can generate better code (minimum 50 characters)
+                  </span>
+                ) : (
+                  <span style={{ fontSize: 11, color: "var(--md-on-surface-variant)" }}>
+                    The more detail you provide, the better the AI-generated code will be.
+                  </span>
+                )}
+                <span style={{
+                  fontSize: 11,
+                  color: isTooShort ? "#F57C00" : isValid ? "#1B5E20" : "var(--md-on-surface-variant)",
+                  flexShrink: 0,
+                  fontWeight: isTooShort ? 600 : 400,
+                }}>
+                  {descLen} / 50 characters minimum
+                </span>
+              </div>
+            </>
+          );
+        })()}
       </div>
 
       <div className="step-field" style={{ "--field-index": 5 }}>

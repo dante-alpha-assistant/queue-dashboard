@@ -50,7 +50,7 @@ async function emitStep(appId, stepId, status, error = null) {
       id: stepId,
       status,
       ...(status === "in_progress" && { started_at: now }),
-      ...(["done", "failed"].includes(status) && { completed_at: now }),
+      ...(["done", "failed", "warning"].includes(status) && { completed_at: now }),
       ...(error && { error: String(error).slice(0, 500) }),
     };
 
@@ -391,17 +391,17 @@ export async function runScaffoldPipeline(app) {
               await emitStep(id, "first_deploy", "done");
             } catch (firstDeployErr) {
               console.warn(`[SCAFFOLD] First deployment verification failed (non-fatal): ${firstDeployErr.message}`);
-              await emitStep(id, "first_deploy", "failed", firstDeployErr.message);
+              await emitStep(id, "first_deploy", "warning", firstDeployErr.message);
             }
           } else {
             console.warn(`[SCAFFOLD] Deployment ended with state ${deployStatus.readyState} — will not set live URL`);
-            await emitStep(id, "vercel_deploy", "failed", `Deployment ended with state ${deployStatus.readyState}`);
+            await emitStep(id, "vercel_deploy", "warning", `Deployment ended with state ${deployStatus.readyState}`);
           }
         } catch (deployErr) {
           // Non-fatal: log warning, deployment failed but pipeline continues
           console.warn(`[SCAFFOLD] Initial Vercel deployment failed (non-fatal): ${deployErr.message}`);
           vercelDeployStatus = "error";
-          await emitStep(id, "vercel_deploy", "failed", deployErr.message);
+          await emitStep(id, "vercel_deploy", "warning", deployErr.message);
         }
 
         // 5. Add custom subdomain: {slug}.dante.id → cname.vercel-dns.com

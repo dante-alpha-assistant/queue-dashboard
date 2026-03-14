@@ -73,6 +73,7 @@ function getStageStatus(stage, tasks, app) {
     if (buildStep.status === "done") return "completed";
     if (buildStep.status === "in_progress") return "in_progress";
     if (buildStep.status === "failed") return "failed";
+    if (buildStep.status === "warning") return "warning";
   }
 
   // github_repo: completed once repo_url is set on the app
@@ -95,18 +96,21 @@ function getStageStatus(stage, tasks, app) {
   if (stage.id === "vercel_deploy") {
     const ds = app?.vercel_deploy_status;
     if (ds === "ready") return "completed";
-    if (ds === "error" || ds === "canceled") return "failed";
+    if (ds === "error" || ds === "canceled") return "warning";
     if (ds === "deploying") return "in_progress";
     return "pending";
   }
 
   // first_deploy: completed only when Vercel is fully READY (a successful deployment)
-  // Never derives from tasks — only from vercel_deploy_status to avoid false matches.
+  // Check build_steps entry for first_deploy first (written by scaffold.js),
+  // then fall through to vercel_deploy_status-derived logic.
   if (stage.id === "first_deploy") {
+    // buildStep already handled above via the generic buildStep block (done/in_progress/failed/warning)
+    // Only reach here if there's no build_step entry for first_deploy yet
     const ds = app?.vercel_deploy_status;
     if (ds === "ready") return "completed";
     if (ds === "deploying") return "in_progress";
-    // error/canceled/not-set → pending (sequential halt propagates failure from vercel_deploy)
+    // error/canceled/not-set → pending (sequential halt propagates warning from vercel_deploy)
     return "pending";
   }
 
@@ -144,6 +148,7 @@ function getSequentialStatuses(stages, tasks, app) {
   return stages.map((stage) => {
     if (halted) return "pending";
     const status = getStageStatus(stage, tasks, app);
+    // Only halt on hard "failed" — "warning" is non-fatal and should NOT block subsequent stages
     if (status === "failed") halted = true;
     return status;
   });
@@ -191,6 +196,7 @@ function StageRow({ stage, status, tasks, comments, stepData }) {
     in_progress: "#6750A4",
     completed: "#1B5E20",
     failed: "#BA1A1A",
+    warning: "#F57C00",
   }[status] || "#79747E";
 
   const statusIcon = {
@@ -198,6 +204,7 @@ function StageRow({ stage, status, tasks, comments, stepData }) {
     in_progress: "◉",
     completed: "✓",
     failed: "✗",
+    warning: "⚠",
   }[status] || "○";
 
   return (
@@ -307,6 +314,22 @@ function StageRow({ stage, status, tasks, comments, stepData }) {
             ⚠️ {stepData.error}
           </div>
         )}
+        {/* Warning detail for non-fatal warning steps */}
+        {status === "warning" && stepData?.error && (
+          <div
+            style={{
+              fontSize: "12px",
+              color: "#E65100",
+              marginTop: "6px",
+              padding: "6px 10px",
+              background: "rgba(245, 124, 0, 0.08)",
+              borderRadius: "4px",
+              fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+            }}
+          >
+            ⚠ {stepData.error} (non-fatal — pipeline continues)
+          </div>
+        )}
         {/* AI codegen: live comment feed showing files being created */}
         {stageComments.length > 0 && (
           <div
@@ -356,6 +379,7 @@ function StageRow({ stage, status, tasks, comments, stepData }) {
         {status === "completed" && "Done"}
         {status === "in_progress" && "Running…"}
         {status === "failed" && "Failed"}
+        {status === "warning" && "Warning"}
       </div>
     </div>
   );
@@ -391,10 +415,28 @@ export default function AppBuildProgress() {
     }
   }, [id]);
 
+  const fetchTasks = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/apps/${id}/tasks`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const taskList = Array.isArray(data) ? data : (data.tasks || []);
+      taskMapRef.current = Object.fromEntries(taskList.map((t) => [t.id, t]));
+      setTasks(Object.values(taskMapRef.current));
+      // If any task just deployed/completed, refresh the app record too
+      if (taskList.some((t) => ["deployed", "completed"].includes(t.status))) {
+        fetchApp();
+      }
+    } catch {
+      // Non-fatal
+    }
+  }, [id, fetchApp]);
+
   // Initial app fetch
   useEffect(() => {
     fetchApp();
-  }, [fetchApp]);
+    fetchTasks();
+  }, [fetchApp, fetchTasks]);
 
   // Supabase Realtime SSE — build-events stream
   useEffect(() => {
@@ -453,10 +495,14 @@ export default function AppBuildProgress() {
   }, [id, fetchApp]);
 
   // Fallback polling (slower — SSE is primary)
+  // Polls both app data and tasks every 8s so the UI stays current even if SSE disconnects.
   useEffect(() => {
-    const appInterval = setInterval(fetchApp, 10000);
+    const appInterval = setInterval(() => {
+      fetchApp();
+      fetchTasks();
+    }, 8000);
     return () => clearInterval(appInterval);
-  }, [fetchApp]);
+  }, [fetchApp, fetchTasks]);
 
   const handleRetry = async () => {
     setRetrying(true);
@@ -486,7 +532,9 @@ export default function AppBuildProgress() {
 
   // Derived from sequential statuses (single source of truth)
   const liveStatus = stageStatuses[STAGES.length - 1];
+  // Only treat hard "failed" as fatal — "warning" is non-fatal and does NOT halt the build
   const anyStepFailed = stageStatuses.includes("failed");
+  const anyStepWarning = stageStatuses.includes("warning");
 
   // Derive ai_codegen status for the error banner message
   const aiCodegenIdx = STAGES.findIndex((s) => s.id === "ai_codegen");
