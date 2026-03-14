@@ -51,6 +51,50 @@ jobs:
       - name: Build client
         run: cd client && npm ci && npm run build
 
+      - name: Verify build artifacts — all dynamic import chunks present
+        run: |
+          echo "=== Verifying Vite build artifacts ==="
+          DIST=client/dist
+          INDEX="$DIST/index.html"
+
+          [ -f "$INDEX" ] || { echo "❌ index.html missing from dist!"; exit 1; }
+          echo "✅ index.html exists"
+
+          # Count JS chunks in assets/
+          JS_COUNT=$(find "$DIST/assets" -name "*.js" 2>/dev/null | wc -l)
+          echo "Found $JS_COUNT JS chunks in dist/assets"
+
+          # We have 5 lazy-loaded steps + 1 main bundle — expect at least 4 JS files
+          if [ "$JS_COUNT" -lt 4 ]; then
+            echo "❌ Expected at least 4 JS chunks (lazy-loaded steps + index), found: $JS_COUNT"
+            exit 1
+          fi
+
+          # Verify each lazy-loaded step chunk exists and is non-empty (>500 bytes)
+          MISSING=0
+          find "$DIST/assets" -name "*.js" | while read chunk; do
+            size=$(stat -c%s "$chunk" 2>/dev/null || stat -f%z "$chunk" 2>/dev/null || echo 0)
+            if [ "$size" -lt 500 ]; then
+              echo "❌ Chunk suspiciously small ($size bytes): $chunk"
+              MISSING=1
+            else
+              echo "✅ $(basename $chunk) — $size bytes"
+            fi
+          done
+
+          # Verify all JS srcs referenced in index.html actually exist in dist
+          grep -oE '/assets/[^"'\'']+\.js' "$INDEX" | sort -u | while read ref; do
+            file="$DIST$ref"
+            if [ -f "$file" ]; then
+              echo "✅ Referenced asset exists: $ref"
+            else
+              echo "❌ MISSING referenced asset: $ref (index.html references a chunk that was not built!)"
+              exit 1
+            fi
+          done
+
+          echo "✅ All build artifacts verified"
+
   test:
     name: 🧪 Test
     continue-on-error: true
@@ -88,3 +132,86 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          load: true
+
+      - name: Verify Docker image build artifacts
+        run: |
+          echo "=== Verifying Docker image contains valid build artifacts ==="
+          docker run --rm --entrypoint sh ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest -c '
+            DIST=/app/client/dist
+            echo "Checking $DIST exists..."
+            [ -d "$DIST" ] || { echo "❌ client/dist missing in Docker image!"; exit 1; }
+            [ -f "$DIST/index.html" ] || { echo "❌ index.html missing in Docker image!"; exit 1; }
+            JS_COUNT=$(find $DIST/assets -name "*.js" 2>/dev/null | wc -l)
+            echo "Found $JS_COUNT JS chunks in Docker image"
+            [ "$JS_COUNT" -ge 4 ] || { echo "❌ Too few JS chunks in image: $JS_COUNT (expected >= 4)"; exit 1; }
+            echo "✅ Docker image build artifacts OK ($JS_COUNT JS chunks)"
+          '
+
+  health_check:
+    name: 🏥 Post-Deploy Health Check
+    needs: [docker]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for ArgoCD to deploy (60s)
+        run: sleep 60
+
+      - name: Smoke test — verify production site is alive
+        run: |
+          BASE="https://tasks.dante.id"
+          FAILED=0
+
+          for path in "/" "/apps/new"; do
+            url="${BASE}${path}"
+            echo "Testing: $url"
+            status=$(curl -sL -o /tmp/resp.html -w '%{http_code}' "$url" --max-time 20 || echo "000")
+            size=$(wc -c < /tmp/resp.html 2>/dev/null || echo 0)
+
+            if [ "$status" != "200" ]; then
+              echo "❌ $url returned HTTP $status"
+              FAILED=1
+            elif [ "$size" -lt 500 ]; then
+              echo "❌ $url returned suspiciously small body ($size bytes) — possible blank page"
+              cat /tmp/resp.html
+              FAILED=1
+            else
+              echo "✅ $url — HTTP $status, ${size} bytes"
+            fi
+          done
+
+          # Verify that JS assets referenced in index.html are actually reachable
+          echo ""
+          echo "=== Checking JS asset reachability ==="
+          curl -sL "${BASE}/" -o /tmp/index.html --max-time 15
+          JS_REFS=$(grep -oE '/assets/[^"'\'']+\.js' /tmp/index.html | sort -u)
+
+          if [ -z "$JS_REFS" ]; then
+            echo "❌ No JS asset references found in index.html — build may be broken"
+            FAILED=1
+          fi
+
+          echo "$JS_REFS" | while read ref; do
+            asset_url="${BASE}${ref}"
+            ct=$(curl -sL -o /dev/null -w '%{content_type}' "$asset_url" --max-time 10 || echo "error")
+            status=$(curl -sL -o /dev/null -w '%{http_code}' "$asset_url" --max-time 10 || echo "000")
+            if [ "$status" != "200" ]; then
+              echo "❌ Asset missing (HTTP $status): $asset_url"
+              FAILED=1
+            elif echo "$ct" | grep -q "text/html"; then
+              echo "❌ Asset served as text/html (SPA fallback hit!): $asset_url"
+              echo "   This means the chunk file is missing from the deployed image."
+              FAILED=1
+            else
+              echo "✅ Asset OK ($ct): $(basename $ref)"
+            fi
+          done
+
+          if [ "$FAILED" != "0" ]; then
+            echo ""
+            echo "❌ SMOKE TESTS FAILED — production deployment may be broken!"
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ All smoke tests passed — production is healthy"
