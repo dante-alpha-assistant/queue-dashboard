@@ -267,9 +267,10 @@ export default function AppOnboardingWizard() {
         });
         primaryDeployTarget = state.aiSuggestions[0]?.deploy_target || state.deployTarget;
       } else if (state.repoSource === "scratch") {
-        const proposed = computeProposedArchitecture(state.name, state.description);
-        repoArchitecture = proposed;
-        reposForBody = proposed.map(r => `dante-alpha-assistant/${r.name}`);
+        // Always use Next.js template for scratch apps — scaffold.js handles repo creation
+        // from dante-alpha-assistant/nextjs-template (Next.js 15, React 19, shadcn/ui, Tailwind v4, TS)
+        reposForBody = [];
+        repoArchitecture = null;
       } else {
         reposForBody = state.repos.map(r => r.full_name);
       }
