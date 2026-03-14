@@ -375,6 +375,11 @@ export async function runScaffoldPipeline(app) {
             ...(deploySucceeded && { vercel_preview_url: vercelUrl }),
             vercel_deploy_id: vercelDeployId,
             vercel_deploy_status: vercelDeployStatus,
+            // Reset status from 'deploying' so the pipeline continues and the UI
+            // doesn't show a stuck "in_progress" state after a failed deploy.
+            // The pipeline continues regardless — 'scaffolding' signals that.
+            // Step 8 below will update to 'building' once coding task is created.
+            status: deploySucceeded ? "deploying" : "scaffolding",
             ...(customDomain && { custom_domain: customDomain }),
             updated_at: new Date().toISOString(),
           })

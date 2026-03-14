@@ -1,6 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 
+// Stages ordered to match the actual pipeline execution sequence in scaffold.js:
+//   app_created → github_repo → vercel_setup → vercel_deploy → first_deploy → scaffold → ai_codegen → live
+//
+// IMPORTANT: order matters — sequential halt logic (getSequentialStatuses) relies on it.
+// If a stage fails, all subsequent stages are forced to "pending" so we never show
+// contradictory states like "Failed + Running simultaneously".
 const STAGES = [
   {
     id: "app_created",
@@ -12,46 +18,50 @@ const STAGES = [
     id: "github_repo",
     label: "Creating GitHub Repo",
     icon: "🐙",
-    match: /github|repo/i,
-  },
-  {
-    id: "scaffold",
-    label: "Scaffolding Template",
-    icon: "🏗️",
-    match: /scaffold|template|next\.?js|boilerplate/i,
-  },
-  {
-    id: "ai_codegen",
-    label: "AI Generating Code",
-    icon: "🤖",
-    match: /generat|codegen|ai.+code|pages|api.+route/i,
+    match: null, // derived from app.repo_url
   },
   {
     id: "vercel_setup",
     label: "Setting Up Vercel",
     icon: "▲",
-    match: /vercel|project.+creat/i,
+    match: null, // derived from app.vercel_project_id
   },
   {
     id: "vercel_deploy",
     label: "Deploying to Vercel",
     icon: "🚀",
-    match: null, // special: check app.vercel_deploy_status
+    match: null, // derived from app.vercel_deploy_status
   },
   {
     id: "first_deploy",
     label: "First Deployment",
     icon: "⚙️",
-    match: /deploy|build/i,
+    match: null, // derived from vercel_deploy_status = "ready"
+  },
+  {
+    id: "scaffold",
+    label: "Scaffolding Template",
+    icon: "🏗️",
+    match: /scaffold|template|boilerplate/i,
+  },
+  {
+    id: "ai_codegen",
+    label: "AI Generating Code",
+    icon: "🤖",
+    match: /generat|codegen|ai.+code|build.+initial|initial.+version/i,
   },
   {
     id: "live",
     label: "Live!",
     icon: "🌐",
-    match: null, // special: check app.vercel_preview_url or deployed tasks
+    match: null, // derived from app.vercel_preview_url or deployed tasks
   },
 ];
 
+/**
+ * Compute the raw status for a single stage (no halt applied).
+ * Halt logic is applied separately in getSequentialStatuses.
+ */
 function getStageStatus(stage, tasks, app) {
   if (stage.id === "app_created") return "completed";
 
@@ -65,7 +75,21 @@ function getStageStatus(stage, tasks, app) {
     if (buildStep.status === "failed") return "failed";
   }
 
-  // Special: vercel_deploy — check app.vercel_deploy_status
+  // github_repo: completed once repo_url is set on the app
+  if (stage.id === "github_repo") {
+    if (app?.repo_url) return "completed";
+    if (app?.status === "scaffolding" || app?.status === "deploying" || app?.status === "building") return "in_progress";
+    return "pending";
+  }
+
+  // vercel_setup: completed once vercel_project_id is set
+  if (stage.id === "vercel_setup") {
+    if (app?.vercel_project_id) return "completed";
+    if (app?.repo_url && !app?.vercel_project_id && app?.status !== "failed") return "in_progress";
+    return "pending";
+  }
+
+  // vercel_deploy: tracks the initial Vercel deployment attempt
   // NOTE: do NOT use app.status === "deploying" here — it caused premature in_progress display
   // when earlier steps (github_repo, scaffold, vercel_setup) were still pending.
   if (stage.id === "vercel_deploy") {
@@ -76,10 +100,18 @@ function getStageStatus(stage, tasks, app) {
     return "pending";
   }
 
-  if (stage.id === "live") {
-    // Only show Live if the Vercel deployment is confirmed ready (or legacy app with no deploy tracking)
+  // first_deploy: completed only when Vercel is fully READY (a successful deployment)
+  // Never derives from tasks — only from vercel_deploy_status to avoid false matches.
+  if (stage.id === "first_deploy") {
     const ds = app?.vercel_deploy_status;
-    if (ds === "error" || ds === "canceled") return "failed";
+    if (ds === "ready") return "completed";
+    if (ds === "deploying") return "in_progress";
+    // error/canceled/not-set → pending (sequential halt propagates failure from vercel_deploy)
+    return "pending";
+  }
+
+  if (stage.id === "live") {
+    // Live only when we have a confirmed preview URL or a deployed task
     if (app?.vercel_preview_url) return "completed";
     if (tasks.some((t) => t.status === "deployed")) return "completed";
     return "pending";
@@ -102,6 +134,21 @@ function getStageStatus(stage, tasks, app) {
   return "pending";
 }
 
+/**
+ * Compute all stage statuses with sequential halt logic.
+ * Once a stage fails, ALL subsequent stages are forced to "pending".
+ * This prevents contradictory states like Failed + Running simultaneously.
+ */
+function getSequentialStatuses(stages, tasks, app) {
+  let halted = false;
+  return stages.map((stage) => {
+    if (halted) return "pending";
+    const status = getStageStatus(stage, tasks, app);
+    if (status === "failed") halted = true;
+    return status;
+  });
+}
+
 // Truncate long comment text to one line
 function trimComment(text) {
   if (!text) return "";
@@ -109,8 +156,9 @@ function trimComment(text) {
   return single.length > 90 ? single.slice(0, 87) + "…" : single;
 }
 
-function StageRow({ stage, tasks, app, comments }) {
-  const status = getStageStatus(stage, tasks, app);
+// StageRow receives a pre-computed `status` prop (from getSequentialStatuses)
+// so sequential halt logic is applied before rendering — never compute status here.
+function StageRow({ stage, status, tasks, comments }) {
   const matchingTasks = stage.match
     ? tasks.filter((t) => stage.match.test(t.title || ""))
     : [];
@@ -128,14 +176,14 @@ function StageRow({ stage, tasks, app, comments }) {
     in_progress: "#6750A4",
     completed: "#1B5E20",
     failed: "#BA1A1A",
-  }[status];
+  }[status] || "#79747E";
 
   const statusIcon = {
     pending: "○",
     in_progress: "◉",
     completed: "✓",
     failed: "✗",
-  }[status];
+  }[status] || "○";
 
   return (
     <div
@@ -375,10 +423,20 @@ export default function AppBuildProgress() {
     return () => clearInterval(appInterval);
   }, [fetchApp]);
 
-  // Determine if the app is live
-  const liveStatus = app
-    ? getStageStatus(STAGES[STAGES.length - 1], tasks, app)
-    : "pending";
+  // Compute all stage statuses with sequential halt.
+  // Once a stage fails, all subsequent stages are forced to "pending".
+  // Pass stageStatuses[i] to each StageRow — never let StageRow compute its own status.
+  const stageStatuses = app
+    ? getSequentialStatuses(STAGES, tasks, app)
+    : STAGES.map(() => "pending");
+
+  // Derived from sequential statuses (single source of truth)
+  const liveStatus = stageStatuses[STAGES.length - 1];
+  const anyStepFailed = stageStatuses.includes("failed");
+
+  // Derive ai_codegen status for the error banner message
+  const aiCodegenIdx = STAGES.findIndex((s) => s.id === "ai_codegen");
+  const aiCodegenStatus = stageStatuses[aiCodegenIdx];
 
   // Start countdown when live
   useEffect(() => {
@@ -400,9 +458,7 @@ export default function AppBuildProgress() {
     return () => clearTimeout(countdownRef.current);
   }, [countdown, navigate]);
 
-  const completedCount = app
-    ? STAGES.filter((s) => getStageStatus(s, tasks, app) === "completed").length
-    : 0;
+  const completedCount = stageStatuses.filter((s) => s === "completed").length;
   const progressPct = Math.round((completedCount / STAGES.length) * 100);
 
   if (loading) {
@@ -491,14 +547,14 @@ export default function AppBuildProgress() {
             }}
           >
             App Factory
-            {/* Live / connecting indicator */}
+            {/* SSE connection indicator — shows stream connectivity, NOT app liveness */}
             <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
               <span
                 style={{
                   width: "6px",
                   height: "6px",
                   borderRadius: "50%",
-                  background: sseConnected ? "#1B5E20" : "#E65100",
+                  background: sseConnected ? "#6750A4" : "#E65100",
                   display: "inline-block",
                   animation: "liveDot 1.5s ease-in-out infinite",
                 }}
@@ -506,10 +562,10 @@ export default function AppBuildProgress() {
               <span
                 style={{
                   fontSize: "11px",
-                  color: sseConnected ? "#1B5E20" : "#E65100",
+                  color: sseConnected ? "#6750A4" : "#E65100",
                 }}
               >
-                {sseConnected ? "Live" : "Connecting…"}
+                {sseConnected ? "Connected" : "Connecting…"}
               </span>
             </span>
           </div>
@@ -523,9 +579,11 @@ export default function AppBuildProgress() {
           >
             {liveStatus === "completed"
               ? `🎉 ${appName} is live!`
+              : anyStepFailed
+              ? `⚠️ Build failed for ${appName}`
               : `Building ${appName}…`}
           </h1>
-          {liveStatus !== "completed" && (
+          {liveStatus !== "completed" && !anyStepFailed && (
             <p
               style={{
                 color: "var(--md-on-surface-variant, #49454F)",
@@ -534,6 +592,17 @@ export default function AppBuildProgress() {
               }}
             >
               Watch your app come to life in real time
+            </p>
+          )}
+          {anyStepFailed && (
+            <p
+              style={{
+                color: "#BA1A1A",
+                margin: 0,
+                fontSize: "14px",
+              }}
+            >
+              A pipeline step failed. See details below.
             </p>
           )}
         </div>
@@ -555,6 +624,8 @@ export default function AppBuildProgress() {
               background:
                 liveStatus === "completed"
                   ? "linear-gradient(90deg, #2E7D32, #1B5E20)"
+                  : anyStepFailed
+                  ? "linear-gradient(90deg, #BA1A1A, #e53935)"
                   : "linear-gradient(90deg, #6750A4, #9C4AE2)",
               borderRadius: "8px",
               transition: "width 0.6s ease",
@@ -562,7 +633,7 @@ export default function AppBuildProgress() {
           />
         </div>
 
-        {/* Stages list */}
+        {/* Stages list — status is pre-computed with sequential halt, passed as prop */}
         <div
           style={{
             background: "#FFFFFF",
@@ -572,12 +643,12 @@ export default function AppBuildProgress() {
             marginBottom: "24px",
           }}
         >
-          {STAGES.map((stage) => (
+          {STAGES.map((stage, i) => (
             <StageRow
               key={stage.id}
               stage={stage}
+              status={stageStatuses[i]}
               tasks={tasks}
-              app={app}
               comments={comments}
             />
           ))}
@@ -601,9 +672,13 @@ export default function AppBuildProgress() {
                   Initial Vercel deployment {app?.vercel_deploy_status === "canceled" ? "was canceled" : "failed"}
                 </div>
                 <div style={{ color: "#f87171", fontSize: "14px", lineHeight: "1.5" }}>
-                  The scaffold triggered a deployment but it did not succeed. The AI code agent task
-                  is still running — its final push to GitHub will trigger a new Vercel deployment automatically.
-                  Check the{" "}
+                  {aiCodegenStatus === "in_progress"
+                    ? "The AI code agent is currently generating code — its final push to GitHub will trigger a new Vercel deployment automatically."
+                    : aiCodegenStatus === "completed"
+                    ? "The AI code agent has finished. A new Vercel deployment should have been triggered by the code push."
+                    : "The scaffold triggered a deployment but it did not succeed. Once AI code generation completes, its push to GitHub will trigger a new Vercel deployment."
+                  }
+                  {" "}Check the{" "}
                   <a
                     href={`https://vercel.com/lautaro450/${app?.slug}`}
                     target="_blank"
