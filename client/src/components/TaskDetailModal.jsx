@@ -224,7 +224,7 @@ function ensureModalStyles() {
     .tdm-sidebar-card {
       background: var(--md-surface-container-low, #F7F2FA);
       border: 1px solid var(--md-surface-variant, #E7E0EC);
-      border-radius: 12px; padding: 12px;
+      border-radius: 12px; padding: 12px; overflow: visible;
     }
 
     .tdm-kbd {
@@ -1203,27 +1203,17 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
             <MetaCell label="Project">{task.project.name}</MetaCell>
           )}
           <MetaCell label="App">
-            {apps.length > 0 ? (
-              <select
-                className="tdm-stage-select"
-                value={task.app_id || ""}
-                disabled={fieldSaving || actionProcessing}
-                onChange={e => handleFieldChange({ app_id: e.target.value || null })}
-                onClick={e => e.stopPropagation()}
-                style={{ color: task.app ? appSlugColor(task.app.slug || task.app.name) : 'var(--md-outline, #79747E)' }}
-              >
-                <option value="">No app</option>
-                {apps.map(a => <option key={a.id} value={a.id}>{a.icon || "📦"} {a.name}</option>)}
-              </select>
-            ) : (
-              task.app ? (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: appSlugColor(task.app.slug || task.app.name) }}>
-                  {task.app.icon || "📦"} {task.app.name}
-                </span>
-              ) : (
-                <span style={{ color: 'var(--md-outline, #79747E)', fontStyle: 'italic' }}>No app</span>
-              )
-            )}
+            <select
+              className="tdm-stage-select"
+              value={task.app_id || ""}
+              disabled={fieldSaving || actionProcessing}
+              onChange={e => handleFieldChange({ app_id: e.target.value || null })}
+              onClick={e => e.stopPropagation()}
+              style={{ color: task.app ? appSlugColor(task.app.slug || task.app.name) : 'var(--md-outline, #79747E)' }}
+            >
+              <option value="">No app</option>
+              {apps.map(a => <option key={a.id} value={a.id}>{a.icon || "📦"} {a.name}</option>)}
+            </select>
           </MetaCell>
 
           <MetaCell label="Deploy">
