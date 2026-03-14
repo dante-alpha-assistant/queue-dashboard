@@ -17,7 +17,7 @@
 //   On any error: update app status → 'failed'
 
 import supabase from "./supabase.js";
-import { createVercelProject, addCustomDomain } from "./vercel.js";
+import { createVercelProject, triggerVercelDeployment, waitForDeployment, addCustomDomain } from "./vercel.js";
 import { createDnsRecord } from "./digitalocean.js";
 import {
   detectNeedsDatabase,
@@ -96,6 +96,7 @@ async function createGitHubRepo(slug, description) {
       const existingData = await existingResp.json();
       if (existingResp.ok) {
         return {
+          id: existingData.id,
           fullName: existingData.full_name,
           htmlUrl: existingData.html_url,
         };
@@ -105,6 +106,7 @@ async function createGitHubRepo(slug, description) {
   }
 
   return {
+    id: data.id,
     fullName: data.full_name,
     htmlUrl: data.html_url,
   };
@@ -191,8 +193,8 @@ export async function runScaffoldPipeline(app) {
 
     // 2. Create GitHub repo from template
     console.log(`[SCAFFOLD] Creating GitHub repo: ${TEMPLATE_OWNER}/${slug}`);
-    const { fullName, htmlUrl } = await createGitHubRepo(slug, description);
-    console.log(`[SCAFFOLD] Repo created: ${htmlUrl}`);
+    const { id: githubRepoId, fullName, htmlUrl } = await createGitHubRepo(slug, description);
+    console.log(`[SCAFFOLD] Repo created: ${htmlUrl} (id=${githubRepoId})`);
 
     // 3. Update app record with repo_url + repos array
     await supabase
@@ -226,6 +228,67 @@ export async function runScaffoldPipeline(app) {
 
         console.log(`[SCAFFOLD] Vercel project created: id=${vercelProjectId} url=${vercelUrl}`);
 
+        // 4b. Trigger initial deployment explicitly.
+        // Vercel only auto-deploys on NEW pushes. Since the GitHub repo was created from
+        // a template BEFORE the Vercel project was linked, the initial commit does NOT
+        // trigger an auto-deploy. We must trigger it manually via the API.
+        let vercelDeployId = null;
+        let vercelDeployStatus = "deploying";
+        let vercelDeployedUrl = null;
+
+        // Update status to 'deploying' while we wait
+        await supabase
+          .from("apps")
+          .update({
+            vercel_project_id: vercelProjectId,
+            vercel_deploy_status: "deploying",
+            status: "deploying",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", id);
+
+        try {
+          if (!githubRepoId) {
+            throw new Error("GitHub repo ID not available — cannot trigger Vercel deployment");
+          }
+
+          console.log(`[SCAFFOLD] Triggering initial Vercel deployment for project ${vercelProjectId} (repoId=${githubRepoId})`);
+          const deployResult = await triggerVercelDeployment({
+            projectId: vercelProjectId,
+            projectName: slug,
+            repoId: githubRepoId,
+            vercelToken: VERCEL_TOKEN,
+            ref: "main",
+          });
+
+          vercelDeployId = deployResult.id;
+          console.log(`[SCAFFOLD] Deployment triggered: ${vercelDeployId} — waiting for READY state...`);
+
+          // Poll until deployment completes (max 5 min)
+          const deployStatus = await waitForDeployment({
+            deploymentId: vercelDeployId,
+            vercelToken: VERCEL_TOKEN,
+            timeoutMs: 300000,
+            pollIntervalMs: 5000,
+          });
+
+          vercelDeployStatus = deployStatus.readyState.toLowerCase(); // "ready" | "error" | "canceled"
+          vercelDeployedUrl = deployStatus.readyState === "READY"
+            ? `https://${deployStatus.url}`
+            : null;
+
+          if (deployStatus.readyState === "READY") {
+            vercelUrl = vercelDeployedUrl || vercelUrl;
+            console.log(`[SCAFFOLD] Deployment READY: ${vercelUrl}`);
+          } else {
+            console.warn(`[SCAFFOLD] Deployment ended with state ${deployStatus.readyState} — will not set live URL`);
+          }
+        } catch (deployErr) {
+          // Non-fatal: log warning, deployment failed but pipeline continues
+          console.warn(`[SCAFFOLD] Initial Vercel deployment failed (non-fatal): ${deployErr.message}`);
+          vercelDeployStatus = "error";
+        }
+
         // 5. Add custom subdomain: {slug}.dante.id → cname.vercel-dns.com
         let customDomain = null;
         try {
@@ -250,11 +313,16 @@ export async function runScaffoldPipeline(app) {
           console.warn(`[SCAFFOLD] Custom subdomain setup failed (non-fatal): ${domainErr.message}`);
         }
 
+        // Only set vercel_preview_url if the deployment actually succeeded
+        const deploySucceeded = vercelDeployStatus === "ready";
         await supabase
           .from("apps")
           .update({
             vercel_project_id: vercelProjectId,
-            vercel_preview_url: vercelUrl,
+            // Only write vercel_preview_url once we confirm a real deployment is READY
+            ...(deploySucceeded && { vercel_preview_url: vercelUrl }),
+            vercel_deploy_id: vercelDeployId,
+            vercel_deploy_status: vercelDeployStatus,
             ...(customDomain && { custom_domain: customDomain }),
             updated_at: new Date().toISOString(),
           })

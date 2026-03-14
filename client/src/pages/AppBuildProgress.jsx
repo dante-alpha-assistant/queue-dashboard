@@ -33,9 +33,15 @@ const STAGES = [
     match: /vercel|project.+creat/i,
   },
   {
+    id: "vercel_deploy",
+    label: "Deploying to Vercel",
+    icon: "🚀",
+    match: null, // special: check app.vercel_deploy_status
+  },
+  {
     id: "first_deploy",
     label: "First Deployment",
-    icon: "🚀",
+    icon: "⚙️",
     match: /deploy|build/i,
   },
   {
@@ -48,7 +54,20 @@ const STAGES = [
 
 function getStageStatus(stage, tasks, app) {
   if (stage.id === "app_created") return "completed";
+
+  // Vercel initial deployment tracking
+  if (stage.id === "vercel_deploy") {
+    const ds = app?.vercel_deploy_status;
+    if (ds === "ready") return "completed";
+    if (ds === "error" || ds === "canceled") return "failed";
+    if (ds === "deploying" || app?.status === "deploying") return "in_progress";
+    return "pending";
+  }
+
   if (stage.id === "live") {
+    // Only show Live if the Vercel deployment is confirmed ready (or legacy app with no deploy tracking)
+    const ds = app?.vercel_deploy_status;
+    if (ds === "error" || ds === "canceled") return "failed";
     if (app?.vercel_preview_url) return "completed";
     if (tasks.some((t) => t.status === "deployed")) return "completed";
     return "pending";
@@ -525,6 +544,42 @@ export default function AppBuildProgress() {
             />
           ))}
         </div>
+
+        {/* Vercel deployment error banner */}
+        {(app?.vercel_deploy_status === "error" || app?.vercel_deploy_status === "canceled") && !app?.vercel_preview_url && (
+          <div
+            style={{
+              background: "rgba(127, 29, 29, 0.3)",
+              border: "1px solid rgba(239, 68, 68, 0.4)",
+              borderRadius: "12px",
+              padding: "20px 24px",
+              marginBottom: "24px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+              <span style={{ fontSize: "22px" }}>⚠️</span>
+              <div>
+                <div style={{ color: "#fca5a5", fontWeight: "600", marginBottom: "6px" }}>
+                  Initial Vercel deployment {app?.vercel_deploy_status === "canceled" ? "was canceled" : "failed"}
+                </div>
+                <div style={{ color: "#f87171", fontSize: "14px", lineHeight: "1.5" }}>
+                  The scaffold triggered a deployment but it did not succeed. The AI code agent task
+                  is still running — its final push to GitHub will trigger a new Vercel deployment automatically.
+                  Check the{" "}
+                  <a
+                    href={`https://vercel.com/lautaro450/${app?.slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "#93c5fd" }}
+                  >
+                    Vercel dashboard
+                  </a>
+                  {" "}for build logs.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Live banner */}
         {liveStatus === "completed" && (

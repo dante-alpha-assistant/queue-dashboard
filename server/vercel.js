@@ -84,6 +84,126 @@ export async function createVercelProject({ slug, repoFullName, envKeys = [], ve
 }
 
 /**
+ * Triggers an initial deployment for a Vercel project from a GitHub repo.
+ * This is needed because Vercel only auto-deploys on NEW pushes — if the repo
+ * was created from a template before the Vercel project was linked, the initial
+ * commit does NOT trigger an automatic deployment.
+ *
+ * @param {object} opts
+ * @param {string} opts.projectId - Vercel project ID
+ * @param {string} opts.projectName - Vercel project name (slug)
+ * @param {string|number} opts.repoId - GitHub numeric repo ID
+ * @param {string} opts.vercelToken - Vercel API bearer token
+ * @param {string} [opts.ref] - Git ref to deploy (default: "main")
+ * @returns {Promise<{id: string, url: string, readyState: string}>}
+ */
+export async function triggerVercelDeployment({
+  projectId,
+  projectName,
+  repoId,
+  vercelToken,
+  ref = "main",
+}) {
+  if (!vercelToken) throw new Error("VERCEL_TOKEN not configured");
+  if (!repoId) throw new Error("repoId is required to trigger a Vercel deployment");
+
+  const teamParam = `?teamId=${VERCEL_TEAM_SLUG}`;
+
+  const body = {
+    name: projectName,
+    project: projectId,
+    gitSource: {
+      type: "github",
+      repoId: String(repoId),
+      ref,
+    },
+  };
+
+  const resp = await fetch(`${VERCEL_API}/v13/deployments${teamParam}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${vercelToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  const data = await resp.json();
+
+  if (!resp.ok) {
+    throw new Error(
+      `Vercel deployment trigger error (${resp.status}): ${data.error?.message || JSON.stringify(data)}`
+    );
+  }
+
+  console.log(
+    `[VERCEL] Deployment triggered: id=${data.id} readyState=${data.readyState} url=${data.url}`
+  );
+
+  return {
+    id: data.id,
+    url: data.url,
+    readyState: data.readyState,
+  };
+}
+
+/**
+ * Polls a Vercel deployment until it reaches a terminal state (READY, ERROR, CANCELED).
+ *
+ * @param {object} opts
+ * @param {string} opts.deploymentId - Vercel deployment ID (e.g. "dpl_xxx")
+ * @param {string} opts.vercelToken - Vercel API bearer token
+ * @param {number} [opts.timeoutMs] - Max time to wait in ms (default: 300000 = 5 min)
+ * @param {number} [opts.pollIntervalMs] - Poll interval in ms (default: 5000)
+ * @returns {Promise<{url: string, readyState: string}>}
+ */
+export async function waitForDeployment({
+  deploymentId,
+  vercelToken,
+  timeoutMs = 300000,
+  pollIntervalMs = 5000,
+}) {
+  if (!vercelToken) throw new Error("VERCEL_TOKEN not configured");
+
+  const teamParam = `?teamId=${VERCEL_TEAM_SLUG}`;
+  const terminal = new Set(["READY", "ERROR", "CANCELED"]);
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const resp = await fetch(
+      `${VERCEL_API}/v13/deployments/${deploymentId}${teamParam}`,
+      {
+        headers: {
+          Authorization: `Bearer ${vercelToken}`,
+        },
+      }
+    );
+
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      throw new Error(
+        `Vercel deployment status error (${resp.status}): ${data.error?.message || JSON.stringify(data)}`
+      );
+    }
+
+    const { readyState, url } = data;
+    console.log(`[VERCEL] Deployment ${deploymentId} state: ${readyState}`);
+
+    if (terminal.has(readyState)) {
+      return { url, readyState };
+    }
+
+    // Wait before polling again
+    await new Promise((r) => setTimeout(r, pollIntervalMs));
+  }
+
+  throw new Error(
+    `Vercel deployment ${deploymentId} timed out after ${timeoutMs / 1000}s`
+  );
+}
+
+/**
  * Adds a custom domain to an existing Vercel project.
  * Uses POST /v10/projects/{projectId}/domains
  *
