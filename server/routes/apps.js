@@ -456,6 +456,115 @@ appsRouter.get("/:id/stats", async (req, res) => {
   }
 });
 
+// GET /api/apps/:id/build-events — SSE stream of real-time build progress
+// Uses Supabase Realtime to subscribe to task status changes + task comments
+appsRouter.get("/:id/build-events", async (req, res) => {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+
+  const send = (event, data) => {
+    try {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    } catch {}
+  };
+
+  const identifier = req.params.id;
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
+
+  let appId = identifier;
+  if (!isUuid) {
+    const { data: appRow } = await supabase.from("apps").select("id").eq("slug", identifier).single();
+    if (!appRow) {
+      send("error", { error: "App not found" });
+      res.end();
+      return;
+    }
+    appId = appRow.id;
+  }
+
+  // Initial snapshot — send current tasks
+  const { data: initTasks } = await supabase
+    .from("agent_tasks")
+    .select("id, title, status, type, priority, assigned_agent, created_at, updated_at, pull_request_url, app_id, result, deployment_url")
+    .eq("app_id", appId)
+    .neq("status", "deprecated")
+    .order("created_at", { ascending: true });
+
+  const taskIds = (initTasks || []).map(t => t.id);
+
+  for (const task of initTasks || []) {
+    send("task_update", task);
+  }
+
+  // Send recent comments (last 20)
+  if (taskIds.length > 0) {
+    const { data: initComments } = await supabase
+      .from("task_comments")
+      .select("id, task_id, content, author, created_at, role")
+      .in("task_id", taskIds)
+      .order("created_at", { ascending: true })
+      .limit(20);
+    for (const comment of initComments || []) {
+      send("comment", comment);
+    }
+  }
+
+  // Keep-alive ping
+  const keepAlive = setInterval(() => {
+    try { res.write(":ping\n\n"); } catch {}
+  }, 15000);
+
+  // Realtime channel for task status changes
+  const channelName = `build-${appId}-${Date.now()}`;
+  const channel = supabase.channel(channelName)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "agent_tasks", filter: `app_id=eq.${appId}` },
+      (payload) => {
+        if (payload.new) send("task_update", payload.new);
+      }
+    )
+    .subscribe();
+
+  // Poll for new comments every 6 seconds (Realtime IN filter not reliable)
+  let lastCommentAt = new Date().toISOString();
+  const commentPoll = setInterval(async () => {
+    try {
+      // Re-fetch task IDs in case new tasks were created
+      const { data: currentTasks } = await supabase
+        .from("agent_tasks")
+        .select("id")
+        .eq("app_id", appId)
+        .neq("status", "deprecated");
+      const currentIds = (currentTasks || []).map(t => t.id);
+      if (currentIds.length === 0) return;
+
+      const { data: newComments } = await supabase
+        .from("task_comments")
+        .select("id, task_id, content, author, created_at, role")
+        .in("task_id", currentIds)
+        .gt("created_at", lastCommentAt)
+        .order("created_at", { ascending: true });
+
+      for (const comment of newComments || []) {
+        send("comment", comment);
+        lastCommentAt = comment.created_at;
+      }
+    } catch {}
+  }, 6000);
+
+  // Cleanup on client disconnect
+  res.on("close", () => {
+    clearInterval(keepAlive);
+    clearInterval(commentPoll);
+    supabase.removeChannel(channel);
+  });
+});
+
 // GET /api/apps/:id/tasks — list tasks for an app
 appsRouter.get("/:id/tasks", async (req, res) => {
   try {

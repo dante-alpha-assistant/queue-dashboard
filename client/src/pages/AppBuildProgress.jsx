@@ -70,11 +70,26 @@ function getStageStatus(stage, tasks, app) {
   return "pending";
 }
 
-function StageRow({ stage, tasks, app }) {
+// Truncate long comment text to one line
+function trimComment(text) {
+  if (!text) return "";
+  const single = text.replace(/\n/g, " ").trim();
+  return single.length > 90 ? single.slice(0, 87) + "…" : single;
+}
+
+function StageRow({ stage, tasks, app, comments }) {
   const status = getStageStatus(stage, tasks, app);
   const matchingTasks = stage.match
     ? tasks.filter((t) => stage.match.test(t.title || ""))
     : [];
+
+  // For ai_codegen stage: show recent agent comments (file names / progress)
+  const stageComments =
+    stage.id === "ai_codegen" && matchingTasks.length > 0
+      ? comments
+          .filter((c) => matchingTasks.some((t) => t.id === c.task_id))
+          .slice(-4)
+      : [];
 
   const statusColor = {
     pending: "#6b7280",
@@ -125,7 +140,7 @@ function StageRow({ stage, tasks, app }) {
       >
         {statusIcon}
       </div>
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
             display: "flex",
@@ -175,6 +190,36 @@ function StageRow({ stage, tasks, app }) {
             ))}
           </div>
         )}
+        {/* AI codegen: live comment feed showing files being created */}
+        {stageComments.length > 0 && (
+          <div
+            style={{
+              marginTop: "8px",
+              padding: "8px 10px",
+              background: "rgba(96, 165, 250, 0.06)",
+              borderRadius: "6px",
+              borderLeft: "2px solid rgba(96, 165, 250, 0.3)",
+            }}
+          >
+            {stageComments.map((c, i) => (
+              <div
+                key={c.id || i}
+                style={{
+                  fontSize: "11px",
+                  color: i === stageComments.length - 1 ? "#93c5fd" : "#4b5563",
+                  fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                  marginBottom: i < stageComments.length - 1 ? "3px" : 0,
+                  animation: i === stageComments.length - 1 ? "buildBlink 1.5s ease-in-out infinite" : "none",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                📄 {trimComment(c.content)}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div
         style={{
@@ -198,10 +243,12 @@ export default function AppBuildProgress() {
   const navigate = useNavigate();
   const [app, setApp] = useState(null);
   const [tasks, setTasks] = useState([]);
+  const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [countdown, setCountdown] = useState(null);
-  const taskIdsRef = useRef(new Set());
+  const [sseConnected, setSseConnected] = useState(false);
+  const taskMapRef = useRef({});
   const countdownRef = useRef(null);
 
   const fetchApp = useCallback(async () => {
@@ -220,56 +267,63 @@ export default function AppBuildProgress() {
     }
   }, [id]);
 
-  const fetchTasks = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/apps/${id}/tasks`);
-      if (!res.ok) return;
-      const data = await res.json();
-      setTasks(data || []);
-      taskIdsRef.current = new Set((data || []).map((t) => t.id));
-    } catch {
-      // ignore fetch errors silently
-    }
-  }, [id]);
-
-  // Initial fetch
+  // Initial app fetch
   useEffect(() => {
     fetchApp();
-    fetchTasks();
-  }, [fetchApp, fetchTasks]);
+  }, [fetchApp]);
 
-  // Polling
+  // Supabase Realtime SSE — build-events stream
   useEffect(() => {
-    const appInterval = setInterval(fetchApp, 3000);
-    const taskInterval = setInterval(fetchTasks, 5000);
-    return () => {
-      clearInterval(appInterval);
-      clearInterval(taskInterval);
-    };
-  }, [fetchApp, fetchTasks]);
+    if (!id) return;
 
-  // SSE subscription for real-time task status changes
-  useEffect(() => {
-    const es = new EventSource("/api/events");
+    const es = new EventSource(`/api/apps/${id}/build-events`);
 
-    es.addEventListener("task:status", (e) => {
+    es.onopen = () => setSseConnected(true);
+    es.onerror = () => setSseConnected(false);
+
+    // task_update: upsert into task map
+    es.addEventListener("task_update", (e) => {
       try {
-        const data = JSON.parse(e.data);
-        if (taskIdsRef.current.has(data.taskId)) {
-          fetchTasks();
+        const task = JSON.parse(e.data);
+        taskMapRef.current = { ...taskMapRef.current, [task.id]: task };
+        setTasks(Object.values(taskMapRef.current));
+        setLoading(false);
+        // Refresh app record when a task deploys (may update vercel_preview_url)
+        if (["deployed", "completed"].includes(task.status)) {
           fetchApp();
         }
-      } catch {
-        // ignore parse errors
-      }
+      } catch {}
     });
 
-    es.onerror = () => {
-      es.close();
-    };
+    // comment: append to comment list (deduplicated by id)
+    es.addEventListener("comment", (e) => {
+      try {
+        const comment = JSON.parse(e.data);
+        setComments((prev) => {
+          if (prev.some((c) => c.id === comment.id)) return prev;
+          return [...prev, comment];
+        });
+      } catch {}
+    });
 
-    return () => es.close();
-  }, [fetchTasks, fetchApp]);
+    es.addEventListener("error", (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.error) setError(data.error);
+      } catch {}
+    });
+
+    return () => {
+      es.close();
+      setSseConnected(false);
+    };
+  }, [id, fetchApp]);
+
+  // Fallback polling (slower — SSE is primary)
+  useEffect(() => {
+    const appInterval = setInterval(fetchApp, 10000);
+    return () => clearInterval(appInterval);
+  }, [fetchApp]);
 
   // Determine if the app is live
   const liveStatus = app
@@ -364,6 +418,10 @@ export default function AppBuildProgress() {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.5; }
         }
+        @keyframes liveDot {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
       `}</style>
 
       <div style={{ maxWidth: "620px", margin: "0 auto" }}>
@@ -376,9 +434,28 @@ export default function AppBuildProgress() {
               marginBottom: "8px",
               letterSpacing: "0.1em",
               textTransform: "uppercase",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
             }}
           >
             App Factory
+            {/* Live / connecting indicator */}
+            <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+              <span
+                style={{
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  background: sseConnected ? "#34d399" : "#f59e0b",
+                  display: "inline-block",
+                  animation: "liveDot 1.5s ease-in-out infinite",
+                }}
+              />
+              <span style={{ fontSize: "11px", color: sseConnected ? "#34d399" : "#f59e0b" }}>
+                {sseConnected ? "Live" : "Connecting…"}
+              </span>
+            </span>
           </div>
           <h1
             style={{
@@ -439,7 +516,13 @@ export default function AppBuildProgress() {
           }}
         >
           {STAGES.map((stage) => (
-            <StageRow key={stage.id} stage={stage} tasks={tasks} app={app} />
+            <StageRow
+              key={stage.id}
+              stage={stage}
+              tasks={tasks}
+              app={app}
+              comments={comments}
+            />
           ))}
         </div>
 
