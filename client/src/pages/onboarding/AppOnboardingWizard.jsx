@@ -304,10 +304,10 @@ export default function AppOnboardingWizard() {
       setCreatedApp(created);
       setSuccess(true);
 
-      // Redirect after success animation
+      // Redirect to build progress page after success animation
       setTimeout(() => {
-        navigate("/");
-      }, 2500);
+        navigate(`/apps/${created.id}/building`);
+      }, 1500);
     } catch (e) {
       dispatch({ type: "SET_FIELD", field: "error", value: e.message });
     } finally {
