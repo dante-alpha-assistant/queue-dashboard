@@ -222,6 +222,58 @@ function ManualConfig({ state, dispatch }) {
           ℹ️ <strong>Code changes only.</strong> Tasks for this app will produce PRs but won't trigger deployments.
         </div>
       )}
+
+      {/* Database toggle */}
+      <div>
+        <label style={labelStyle}>Database</label>
+        <button
+          onClick={() => dispatch({ type: "SET_FIELD", field: "needsDatabase", value: !state.needsDatabase })}
+          style={{
+            display: "flex", alignItems: "center", gap: 12, padding: "16px 20px",
+            borderRadius: 16,
+            border: `2px solid ${state.needsDatabase ? "#10B981" : "var(--md-surface-variant, #E7E0EC)"}`,
+            background: state.needsDatabase ? "rgba(16,185,129,0.06)" : "var(--md-surface, #FFFBFE)",
+            cursor: "pointer", width: "100%", textAlign: "left",
+            fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+            transition: "all 200ms ease-out",
+          }}
+        >
+          <span style={{ fontSize: 28 }}>🗄️</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: state.needsDatabase ? "#059669" : "var(--md-on-surface, #1C1B1F)" }}>
+              Supabase Database
+            </div>
+            <div style={{ fontSize: 12, color: "var(--md-on-surface-variant, #49454F)", marginTop: 2 }}>
+              Auto-provision schema, AI-generated tables + RLS policies
+            </div>
+          </div>
+          <div style={{
+            width: 44, height: 24, borderRadius: 12,
+            background: state.needsDatabase ? "#10B981" : "var(--md-surface-variant, #E7E0EC)",
+            position: "relative", transition: "background 200ms",
+            flexShrink: 0,
+          }}>
+            <div style={{
+              position: "absolute", top: 2, left: state.needsDatabase ? 22 : 2,
+              width: 20, height: 20, borderRadius: "50%", background: "#fff",
+              transition: "left 200ms", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+            }} />
+          </div>
+        </button>
+        {state.needsDatabase && (
+          <div style={{
+            marginTop: 8, padding: "12px 16px", borderRadius: 12,
+            background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)",
+            fontSize: 12, color: "#065F46", lineHeight: 1.6,
+          }}>
+            ✅ Supabase will auto-provision a dedicated schema{" "}
+            <code style={{ fontFamily: "'JetBrains Mono', monospace", background: "rgba(0,0,0,0.06)", padding: "1px 5px", borderRadius: 4 }}>
+              {state.slug || "app-slug"}
+            </code>{" "}
+            with AI-generated tables based on your description. Env vars are injected into Vercel automatically — no manual setup needed.
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -356,9 +408,60 @@ export default function StepDeployTargets({ state, dispatch }) {
           </div>
         ))}
 
+        {/* Database toggle (AI suggestion view) */}
+        <div className="step-field" style={{ "--field-index": state.aiSuggestions.length + 1 }}>
+          <button
+            onClick={() => dispatch({ type: "SET_FIELD", field: "needsDatabase", value: !state.needsDatabase })}
+            style={{
+              display: "flex", alignItems: "center", gap: 12, padding: "16px 20px",
+              borderRadius: 16,
+              border: `2px solid ${state.needsDatabase ? "#10B981" : "var(--md-surface-variant, #E7E0EC)"}`,
+              background: state.needsDatabase ? "rgba(16,185,129,0.06)" : "var(--md-surface, #FFFBFE)",
+              cursor: "pointer", width: "100%", textAlign: "left",
+              fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+              transition: "all 200ms ease-out",
+            }}
+          >
+            <span style={{ fontSize: 28 }}>🗄️</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: state.needsDatabase ? "#059669" : "var(--md-on-surface, #1C1B1F)" }}>
+                Supabase Database
+              </div>
+              <div style={{ fontSize: 12, color: "var(--md-on-surface-variant, #49454F)", marginTop: 2 }}>
+                Auto-provision schema, AI-generated tables + RLS policies
+              </div>
+            </div>
+            <div style={{
+              width: 44, height: 24, borderRadius: 12,
+              background: state.needsDatabase ? "#10B981" : "var(--md-surface-variant, #E7E0EC)",
+              position: "relative", transition: "background 200ms",
+              flexShrink: 0,
+            }}>
+              <div style={{
+                position: "absolute", top: 2, left: state.needsDatabase ? 22 : 2,
+                width: 20, height: 20, borderRadius: "50%", background: "#fff",
+                transition: "left 200ms", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+              }} />
+            </div>
+          </button>
+          {state.needsDatabase && (
+            <div style={{
+              marginTop: 8, padding: "12px 16px", borderRadius: 12,
+              background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)",
+              fontSize: 12, color: "#065F46", lineHeight: 1.6,
+            }}>
+              ✅ Supabase will auto-provision a dedicated schema{" "}
+              <code style={{ fontFamily: "'JetBrains Mono', monospace", background: "rgba(0,0,0,0.06)", padding: "1px 5px", borderRadius: 4 }}>
+                {state.slug || "app-slug"}
+              </code>{" "}
+              with AI-generated tables based on your description. Env vars are injected into Vercel automatically — no manual setup needed.
+            </div>
+          )}
+        </div>
+
         {/* Action buttons */}
         <div className="step-field" style={{
-          "--field-index": state.aiSuggestions.length + 1,
+          "--field-index": state.aiSuggestions.length + 2,
           display: "flex", gap: 12,
         }}>
           <button

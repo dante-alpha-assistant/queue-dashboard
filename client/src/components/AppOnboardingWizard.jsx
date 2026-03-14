@@ -44,7 +44,7 @@ const initialState = {
   icon: "",
   selectedRepos: [],
   repoDeployConfigs: {},
-  supabaseProjectRef: "",
+  needs_database: "auto",
 };
 
 function reducer(state, action) {
@@ -96,8 +96,8 @@ function reducer(state, action) {
         },
       };
     }
-    case "SET_SUPABASE_REF":
-      return { ...state, supabaseProjectRef: action.value };
+    case "SET_NEEDS_DATABASE":
+      return { ...state, needs_database: action.value };
     case "NEXT_STEP":
       return { ...state, step: Math.min(state.step + 1, STEPS.length - 1) };
     case "PREV_STEP":
@@ -1080,8 +1080,23 @@ function RepoDeployCard({ repo, config, dispatch }) {
 }
 
 function OnboardingStep3({ state, dispatch }) {
-  const supabaseRef = state.supabaseProjectRef || "";
-  const supabaseValid = !supabaseRef || /^[a-z]{20}$/.test(supabaseRef);
+  const dbOptions = [
+    {
+      value: "auto",
+      label: "Auto-detect (recommended)",
+      description: "We'll check your app description and provision a database if needed",
+    },
+    {
+      value: "yes",
+      label: "Yes, provision database",
+      description: "Always provision a Supabase schema + tables for this app",
+    },
+    {
+      value: "no",
+      label: "No database needed",
+      description: "Skip database provisioning entirely",
+    },
+  ];
 
   return (
     <div>
@@ -1113,53 +1128,64 @@ function OnboardingStep3({ state, dispatch }) {
         ))
       )}
 
-      {/* Supabase section */}
+      {/* Database auto-provisioning section */}
       <div style={{
         marginTop: 32, border: "1px solid var(--md-surface-variant, #E7E0EC)",
         borderRadius: 12, padding: 20, background: "var(--md-surface-container, #F5F0FB)",
       }}>
         <div style={{ marginBottom: 14 }}>
           <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "var(--md-on-surface)" }}>
-            Connect Supabase Project <span style={{ fontWeight: 400, fontSize: 13, color: "var(--md-on-surface-variant)" }}>(optional)</span>
+            Database
           </h3>
           <p style={{ margin: 0, fontSize: 13, color: "var(--md-on-surface-variant)" }}>
-            Link a Supabase database to this app for backend storage
+            Auto-provision a Supabase schema + tables in our shared project. No manual setup needed.
           </p>
         </div>
-        <div>
-          <input
-            type="text"
-            placeholder="e.g. abcdefghijklmnop"
-            value={supabaseRef}
-            onChange={(e) => dispatch({ type: "SET_SUPABASE_REF", value: e.target.value })}
-            style={{
-              width: "100%",
-              padding: "8px 12px",
-              borderRadius: 8,
-              border: `1px solid ${!supabaseValid ? "#C00012" : "var(--md-surface-variant, #E7E0EC)"}`,
-              background: "var(--md-surface, #FFFBFE)",
-              color: "var(--md-on-surface)",
-              fontSize: 14,
-              fontFamily: "'Inter', system-ui, sans-serif",
-              boxSizing: "border-box",
-            }}
-          />
-          {!supabaseValid && (
-            <div style={{ marginTop: 6, fontSize: 12, color: "#C00012" }}>
-              Project ref must be exactly 20 lowercase letters
-            </div>
-          )}
-          <div style={{ marginTop: 8 }}>
-            <a
-              href="https://supabase.com/dashboard/new/_"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ fontSize: 13, color: "#6750A4", textDecoration: "none" }}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {dbOptions.map((opt) => (
+            <label
+              key={opt.value}
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 12,
+                padding: "10px 14px",
+                borderRadius: 8,
+                border: `1px solid ${state.needs_database === opt.value ? "#6750A4" : "var(--md-surface-variant, #E7E0EC)"}`,
+                background: state.needs_database === opt.value ? "rgba(103,80,164,0.06)" : "var(--md-surface, #FFFBFE)",
+                cursor: "pointer",
+                transition: "border-color 0.15s, background 0.15s",
+              }}
             >
-              Create new project →
-            </a>
-          </div>
+              <input
+                type="radio"
+                name="needs_database"
+                value={opt.value}
+                checked={state.needs_database === opt.value}
+                onChange={() => dispatch({ type: "SET_NEEDS_DATABASE", value: opt.value })}
+                style={{ marginTop: 2, accentColor: "#6750A4" }}
+              />
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--md-on-surface)" }}>
+                  {opt.label}
+                </div>
+                <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)", marginTop: 2 }}>
+                  {opt.description}
+                </div>
+              </div>
+            </label>
+          ))}
         </div>
+        {state.needs_database !== "no" && (
+          <div style={{
+            marginTop: 12, padding: "8px 12px", borderRadius: 6,
+            background: "rgba(103,80,164,0.08)", fontSize: 12,
+            color: "var(--md-on-surface-variant)",
+          }}>
+            ✨ Powered by our shared Supabase project — schema, tables, and Row Level Security are created automatically.
+            Env vars (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, etc.) are injected into Vercel automatically.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1267,7 +1293,7 @@ export default function AppOnboardingWizard({ onClose, onCreated }) {
     switch (state.step) {
       case 0: return isStep1Valid();
       case 1: return state.selectedRepos && state.selectedRepos.length > 0;
-      case 2: return !state.supabaseProjectRef || /^[a-z]{20}$/.test(state.supabaseProjectRef);
+      case 2: return true; // Database selection always valid
       default: return true;
     }
   };

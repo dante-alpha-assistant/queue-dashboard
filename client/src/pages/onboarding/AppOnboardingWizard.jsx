@@ -60,6 +60,7 @@ const initialState = {
   customCredential: "",
   customQaCredential: "",
   supabaseRef: "",
+  needsDatabase: false,
   selectedTemplate: null,
   submitting: false,
   error: null,
@@ -290,6 +291,7 @@ export default function AppOnboardingWizard() {
         env_keys: state.reqCredentials,
         qa_env_keys: state.qaCredentials,
         supabase_project_ref: state.supabaseRef.trim() || null,
+        needs_database: state.needsDatabase || false,
         template_id: state.selectedTemplate || null,
         template_repo: state.selectedTemplate
           ? (TEMPLATES.find(t => t.id === state.selectedTemplate)?.githubTemplate || null)
