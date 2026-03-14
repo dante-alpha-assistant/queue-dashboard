@@ -82,3 +82,45 @@ export async function createVercelProject({ slug, repoFullName, envKeys = [], ve
     previewUrl: `https://${data.name}.vercel.app`,
   };
 }
+
+/**
+ * Adds a custom domain to an existing Vercel project.
+ * Uses POST /v10/projects/{projectId}/domains
+ *
+ * @param {object} opts
+ * @param {string} opts.projectId - Vercel project ID
+ * @param {string} opts.domain - Custom domain to add, e.g. "personal-crm-a7f3.dante.id"
+ * @param {string} opts.vercelToken - Vercel API bearer token
+ * @returns {Promise<void>}
+ */
+export async function addCustomDomain({ projectId, domain, vercelToken }) {
+  if (!vercelToken) throw new Error("VERCEL_TOKEN not configured");
+
+  const teamParam = `?teamId=${VERCEL_TEAM_SLUG}`;
+  const resp = await fetch(`${VERCEL_API}/v10/projects/${projectId}/domains${teamParam}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${vercelToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ name: domain }),
+  });
+
+  const data = await resp.json();
+
+  if (!resp.ok) {
+    // 409 or domain_conflict = already added — treat as success
+    if (
+      resp.status === 409 ||
+      (data.error && ["domain_conflict", "domain_already_exists"].includes(data.error.code))
+    ) {
+      console.log(`[VERCEL] Custom domain ${domain} already on project ${projectId} — skipping`);
+      return;
+    }
+    throw new Error(
+      `Vercel domain API error (${resp.status}): ${data.error?.message || JSON.stringify(data)}`
+    );
+  }
+
+  console.log(`[VERCEL] Custom domain added: ${domain} → project ${projectId}`);
+}

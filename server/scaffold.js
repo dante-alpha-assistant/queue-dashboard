@@ -6,17 +6,20 @@
 //   2. Create GitHub repo from dante-alpha-assistant/nextjs-template
 //   3. Wait briefly for GitHub to initialize the repo (3s)
 //   4. Create Vercel project linked to GitHub repo (if deploy_target=vercel)
-//   5. Update app record: repo_url, vercel_project_id, vercel_preview_url
-//   6. Auto-create coding task in agent_tasks (picked up by neo-worker)
-//   7. Update app status → 'building'
+//   5. Add custom subdomain {slug}.dante.id via DigitalOcean DNS + Vercel domain API
+//   6. Update app record: repo_url, vercel_project_id, vercel_preview_url, custom_domain
+//   7. Auto-create coding task in agent_tasks (picked up by neo-worker)
+//   8. Update app status → 'building'
 //   On any error: update app status → 'failed'
 
 import supabase from "./supabase.js";
-import { createVercelProject } from "./vercel.js";
+import { createVercelProject, addCustomDomain } from "./vercel.js";
+import { createDnsRecord } from "./digitalocean.js";
 
 const GH_API = "https://api.github.com";
 const GH_TOKEN = process.env.GH_TOKEN;
 const VERCEL_TOKEN = process.env.VERCEL_TOKEN;
+const DO_TOKEN = process.env.DO_TOKEN;
 const TEMPLATE_OWNER = "dante-alpha-assistant";
 const TEMPLATE_REPO = "nextjs-template";
 
@@ -176,11 +179,36 @@ export async function runScaffoldPipeline(app) {
 
         console.log(`[SCAFFOLD] Vercel project created: id=${vercelProjectId} url=${vercelUrl}`);
 
+        // 5. Add custom subdomain: {slug}.dante.id → cname.vercel-dns.com
+        let customDomain = null;
+        try {
+          const subdomain = `${slug}.dante.id`;
+
+          // 5a. Create CNAME record in DigitalOcean DNS
+          if (DO_TOKEN) {
+            console.log(`[SCAFFOLD] Creating DNS CNAME: ${subdomain} → cname.vercel-dns.com`);
+            await createDnsRecord({ slug, doToken: DO_TOKEN });
+          } else {
+            console.warn('[SCAFFOLD] DO_TOKEN not configured — skipping DNS CNAME creation');
+          }
+
+          // 5b. Add custom domain to Vercel project
+          console.log(`[SCAFFOLD] Adding custom domain to Vercel: ${subdomain}`);
+          await addCustomDomain({ projectId: vercelProjectId, domain: subdomain, vercelToken: VERCEL_TOKEN });
+
+          customDomain = subdomain;
+          console.log(`[SCAFFOLD] Custom subdomain ready: https://${subdomain}`);
+        } catch (domainErr) {
+          // Non-fatal: log warning, do not crash the pipeline
+          console.warn(`[SCAFFOLD] Custom subdomain setup failed (non-fatal): ${domainErr.message}`);
+        }
+
         await supabase
           .from("apps")
           .update({
             vercel_project_id: vercelProjectId,
             vercel_preview_url: vercelUrl,
+            ...(customDomain && { custom_domain: customDomain }),
             updated_at: new Date().toISOString(),
           })
           .eq("id", id);
