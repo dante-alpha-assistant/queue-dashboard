@@ -750,3 +750,53 @@ appsRouter.post("/:id/chat", async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// POST /api/apps/:id/retry — restart scaffold pipeline from failed/stalled state
+appsRouter.post("/:id/retry", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data: app, error } = await supabase
+      .from("apps")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (error || !app) return res.status(404).json({ error: "App not found" });
+    if (!["failed", "scaffolding", "building"].includes(app.status)) {
+      return res.status(400).json({
+        error: `App is in status "${app.status}" — only failed/scaffolding/building apps can be retried`,
+      });
+    }
+
+    // Reset failed build_steps to pending, keep completed ones
+    const existingSteps = Array.isArray(app.build_steps) ? app.build_steps : [];
+    const resetSteps = existingSteps.map((s) =>
+      s.status === "failed"
+        ? { ...s, status: "pending", error: null, completed_at: null }
+        : s
+    );
+
+    await supabase
+      .from("apps")
+      .update({
+        status: "scaffolding",
+        build_steps: resetSteps,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+
+    // Re-run scaffold pipeline async (don't await — returns immediately)
+    import("../scaffold.js")
+      .then(({ runScaffoldPipeline }) => {
+        runScaffoldPipeline({ ...app, build_steps: resetSteps, status: "scaffolding" }).catch((e) => {
+          console.error(`[RETRY] Pipeline failed for app ${id}:`, e.message);
+        });
+      })
+      .catch((e) => {
+        console.error(`[RETRY] Failed to import scaffold.js:`, e.message);
+      });
+
+    res.json({ ok: true, message: "Pipeline restarted from failed step" });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
