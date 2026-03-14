@@ -230,7 +230,7 @@ export default function StepConnectRepos({ state, dispatch }) {
 
       {/* Mode selector */}
       <div className="step-field" style={{ "--field-index": 0, display: "flex", gap: 12 }}>
-        {modeCard("scratch", <FolderPlus size={20} />, "Create from scratch", "AI will analyze your app and create the optimal repo structure")}
+        {modeCard("scratch", <FolderPlus size={20} />, "Create from scratch", "Scaffold Next.js 15 + shadcn/ui + Supabase Auth. Deploy to Vercel instantly.")}
         {modeCard("github", <Github size={20} />, "Connect with your GitHub", "Browse and select from your personal repos")}
       </div>
 
@@ -254,7 +254,7 @@ export default function StepConnectRepos({ state, dispatch }) {
         </div>
       )}
 
-      {/* ── Create from scratch mode — AI info card ──────── */}
+      {/* ── Create from scratch mode — stack info card ──────── */}
       {state.repoSource === "scratch" && (
         <div className="step-field" style={{ "--field-index": 2 }}>
           <div style={{
@@ -277,16 +277,16 @@ export default function StepConnectRepos({ state, dispatch }) {
               </div>
               <div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", marginBottom: 6 }}>
-                  AI will design your repo structure
+                  Your app ships with a production-ready stack
                 </div>
                 <div style={{ fontSize: 13, color: "#4B5563", lineHeight: 1.65 }}>
-                  Our AI will analyze your app description and create the optimal repository structure —
-                  this could be a single repo, or separate frontend + backend repos, depending on what makes sense for your project.
+                  We'll scaffold a Next.js 15 monorepo with the standard stack — ready to deploy to Vercel in minutes.
+                  GitHub repo created automatically under <code style={{ background: "rgba(124,58,237,0.08)", padding: "1px 5px", borderRadius: 4, fontSize: 12 }}>dante-alpha-assistant/{"{slug}"}</code>.
                 </div>
               </div>
             </div>
 
-            {/* Architecture options preview */}
+            {/* Stack preview */}
             <div style={{
               display: "flex", flexDirection: "column", gap: 8,
               padding: "14px 16px",
@@ -295,15 +295,18 @@ export default function StepConnectRepos({ state, dispatch }) {
               background: "#F8F9FF",
             }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#7C3AED", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>
-                Possible outcomes
+                Included in every app
               </div>
               {[
-                { icon: "📦", label: "Monorepo", desc: "Simple apps — one repo for everything" },
-                { icon: "🔀", label: "Frontend + Backend", desc: "Full-stack apps — separate UI and API repos" },
-                { icon: "⚙️", label: "Multi-Service", desc: "Complex apps — frontend, API, worker repos" },
+                { icon: "⚡", label: "Next.js 15", desc: "App Router + Turbopack dev server" },
+                { icon: "⚛️", label: "React 19", desc: "Latest stable React" },
+                { icon: "🎨", label: "shadcn/ui", desc: "Pre-installed: button, card, input, dialog, table, badge" },
+                { icon: "💨", label: "Tailwind CSS v4", desc: "CSS utility framework, zero-config" },
+                { icon: "🔐", label: "Supabase Auth", desc: "Email/password + Google OAuth, pre-wired" },
+                { icon: "🚀", label: "Vercel ready", desc: "vercel.json included, deploy in one click" },
               ].map(({ icon, label, desc }) => (
                 <div key={label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontSize: 16 }}>{icon}</span>
+                  <span style={{ fontSize: 15, width: 20, textAlign: "center" }}>{icon}</span>
                   <div style={{ flex: 1 }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{label}</span>
                     <span style={{ fontSize: 12, color: "#6B7280", marginLeft: 8 }}>{desc}</span>
@@ -314,7 +317,7 @@ export default function StepConnectRepos({ state, dispatch }) {
 
             <div style={{ fontSize: 12, color: "#6B7280", display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ color: "#7C3AED" }}>✦</span>
-              A preview of the proposed architecture will be shown in the Review step before you confirm.
+              After creation, a coding task is dispatched to build your app's custom pages based on your description.
             </div>
           </div>
         </div>
