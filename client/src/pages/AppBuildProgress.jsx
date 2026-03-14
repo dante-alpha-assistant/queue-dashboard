@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 
 // Stages ordered to match the actual pipeline execution sequence in scaffold.js:
-//   app_created → github_repo → vercel_setup → vercel_deploy → first_deploy → scaffold → ai_codegen → live
+//   app_created → github_repo → scaffold → vercel_setup → vercel_deploy → first_deploy → ai_codegen → live
 //
 // IMPORTANT: order matters — sequential halt logic (getSequentialStatuses) relies on it.
 // If a stage fails, all subsequent stages are forced to "pending" so we never show
@@ -21,6 +21,12 @@ const STAGES = [
     match: null, // derived from app.repo_url
   },
   {
+    id: "scaffold",
+    label: "Scaffolding Template",
+    icon: "🏗️",
+    match: /scaffold|template|boilerplate/i,
+  },
+  {
     id: "vercel_setup",
     label: "Setting Up Vercel",
     icon: "▲",
@@ -37,12 +43,6 @@ const STAGES = [
     label: "First Deployment",
     icon: "⚙️",
     match: null, // derived from vercel_deploy_status = "ready"
-  },
-  {
-    id: "scaffold",
-    label: "Scaffolding Template",
-    icon: "🏗️",
-    match: /scaffold|template|boilerplate/i,
   },
   {
     id: "ai_codegen",
@@ -102,14 +102,13 @@ function getStageStatus(stage, tasks, app) {
   }
 
   // first_deploy: completed only when Vercel is fully READY (a successful deployment)
-  // Check build_steps entry for first_deploy first (written by scaffold.js),
-  // then fall through to vercel_deploy_status-derived logic.
+  // Never derives from tasks — only from vercel_deploy_status to avoid false matches.
+  // in_progress is handled by the build_steps check above (avoids deploying status race condition).
   if (stage.id === "first_deploy") {
     // buildStep already handled above via the generic buildStep block (done/in_progress/failed/warning)
     // Only reach here if there's no build_step entry for first_deploy yet
     const ds = app?.vercel_deploy_status;
     if (ds === "ready") return "completed";
-    if (ds === "deploying") return "in_progress";
     // error/canceled/not-set → pending (sequential halt propagates warning from vercel_deploy)
     return "pending";
   }
@@ -140,17 +139,30 @@ function getStageStatus(stage, tasks, app) {
 
 /**
  * Compute all stage statuses with sequential halt logic.
- * Once a stage fails, ALL subsequent stages are forced to "pending".
- * This prevents contradictory states like Failed + Running simultaneously.
+ * Once a stage fails, ALL subsequent stages are forced to "pending"
+ * UNLESS they have an explicit build_step record showing in_progress or done.
+ * This prevents contradictory states while allowing ai_codegen to show correctly
+ * even when vercel_deploy failed (ai_codegen always runs regardless of deploy status).
  */
 function getSequentialStatuses(stages, tasks, app) {
+  const buildSteps = Array.isArray(app?.build_steps) ? app.build_steps : [];
   let halted = false;
   return stages.map((stage) => {
-    if (halted) return "pending";
-    const status = getStageStatus(stage, tasks, app);
+    const rawStatus = getStageStatus(stage, tasks, app);
+    if (halted) {
+      // Honor explicit build_step records even after a prior failure.
+      // This prevents ai_codegen from showing "pending" when vercel_deploy failed
+      // (initial deploy is expected to fail before AI code is pushed).
+      const buildStep = buildSteps.find((s) => s.id === stage.id);
+      if (buildStep && (buildStep.status === "in_progress" || buildStep.status === "done")) {
+        if (rawStatus === "failed") halted = true;
+        return rawStatus;
+      }
+      return "pending";
+    }
     // Only halt on hard "failed" — "warning" is non-fatal and should NOT block subsequent stages
-    if (status === "failed") halted = true;
-    return status;
+    if (rawStatus === "failed") halted = true;
+    return rawStatus;
   });
 }
 
@@ -535,6 +547,9 @@ export default function AppBuildProgress() {
   // Only treat hard "failed" as fatal — "warning" is non-fatal and does NOT halt the build
   const anyStepFailed = stageStatuses.includes("failed");
   const anyStepWarning = stageStatuses.includes("warning");
+  const anyStepActive = stageStatuses.includes("in_progress");
+  // Only declare the build as failed if a step failed AND no step is still actively running
+  const isBuildFailed = anyStepFailed && !anyStepActive;
 
   // Derive ai_codegen status for the error banner message
   const aiCodegenIdx = STAGES.findIndex((s) => s.id === "ai_codegen");
@@ -681,11 +696,11 @@ export default function AppBuildProgress() {
           >
             {liveStatus === "completed"
               ? `🎉 ${appName} is live!`
-              : anyStepFailed
+              : isBuildFailed
               ? `⚠️ Build failed for ${appName}`
               : `Building ${appName}…`}
           </h1>
-          {liveStatus !== "completed" && !anyStepFailed && (
+          {liveStatus !== "completed" && !isBuildFailed && (
             <p
               style={{
                 color: "var(--md-on-surface-variant, #49454F)",
@@ -696,7 +711,7 @@ export default function AppBuildProgress() {
               Watch your app come to life in real time
             </p>
           )}
-          {anyStepFailed && (
+          {isBuildFailed && (
             <>
               <p
                 style={{
@@ -748,7 +763,7 @@ export default function AppBuildProgress() {
               background:
                 liveStatus === "completed"
                   ? "linear-gradient(90deg, #2E7D32, #1B5E20)"
-                  : anyStepFailed
+                  : isBuildFailed
                   ? "linear-gradient(90deg, #BA1A1A, #e53935)"
                   : "linear-gradient(90deg, #6750A4, #9C4AE2)",
               borderRadius: "8px",
