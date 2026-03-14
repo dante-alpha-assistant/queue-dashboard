@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, X, Loader2, Sparkles } from "lucide-react";
 import OnboardingStepIndicator from "./OnboardingStepIndicator";
 import { computeProposedArchitecture } from "./repoArchitecture";
+import { TEMPLATES } from "./steps/TemplateGallery";
 import "./onboarding.css";
 
 /* ── Lazy-loaded steps ─────────────────────────────────── */
@@ -59,6 +60,7 @@ const initialState = {
   customCredential: "",
   customQaCredential: "",
   supabaseRef: "",
+  selectedTemplate: null,
   submitting: false,
   error: null,
 };
@@ -287,6 +289,10 @@ export default function AppOnboardingWizard() {
         env_keys: state.reqCredentials,
         qa_env_keys: state.qaCredentials,
         supabase_project_ref: state.supabaseRef.trim() || null,
+        template_id: state.selectedTemplate || null,
+        template_repo: state.selectedTemplate
+          ? (TEMPLATES.find(t => t.id === state.selectedTemplate)?.githubTemplate || null)
+          : null,
       };
 
       const resp = await fetch("/api/apps", {
