@@ -1,5 +1,4 @@
-import { ExternalLink, Sparkles } from "lucide-react";
-import { computeProposedArchitecture } from "../repoArchitecture";
+import { ExternalLink } from "lucide-react";
 
 const labelStyle = {
   fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant, #49454F)",
@@ -12,17 +11,10 @@ const DEPLOY_TARGETS = {
   none: { icon: "⏭️", label: "None", color: "#79747E" },
 };
 
-const ARCH_ROLE_ICONS = {
-  "Frontend": "🖥️",
-  "Backend API": "⚙️",
-  "Background Worker": "🔄",
-  "Monorepo": "📦",
-};
 
 export default function StepReview({ state }) {
   const dtCfg = DEPLOY_TARGETS[state.deployTarget] || DEPLOY_TARGETS.none;
   const isScratch = state.repoSource === "scratch";
-  const proposed = isScratch ? computeProposedArchitecture(state.name, state.description) : null;
 
   return (
     <div className="step-fields-stagger">
@@ -79,54 +71,36 @@ export default function StepReview({ state }) {
           </div>
         )}
 
-        {/* Repos — Scratch mode: show proposed architecture */}
-        {isScratch && proposed && (
+        {/* Repos — Scratch mode: show Next.js monorepo */}
+        {isScratch && (
           <div className="step-field" style={{ "--field-index": 1, padding: "16px 24px", borderBottom: "1px solid var(--md-surface-variant, #E7E0EC)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <span style={labelStyle}>Proposed Architecture</span>
-              <span style={{
-                fontSize: 11, padding: "3px 10px", borderRadius: 100, fontWeight: 600,
-                background: "rgba(124,58,237,0.12)", color: "#7C3AED",
-                border: "1px solid rgba(124,58,237,0.25)",
-                display: "inline-flex", alignItems: "center", gap: 5,
-              }}>
-                <Sparkles size={10} /> AI
-              </span>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {proposed.map(r => (
-                <div key={r.name} style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  padding: "10px 14px", borderRadius: 10,
-                  background: "rgba(124,58,237,0.05)",
-                  border: "1px solid rgba(124,58,237,0.15)",
+            <span style={labelStyle}>Repository (auto-scaffolded)</span>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 12, padding: "10px 14px",
+              borderRadius: 12,
+              border: "1px solid rgba(124,58,237,0.2)",
+              background: "rgba(124,58,237,0.04)",
+            }}>
+              <span style={{ fontSize: 18 }}>📦</span>
+              <div>
+                <div style={{
+                  fontSize: 12, fontWeight: 600,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  color: "var(--md-primary, #6750A4)",
                 }}>
-                  <span style={{ fontSize: 16 }}>{ARCH_ROLE_ICONS[r.role] || "📁"}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{
-                      fontSize: 12, fontWeight: 600,
-                      fontFamily: "'JetBrains Mono', monospace",
-                      color: "var(--md-primary, #6750A4)",
-                    }}>
-                      dante-alpha-assistant/{r.name}
-                    </span>
-                  </div>
-                  <span style={{
-                    fontSize: 11, padding: "2px 8px", borderRadius: 6,
-                    background: "rgba(124,58,237,0.1)", color: "#7C3AED",
-                    fontWeight: 600, flexShrink: 0,
-                  }}>
-                    {r.role}
-                  </span>
+                  dante-alpha-assistant/{state.slug}
                 </div>
-              ))}
+                <div style={{ fontSize: 12, color: "var(--md-on-surface-variant, #49454F)", marginTop: 2 }}>
+                  Next.js 15 · React 19 · shadcn/ui · Tailwind CSS v4 · TypeScript
+                </div>
+              </div>
             </div>
             <div style={{
               marginTop: 10, fontSize: 11, color: "var(--md-on-surface-variant, #49454F)",
               display: "flex", alignItems: "center", gap: 5,
             }}>
               <span style={{ color: "#7C3AED" }}>⚡</span>
-              AI will confirm this structure when you create the app
+              Scaffolded from <code style={{ fontSize: 11 }}>dante-alpha-assistant/nextjs-template</code> on confirm
             </div>
           </div>
         )}
@@ -139,12 +113,12 @@ export default function StepReview({ state }) {
             <span style={{ fontSize: 14, fontWeight: 700, color: dtCfg.color }}>{dtCfg.label}</span>
             {state.deployTarget === "kubernetes" && (
               <span style={{ fontSize: 12, color: "var(--md-on-surface-variant)", fontFamily: "'JetBrains Mono', monospace" }}>
-                {state.k8sNamespace}/{state.k8sService || (proposed ? proposed[0]?.name : state.repos[0]?.name)}
+                {state.k8sNamespace}/{state.k8sService || (isScratch ? state.slug : state.repos[0]?.name)}
               </span>
             )}
             {state.deployTarget === "vercel" && (
               <span style={{ fontSize: 12, color: "var(--md-on-surface-variant)", fontFamily: "'JetBrains Mono', monospace" }}>
-                {state.vercelProject || (proposed ? proposed[0]?.name : state.repos[0]?.name)}
+                {state.vercelProject || (isScratch ? state.slug : state.repos[0]?.name)}
               </span>
             )}
           </div>

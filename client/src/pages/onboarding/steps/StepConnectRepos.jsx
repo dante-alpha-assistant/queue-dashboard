@@ -281,7 +281,7 @@ export default function StepConnectRepos({ state, dispatch }) {
                 </div>
                 <div style={{ fontSize: 13, color: "#4B5563", lineHeight: 1.65 }}>
                   We'll scaffold a Next.js 15 monorepo with the standard stack — ready to deploy to Vercel in minutes.
-                  GitHub repo created automatically under <code style={{ background: "rgba(124,58,237,0.08)", padding: "1px 5px", borderRadius: 4, fontSize: 12 }}>dante-alpha-assistant/{"{slug}"}</code>.
+                  GitHub repo created automatically under <code style={{ background: "rgba(124,58,237,0.08)", padding: "1px 5px", borderRadius: 4, fontSize: 12 }}>dante-alpha-assistant/{state.slug || "your-app"}</code>.
                 </div>
               </div>
             </div>
