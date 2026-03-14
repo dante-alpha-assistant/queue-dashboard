@@ -1,23 +1,20 @@
-// server/supabase-provision.js — Supabase auto-provisioning for App Factory
+// server/supabase-provision.js — Supabase per-app project provisioning for App Factory
 //
-// When an app needs a database, this module:
-// 1. Creates a dedicated schema in the shared Supabase project
-// 2. Uses AI to generate tables based on app description
-// 3. Runs migrations via Supabase Management API
-// 4. Sets up Row Level Security
-// 5. Injects env vars into Vercel project
-// 6. Pushes /src/lib/supabase.ts to the GitHub repo
+// Each app gets its own isolated Supabase project:
+//   1. Create new Supabase project via Management API (POST /v1/projects)
+//   2. Wait until project reaches ACTIVE_HEALTHY status
+//   3. Use AI to generate appropriate tables + SQL migrations
+//   4. Run migrations via SQL API (POST /v1/projects/{ref}/database/query)
+//   5. Enable Row Level Security on all tables
+//   6. Run E2E tests: CRUD, RLS enforcement, key validation
+//   7. Inject env vars into Vercel project using per-app credentials
 
-const SUPABASE_URL = 'https://lessxkxujvcmublgwdaa.supabase.co';
-const SUPABASE_PROJECT_REF = process.env.SUPABASE_PROJECT_ID || 'lessxkxujvcmublgwdaa';
-const SUPABASE_DB_PASSWORD = process.env.SUPABASE_DB_PASSWORD; // Optional: enables DATABASE_URL injection
-const SUPABASE_MGMT_TOKEN = process.env.SUPABASE_MGMT_TOKEN;
-const SUPABASE_SERVICE_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxlc3N4a3h1anZjbXVibGd3ZGFhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTM2MTQ2NSwiZXhwIjoyMDg2OTM3NDY1fQ.Wo2WczTauYjpaqtAzfADTSa5htFF6_cKU4UHaJ1EARI';
-const SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxlc3N4a3h1anZjbXVibGd3ZGFhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzNjE0NjUsImV4cCI6MjA4NjkzNzQ2NX0.6cJIFWVqSBv-VWElH_yZxPibXE9xCKj3PF-6ZxDI1vI';
+const SUPABASE_MGMT_TOKEN = process.env.SUPABASE_MGMT_TOKEN || 'sbp_1bba539cc0f681dba9fd333d4dc1fbdb3b9db972';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const GH_TOKEN = process.env.GH_TOKEN;
+
+// Default region for new projects
+const DEFAULT_REGION = 'us-east-1';
 
 // Database-related keywords for auto-detection
 const DB_KEYWORDS = [
@@ -44,42 +41,166 @@ export function detectNeedsDatabase(description) {
 }
 
 /**
- * Run SQL against Supabase via the Management API.
- * @param {string} sql - SQL to execute
+ * Generate a random DB password (32 chars).
  */
-async function runSQL(sql) {
-  if (!SUPABASE_MGMT_TOKEN) {
-    throw new Error('SUPABASE_MGMT_TOKEN is not configured');
+function generateDbPassword() {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%';
+  let pwd = '';
+  // Ensure at least one uppercase, lowercase, digit, special char
+  pwd += 'ABCDE'.charAt(Math.floor(Math.random() * 5));
+  pwd += 'abcde'.charAt(Math.floor(Math.random() * 5));
+  pwd += '01234'.charAt(Math.floor(Math.random() * 5));
+  pwd += '!@#$%'.charAt(Math.floor(Math.random() * 5));
+  for (let i = 4; i < 32; i++) {
+    pwd += chars.charAt(Math.floor(Math.random() * chars.length));
   }
+  // Shuffle
+  return pwd.split('').sort(() => Math.random() - 0.5).join('');
+}
 
-  const resp = await fetch(
-    `https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/database/query`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${SUPABASE_MGMT_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ query: sql }),
-    }
-  );
+/**
+ * Get the first organization ID from Supabase Management API.
+ */
+async function getOrgId() {
+  const resp = await fetch('https://api.supabase.com/v1/organizations', {
+    headers: { Authorization: `Bearer ${SUPABASE_MGMT_TOKEN}` },
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`Failed to get Supabase orgs (${resp.status}): ${text}`);
+  }
+  const orgs = await resp.json();
+  if (!orgs || orgs.length === 0) {
+    throw new Error('No Supabase organizations found for this management token');
+  }
+  return orgs[0].id;
+}
+
+/**
+ * Create a new Supabase project via Management API.
+ * @param {string} slug - App slug (used as project name)
+ * @param {string} orgId - Supabase organization ID
+ * @returns {Promise<{ref: string, name: string}>}
+ */
+async function createSupabaseProject(slug, orgId) {
+  const dbPass = generateDbPassword();
+
+  const body = {
+    name: slug,
+    db_pass: dbPass,
+    region: DEFAULT_REGION,
+    organization_id: orgId,
+  };
+
+  const resp = await fetch('https://api.supabase.com/v1/projects', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${SUPABASE_MGMT_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
 
   const text = await resp.text();
   if (!resp.ok) {
-    throw new Error(`Supabase Management API error (${resp.status}): ${text}`);
+    throw new Error(`Failed to create Supabase project (${resp.status}): ${text}`);
   }
 
+  const data = JSON.parse(text);
+  console.log(`[SUPABASE-PROVISION] Project created: ref=${data.id || data.ref}, name=${data.name}`);
+  return { ref: data.id || data.ref, name: data.name, dbPass };
+}
+
+/**
+ * Wait until the Supabase project reaches ACTIVE_HEALTHY status.
+ * @param {string} ref - Project ref
+ * @param {number} timeoutMs - Max wait time (default 5 min)
+ * @returns {Promise<{ref, url, anonKey, serviceRoleKey}>}
+ */
+export async function waitForProjectReady(ref, timeoutMs = 300000) {
+  const start = Date.now();
+  const pollInterval = 10000; // 10s
+
+  while (Date.now() - start < timeoutMs) {
+    const resp = await fetch(`https://api.supabase.com/v1/projects/${ref}`, {
+      headers: { Authorization: `Bearer ${SUPABASE_MGMT_TOKEN}` },
+    });
+
+    if (resp.ok) {
+      const data = await resp.json();
+      console.log(`[SUPABASE-PROVISION] Project ${ref} status: ${data.status}`);
+
+      if (data.status === 'ACTIVE_HEALTHY') {
+        // Get API keys
+        const keysResp = await fetch(`https://api.supabase.com/v1/projects/${ref}/api-keys`, {
+          headers: { Authorization: `Bearer ${SUPABASE_MGMT_TOKEN}` },
+        });
+
+        let anonKey = null;
+        let serviceRoleKey = null;
+
+        if (keysResp.ok) {
+          const keys = await keysResp.json();
+          for (const k of keys) {
+            if (k.name === 'anon') anonKey = k.api_key;
+            if (k.name === 'service_role') serviceRoleKey = k.api_key;
+          }
+        }
+
+        return {
+          ref,
+          url: `https://${ref}.supabase.co`,
+          anonKey,
+          serviceRoleKey,
+        };
+      }
+
+      // Still provisioning — wait and retry
+      if (data.status === 'COMING_UP' || data.status === 'UNKNOWN' || data.status === 'RESTORING') {
+        await new Promise((r) => setTimeout(r, pollInterval));
+        continue;
+      }
+
+      // Fatal status
+      throw new Error(`Supabase project ${ref} in unexpected status: ${data.status}`);
+    }
+
+    await new Promise((r) => setTimeout(r, pollInterval));
+  }
+
+  throw new Error(`Supabase project ${ref} did not become ACTIVE_HEALTHY within ${timeoutMs / 1000}s`);
+}
+
+/**
+ * Run SQL against a Supabase project via Management API.
+ * @param {string} ref - Project ref
+ * @param {string} sql - SQL to execute
+ */
+export async function runSQLOnProject(ref, sql) {
+  const resp = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${SUPABASE_MGMT_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ query: sql }),
+  });
+
+  const text = await resp.text();
+  if (!resp.ok) {
+    throw new Error(`Supabase SQL error on project ${ref} (${resp.status}): ${text}`);
+  }
   return text;
 }
 
 /**
  * Generate CREATE TABLE SQL for the app using AI.
  * Falls back to a generic template if OpenAI is unavailable.
- * @param {string} appSlug - App slug (used as schema name)
+ * @param {string} appSlug - App slug
  * @param {string} description - App description
  * @returns {Promise<string>} SQL DDL string
  */
-async function generateTablesSQL(appSlug, description) {
+export async function generateTablesSQL(appSlug, description) {
   if (!OPENAI_API_KEY) {
     console.warn('[SUPABASE-PROVISION] OPENAI_API_KEY not set — using generic table template');
     return genericTablesSQL(appSlug);
@@ -89,13 +210,13 @@ async function generateTablesSQL(appSlug, description) {
 
 Requirements:
 - Create 2-4 tables appropriate for this app
-- All tables must be in the schema "${appSlug}" (e.g., CREATE TABLE IF NOT EXISTS ${appSlug}.contacts (...))
-- Every table must have these columns:
+- All tables in the public schema (no schema prefix)
+- Every table must have:
   - id UUID DEFAULT gen_random_uuid() PRIMARY KEY
   - created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
   - user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL
-- Add other columns appropriate for the app (VARCHAR, TEXT, BOOLEAN, INTEGER, JSONB, etc.)
-- Use IF NOT EXISTS for idempotency
+- Add other columns appropriate for the app (VARCHAR, TEXT, BOOLEAN, INTEGER, JSONB)
+- Use CREATE TABLE IF NOT EXISTS for idempotency
 - Return ONLY the SQL statements, no explanations`;
 
   try {
@@ -120,11 +241,7 @@ Requirements:
 
     const data = await resp.json();
     const sql = data.choices?.[0]?.message?.content?.trim();
-
-    if (!sql || sql.length < 50) {
-      return genericTablesSQL(appSlug);
-    }
-
+    if (!sql || sql.length < 50) return genericTablesSQL(appSlug);
     return sql;
   } catch (err) {
     console.warn(`[SUPABASE-PROVISION] OpenAI error: ${err.message} — using generic template`);
@@ -137,7 +254,7 @@ Requirements:
  */
 function genericTablesSQL(appSlug) {
   return `-- Generic tables for ${appSlug}
-CREATE TABLE IF NOT EXISTS ${appSlug}.records (
+CREATE TABLE IF NOT EXISTS records (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
@@ -147,7 +264,7 @@ CREATE TABLE IF NOT EXISTS ${appSlug}.records (
   metadata JSONB DEFAULT '{}'
 );
 
-CREATE TABLE IF NOT EXISTS ${appSlug}.tags (
+CREATE TABLE IF NOT EXISTS tags (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
@@ -157,33 +274,218 @@ CREATE TABLE IF NOT EXISTS ${appSlug}.tags (
 }
 
 /**
- * Enable Row Level Security on the given tables.
- * @param {string[]} tableNames
- * @param {string} schema
+ * Enable Row Level Security on tables.
+ * @param {string} ref - Project ref
+ * @param {string[]} tableNames - Table names
  */
-async function enableRLS(tableNames, schema) {
+async function enableRLS(ref, tableNames) {
   for (const table of tableNames) {
     const sql = `
-ALTER TABLE ${schema}.${table} ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.${table} ENABLE ROW LEVEL SECURITY;
 
 DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies
-    WHERE schemaname = '${schema}'
+    WHERE schemaname = 'public'
       AND tablename = '${table}'
       AND policyname = 'Users can access own data'
   ) THEN
-    EXECUTE 'CREATE POLICY "Users can access own data" ON ${schema}.${table} FOR ALL USING (auth.uid() = user_id)';
+    EXECUTE 'CREATE POLICY "Users can access own data" ON public.${table} FOR ALL USING (auth.uid() = user_id)';
   END IF;
 END
 $$;`;
 
     try {
-      await runSQL(sql);
+      await runSQLOnProject(ref, sql);
     } catch (err) {
-      // Non-fatal: log and continue
-      console.warn(`[SUPABASE-PROVISION] RLS setup failed for ${schema}.${table}: ${err.message}`);
+      console.warn(`[SUPABASE-PROVISION] RLS setup failed for ${table}: ${err.message}`);
+    }
+  }
+}
+
+/**
+ * Create necessary indexes on generated tables.
+ * @param {string} ref - Project ref
+ * @param {string[]} tableNames - Table names
+ */
+async function createIndexes(ref, tableNames) {
+  for (const table of tableNames) {
+    const sql = `
+CREATE INDEX IF NOT EXISTS idx_${table}_user_id ON public.${table}(user_id);
+CREATE INDEX IF NOT EXISTS idx_${table}_created_at ON public.${table}(created_at DESC);`;
+    try {
+      await runSQLOnProject(ref, sql);
+    } catch (err) {
+      console.warn(`[SUPABASE-PROVISION] Index creation failed for ${table}: ${err.message}`);
+    }
+  }
+}
+
+/**
+ * Run E2E tests against a provisioned Supabase project.
+ * Tests: accessibility, CRUD via service_role, RLS blocks anon access.
+ * @param {string} ref - Project ref
+ * @param {string} url - Project URL
+ * @param {string} anonKey - Anonymous API key
+ * @param {string} serviceRoleKey - Service role key
+ * @param {string[]} tables - Table names to test
+ * @returns {Promise<object>} Test results
+ */
+export async function runE2ETests(ref, url, anonKey, serviceRoleKey, tables) {
+  const results = {
+    projectAccessible: false,
+    rlsBlocksAnon: false,
+    serviceRoleBypassesRls: false,
+    anonKeyWorks: false,
+    crudTests: {},
+    passed: 0,
+    failed: 0,
+  };
+
+  // Test 1: Project accessible via URL (anon key)
+  try {
+    const resp = await fetch(`${url}/rest/v1/`, {
+      headers: {
+        apikey: anonKey || '',
+        Authorization: `Bearer ${anonKey || ''}`,
+      },
+    });
+    results.projectAccessible = resp.ok || resp.status === 400; // 400 means auth works but no table specified
+    results.anonKeyWorks = resp.ok || resp.status === 400 || resp.status === 200;
+  } catch (e) {
+    results.projectAccessible = false;
+    results.accessError = e.message;
+  }
+
+  if (results.projectAccessible) results.passed++;
+  else results.failed++;
+
+  // Test each table (max 2)
+  const testTables = tables.slice(0, 2);
+  for (const table of testTables) {
+    const tableResults = {
+      insertWithServiceRole: false,
+      selectWithServiceRole: false,
+      rlsBlocksAnonSelect: false,
+    };
+
+    // Test: service_role_key can INSERT
+    try {
+      const resp = await fetch(`${url}/rest/v1/${table}`, {
+        method: 'POST',
+        headers: {
+          apikey: serviceRoleKey || '',
+          Authorization: `Bearer ${serviceRoleKey || ''}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=representation',
+        },
+        body: JSON.stringify({
+          title: 'E2E test record',
+          status: 'test',
+          user_id: '00000000-0000-0000-0000-000000000000',
+        }),
+      });
+      tableResults.insertWithServiceRole = resp.ok || resp.status === 201;
+    } catch (e) {
+      tableResults.insertError = e.message;
+    }
+
+    // Test: service_role_key can SELECT (bypasses RLS)
+    try {
+      const resp = await fetch(`${url}/rest/v1/${table}?select=*&limit=1`, {
+        headers: {
+          apikey: serviceRoleKey || '',
+          Authorization: `Bearer ${serviceRoleKey || ''}`,
+        },
+      });
+      tableResults.selectWithServiceRole = resp.ok;
+    } catch (e) {
+      tableResults.selectError = e.message;
+    }
+
+    // Test: anon_key SELECT is blocked by RLS (expect empty array since no auth.uid())
+    try {
+      const resp = await fetch(`${url}/rest/v1/${table}?select=*`, {
+        headers: {
+          apikey: anonKey || '',
+          Authorization: `Bearer ${anonKey || ''}`,
+        },
+      });
+      if (resp.status === 401 || resp.status === 403) {
+        tableResults.rlsBlocksAnonSelect = true;
+      } else if (resp.ok) {
+        const data = await resp.json();
+        // RLS policy filters by auth.uid() — anon has no uid, so should return empty
+        tableResults.rlsBlocksAnonSelect = Array.isArray(data) && data.length === 0;
+      }
+    } catch (e) {
+      tableResults.rlsError = e.message;
+    }
+
+    results.crudTests[table] = tableResults;
+
+    if (tableResults.insertWithServiceRole) results.passed++;
+    else results.failed++;
+    if (tableResults.rlsBlocksAnonSelect) results.passed++;
+    else results.failed++;
+  }
+
+  results.rlsBlocksAnon = testTables.length === 0 ||
+    testTables.every((t) => results.crudTests[t]?.rlsBlocksAnonSelect);
+  results.serviceRoleBypassesRls = testTables.length === 0 ||
+    testTables.some((t) => results.crudTests[t]?.selectWithServiceRole);
+
+  return results;
+}
+
+/**
+ * Inject Supabase env vars into a Vercel project using per-app credentials.
+ * @param {string} vercelProjectId - Vercel project ID
+ * @param {string} vercelToken - Vercel API token
+ * @param {string} supabaseUrl - App's Supabase project URL
+ * @param {string} anonKey - App's anon key
+ * @param {string} serviceRoleKey - App's service role key
+ */
+export async function injectVercelEnvVars(vercelProjectId, vercelToken, supabaseUrl, anonKey, serviceRoleKey) {
+  const targets = ['production', 'preview', 'development'];
+
+  const envVars = [
+    { key: 'NEXT_PUBLIC_SUPABASE_URL', value: supabaseUrl },
+    { key: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', value: anonKey || '' },
+    { key: 'SUPABASE_SERVICE_ROLE_KEY', value: serviceRoleKey || '' },
+  ];
+
+  for (const envVar of envVars) {
+    if (!envVar.value) continue;
+    try {
+      const resp = await fetch(`https://api.vercel.com/v10/projects/${vercelProjectId}/env`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${vercelToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          key: envVar.key,
+          value: envVar.value,
+          type: 'encrypted',
+          target: targets,
+        }),
+      });
+
+      if (resp.ok) {
+        console.log(`[SUPABASE-PROVISION] Vercel env var set: ${envVar.key}`);
+      } else {
+        const text = await resp.text();
+        // If already exists, try updating it
+        if (resp.status === 400 && text.includes('already exists')) {
+          console.log(`[SUPABASE-PROVISION] Env var ${envVar.key} already exists, skipping`);
+        } else {
+          console.warn(`[SUPABASE-PROVISION] Failed to set ${envVar.key}: ${resp.status} ${text}`);
+        }
+      }
+    } catch (err) {
+      console.warn(`[SUPABASE-PROVISION] Error setting ${envVar.key}: ${err.message}`);
     }
   }
 }
@@ -239,91 +541,88 @@ export async function pushFileToGitHub(repoFullName, filePath, content, message)
 }
 
 /**
- * Provision a dedicated Supabase schema and tables for an app.
- * @param {string} appSlug - App slug (used as schema name)
- * @param {string} description - App description
- * @returns {Promise<{schema: string, tables: string[], sql: string}>}
+ * Main entry point: create a dedicated Supabase project for an app.
+ * Creates project → waits for ACTIVE_HEALTHY → generates schema → runs migrations → RLS → E2E tests.
+ *
+ * @param {string} appSlug - App slug (used as project name)
+ * @param {string} description - App description (used for AI schema generation)
+ * @returns {Promise<{ref, url, anonKey, serviceRoleKey, tables, sql, e2eResults}>}
  */
-export async function provisionSupabase(appSlug, description) {
-  // 1. Create schema
-  await runSQL(`CREATE SCHEMA IF NOT EXISTS ${appSlug};`);
-  console.log(`[SUPABASE-PROVISION] Schema created: ${appSlug}`);
+export async function createAppSupabaseProject(appSlug, description) {
+  if (!SUPABASE_MGMT_TOKEN) {
+    throw new Error('SUPABASE_MGMT_TOKEN is not configured');
+  }
 
-  // 2. Generate tables SQL
-  const tablesSql = await generateTablesSQL(appSlug, description);
-  console.log(`[SUPABASE-PROVISION] Generated SQL for ${appSlug}`);
+  // 1. Get organization ID
+  console.log(`[SUPABASE-PROVISION] Getting org ID...`);
+  const orgId = await getOrgId();
+  console.log(`[SUPABASE-PROVISION] Org ID: ${orgId}`);
 
-  // 3. Run tables migration
-  await runSQL(tablesSql);
-  console.log(`[SUPABASE-PROVISION] Tables created in schema ${appSlug}`);
+  // 2. Create the project
+  console.log(`[SUPABASE-PROVISION] Creating Supabase project: ${appSlug}`);
+  const { ref } = await createSupabaseProject(appSlug, orgId);
 
-  // 4. Extract table names from generated SQL
-  const tableRegex = /CREATE TABLE IF NOT EXISTS\s+\w+\.(\w+)\s*\(/gi;
-  const tableNames = [];
+  // 3. Wait for project to be ready
+  console.log(`[SUPABASE-PROVISION] Waiting for project ${ref} to be ACTIVE_HEALTHY...`);
+  const { url, anonKey, serviceRoleKey } = await waitForProjectReady(ref);
+  console.log(`[SUPABASE-PROVISION] Project ready: ${url}`);
+
+  // 4. Generate schema SQL
+  console.log(`[SUPABASE-PROVISION] Generating schema for "${appSlug}"...`);
+  const sql = await generateTablesSQL(appSlug, description);
+  console.log(`[SUPABASE-PROVISION] Schema SQL generated (${sql.length} chars)`);
+
+  // 5. Run migrations
+  await runSQLOnProject(ref, sql);
+  console.log(`[SUPABASE-PROVISION] Migrations executed on project ${ref}`);
+
+  // 6. Extract table names from SQL
+  const tableRegex = /CREATE TABLE IF NOT EXISTS\s+(?:public\.)?(\w+)\s*\(/gi;
+  const tables = [];
   let match;
-  while ((match = tableRegex.exec(tablesSql)) !== null) {
-    tableNames.push(match[1]);
+  while ((match = tableRegex.exec(sql)) !== null) {
+    tables.push(match[1]);
+  }
+  console.log(`[SUPABASE-PROVISION] Tables detected: ${tables.join(', ')}`);
+
+  // 7. Enable RLS + create indexes
+  if (tables.length > 0) {
+    await enableRLS(ref, tables);
+    await createIndexes(ref, tables);
+    console.log(`[SUPABASE-PROVISION] RLS + indexes configured for tables: ${tables.join(', ')}`);
   }
 
-  // 5. Enable RLS
-  if (tableNames.length > 0) {
-    await enableRLS(tableNames, appSlug);
-    console.log(`[SUPABASE-PROVISION] RLS enabled for tables: ${tableNames.join(', ')}`);
+  // 8. Run E2E tests
+  console.log(`[SUPABASE-PROVISION] Running E2E tests on project ${ref}...`);
+  let e2eResults = null;
+  try {
+    e2eResults = await runE2ETests(ref, url, anonKey, serviceRoleKey, tables);
+    console.log(`[SUPABASE-PROVISION] E2E tests: ${e2eResults.passed} passed, ${e2eResults.failed} failed`);
+  } catch (e2eErr) {
+    console.warn(`[SUPABASE-PROVISION] E2E tests failed (non-fatal): ${e2eErr.message}`);
   }
 
-  return { schema: appSlug, tables: tableNames, sql: tablesSql };
+  return { ref, url, anonKey, serviceRoleKey, tables, sql, e2eResults };
 }
 
+// ---------------------------------------------------------------------------
+// Legacy compatibility: provisionSupabase still available for backward compat
+// but now it redirects to per-project provisioning
+// ---------------------------------------------------------------------------
+
 /**
- * Inject Supabase env vars into a Vercel project.
- * @param {string} vercelProjectId - Vercel project ID
- * @param {string} vercelToken - Vercel API token
- * @param {string} appSlug - App slug (used in DATABASE_URL schema)
+ * @deprecated Use createAppSupabaseProject instead.
+ * Kept for backward compatibility — redirects to per-project provisioning.
  */
-export async function injectVercelEnvVars(vercelProjectId, vercelToken, appSlug) {
-  const targets = ['production', 'preview', 'development'];
-
-  const envVars = [
-    { key: 'NEXT_PUBLIC_SUPABASE_URL', value: SUPABASE_URL },
-    { key: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', value: SUPABASE_ANON_KEY },
-    { key: 'SUPABASE_SERVICE_ROLE_KEY', value: SUPABASE_SERVICE_KEY },
-  ];
-
-  // DATABASE_URL: inject if SUPABASE_DB_PASSWORD is configured.
-  // Uses the Supabase transaction pooler with search_path set to the app schema.
-  // Region is inferred from project ref (ap-southeast-2 for this project).
-  if (SUPABASE_DB_PASSWORD) {
-    const region = 'ap-southeast-2'; // matches lessxkxujvcmublgwdaa project
-    const databaseUrl = `postgresql://postgres.${SUPABASE_PROJECT_REF}:${SUPABASE_DB_PASSWORD}@aws-0-${region}.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&search_path=${appSlug}`;
-    envVars.push({ key: 'DATABASE_URL', value: databaseUrl });
-  } else {
-    console.warn('[SUPABASE-PROVISION] SUPABASE_DB_PASSWORD not set — skipping DATABASE_URL injection');
-  }
-
-  for (const envVar of envVars) {
-    try {
-      const resp = await fetch(`https://api.vercel.com/v10/projects/${vercelProjectId}/env`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${vercelToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          key: envVar.key,
-          value: envVar.value,
-          type: 'plain',
-          target: targets,
-        }),
-      });
-
-      if (resp.ok) {
-        console.log(`[SUPABASE-PROVISION] Vercel env var set: ${envVar.key}`);
-      } else {
-        const text = await resp.text();
-        console.warn(`[SUPABASE-PROVISION] Failed to set ${envVar.key}: ${resp.status} ${text}`);
-      }
-    } catch (err) {
-      console.warn(`[SUPABASE-PROVISION] Error setting ${envVar.key}: ${err.message}`);
-    }
-  }
+export async function provisionSupabase(appSlug, description) {
+  const result = await createAppSupabaseProject(appSlug, description);
+  return {
+    schema: appSlug,
+    tables: result.tables,
+    sql: result.sql,
+    ref: result.ref,
+    url: result.url,
+    anonKey: result.anonKey,
+    serviceRoleKey: result.serviceRoleKey,
+  };
 }

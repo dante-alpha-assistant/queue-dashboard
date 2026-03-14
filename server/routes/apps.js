@@ -2,6 +2,7 @@ import { Router } from "express";
 import supabase from "../supabase.js";
 import { invalidateGithubRepoCache } from "./github.js";
 import { createVercelProject } from "../vercel.js";
+import { runE2ETests } from "../supabase-provision.js";
 
 export const appsRouter = Router();
 
@@ -730,5 +731,51 @@ appsRouter.post("/:id/chat", async (req, res) => {
   } catch (e) {
     console.error("App chat error:", e);
     res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/apps/:id/db-test — Run E2E tests against the app's Supabase project
+appsRouter.post("/:id/db-test", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { data: app, error } = await supabase
+      .from("apps")
+      .select("id, slug, supabase_project_ref, supabase_tables, credentials, supabase_db_status")
+      .eq("id", id)
+      .single();
+
+    if (error || !app) {
+      return res.status(404).json({ error: "App not found" });
+    }
+
+    const { supabase_project_ref, supabase_tables, credentials, supabase_db_status } = app;
+
+    if (!supabase_project_ref || !credentials?.supabase_url) {
+      return res.status(400).json({
+        error: "App has no Supabase project provisioned",
+        supabase_db_status: supabase_db_status || "none",
+      });
+    }
+
+    const tables = Array.isArray(supabase_tables) ? supabase_tables : [];
+    const results = await runE2ETests(
+      supabase_project_ref,
+      credentials.supabase_url,
+      credentials.supabase_anon_key,
+      credentials.supabase_service_role_key,
+      tables
+    );
+
+    res.json({
+      success: true,
+      project_ref: supabase_project_ref,
+      project_url: credentials.supabase_url,
+      tables_tested: tables,
+      results,
+    });
+  } catch (err) {
+    console.error("db-test error:", err);
+    res.status(500).json({ error: err.message });
   }
 });
