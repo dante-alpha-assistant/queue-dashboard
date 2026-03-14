@@ -119,22 +119,28 @@ appsRouter.post("/suggest-deploy", async (req, res) => {
 
     return repoList.map(repo => {
       const repoName = (repo.name || "").toLowerCase();
-      let deploy_target = "kubernetes";
-      let reasoning = "Default: kubernetes (safe default for unrecognized patterns)";
+      let deploy_target = "vercel";
+      let reasoning = "Default: vercel (user apps deploy to Vercel serverless by default)";
+
+      // Kubernetes ONLY when explicit infra signals detected
+      const isK8sWorker = /\b(worker|cron|websocket|queue|message queue|persistent storage|grpc|microservice)\b/.test(desc);
 
       // Check repo name suffix first (most reliable signal)
       if (/-(frontend|ui|web|client|app)$/.test(repoName)) {
         deploy_target = "vercel";
-        reasoning = `Repo name suffix suggests frontend: "${repo.name}"`;
-      } else if (/-(api|backend|server|worker|service)$/.test(repoName)) {
+        reasoning = `Repo name suffix suggests frontend: "${repo.name}" — ideal for Vercel`;
+      } else if (/-(worker|service)$/.test(repoName)) {
         deploy_target = "kubernetes";
-        reasoning = `Repo name suffix suggests backend: "${repo.name}"`;
-      } else if (isVercelDesc && !isK8sDesc) {
+        reasoning = `Repo name suffix suggests background worker/service: "${repo.name}" — needs Kubernetes`;
+      } else if (/-(api|backend|server)$/.test(repoName) && isK8sWorker) {
+        deploy_target = "kubernetes";
+        reasoning = `Backend repo with infrastructure signals (workers/queues/persistent storage) → Kubernetes`;
+      } else if (isVercelDesc || (!isK8sWorker)) {
         deploy_target = "vercel";
-        reasoning = "Description signals frontend framework (React/Next.js/Vue/etc.)";
-      } else if (isK8sDesc) {
+        reasoning = "Next.js / frontend app or no strong infra signals — ideal for Vercel deployment";
+      } else if (isK8sWorker) {
         deploy_target = "kubernetes";
-        reasoning = "Description signals backend/API/database workload";
+        reasoning = "Description signals background workers, queues, or persistent storage → Kubernetes";
       }
 
       return {
@@ -159,12 +165,17 @@ Decide the deploy target for each repo. Options:
 - kubernetes: for backends, APIs, workers, databases
 
 Rules:
-- If repo name ends with "-api", "-backend", "-worker", "-server" → kubernetes
-- If repo name ends with "-frontend", "-ui", "-web", "-client" → vercel
-- If description mentions React, Next.js, Vue, Angular, Svelte, static → vercel
-- If description mentions API, Express, FastAPI, Django, Rails, Go, database → kubernetes
-- If full-stack: frontend repos → vercel, backend repos → kubernetes
-- Default: kubernetes
+- DEFAULT is vercel — user apps go to Vercel unless there is a clear infrastructure signal
+- Kubernetes ONLY when the app explicitly needs: persistent storage, background workers, WebSocket servers, custom networking, or services that cannot run as serverless functions
+- If repo name ends with "-worker", "-service" → kubernetes (background processes)
+- If repo name ends with "-api", "-backend", "-server" AND description mentions workers/queues/persistent storage → kubernetes
+- If repo name ends with "-frontend", "-ui", "-web", "-client", "-app" → vercel
+- Next.js monorepo with API routes → ideal for Vercel deployment (API routes are serverless)
+- If description mentions React, Next.js, Vue, Angular, Svelte, static site, landing page → vercel
+- If description mentions cron jobs, message queues, WebSockets, persistent storage, background workers → kubernetes
+- Full-stack Next.js app → vercel (API routes run as serverless functions)
+- User apps go to Vercel. Infrastructure/agents go to Kubernetes.
+- Default: vercel
 
 For kubernetes: namespace = "apps", service_name = repo name
 For vercel: no namespace (null), service_name = repo name
