@@ -22,6 +22,15 @@ const STATUS_COLORS = {
   failed: "#BA1A1A",
 };
 
+const APP_STATUS_CONFIG = {
+  active:      { label: "Active",      color: "#1B5E20", bg: "#1B5E2014" },
+  building:    { label: "Building",    color: "#E8A317", bg: "#E8A31714" },
+  scaffolding: { label: "Scaffolding", color: "#7B5EA7", bg: "#7B5EA714" },
+  deploying:   { label: "Deploying",   color: "#E65100", bg: "#E6510014" },
+  failed:      { label: "Failed",      color: "#BA1A1A", bg: "#BA1A1A14" },
+  archived:    { label: "Archived",    color: "#79747E", bg: "#79747E14" },
+};
+
 function slugify(str) {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
@@ -313,10 +322,10 @@ function AppDetailView({ app, onBack, onSave, onArchive, onRestore }) {
               </h1>
               <span style={{
                 fontSize: 10, fontWeight: 600, padding: "3px 10px", borderRadius: 100,
-                background: isArchived ? "#BA1A1A14" : "#1B5E2014",
-                color: isArchived ? "#BA1A1A" : "#1B5E20",
+                background: (APP_STATUS_CONFIG[app.status] || APP_STATUS_CONFIG.active).bg,
+                color: (APP_STATUS_CONFIG[app.status] || APP_STATUS_CONFIG.active).color,
                 textTransform: "uppercase", letterSpacing: "0.04em",
-              }}>{app.status}</span>
+              }}>{(APP_STATUS_CONFIG[app.status] || { label: app.status }).label}</span>
               <span style={{
                 fontSize: 10, fontWeight: 600, padding: "3px 10px", borderRadius: 100,
                 background: dtCfg.bg, color: dtCfg.color,
@@ -627,6 +636,16 @@ function AppCard({ app, stats, onSelect, onEdit, onArchive }) {
               margin: 0, fontSize: 16, fontWeight: 700, color: "var(--md-on-surface)",
               whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
             }}>{app.name}</h3>
+            {app.status && app.status !== "active" && (() => {
+              const sc = APP_STATUS_CONFIG[app.status] || { label: app.status, color: "#79747E", bg: "#79747E14" };
+              return (
+                <span style={{
+                  fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 100,
+                  background: sc.bg, color: sc.color, textTransform: "uppercase",
+                  letterSpacing: "0.04em", flexShrink: 0,
+                }}>{sc.label}</span>
+              );
+            })()}
           </div>
           <span style={{
             fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 100,
@@ -747,16 +766,13 @@ export default function AppsPage() {
 
   const fetchApps = useCallback(async () => {
     try {
-      const [activeResp, archivedResp, statsResp] = await Promise.all([
-        fetch("/api/apps?status=active"),
-        fetch("/api/apps?status=archived"),
+      const [allResp, statsResp] = await Promise.all([
+        fetch("/api/apps?status=all"),
         fetch("/api/apps/stats/bulk"),
       ]);
-      const active = await activeResp.json();
-      const archived = await archivedResp.json();
+      const all = await allResp.json();
       const stats = await statsResp.json();
-      const all = [...(Array.isArray(active) ? active : []), ...(Array.isArray(archived) ? archived : [])];
-      setApps(all);
+      setApps(Array.isArray(all) ? all : []);
       setBulkStats(stats);
     } catch (e) {
       console.error("Failed to fetch apps:", e);
@@ -809,7 +825,9 @@ export default function AppsPage() {
   // Filtered apps
   const filteredApps = useMemo(() => {
     let result = apps;
-    if (statusFilter !== "all") result = result.filter(a => a.status === statusFilter);
+    if (statusFilter === "active") result = result.filter(a => a.status !== "archived");
+    else if (statusFilter === "archived") result = result.filter(a => a.status === "archived");
+    // "all" → no status filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(a =>
@@ -843,7 +861,7 @@ export default function AppsPage() {
     );
   }
 
-  const activeCount = apps.filter(a => a.status === "active").length;
+  const activeCount = apps.filter(a => a.status !== "archived").length;
   const archivedCount = apps.filter(a => a.status === "archived").length;
 
   return (
