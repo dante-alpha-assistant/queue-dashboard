@@ -142,7 +142,8 @@ function getStepHint(state) {
       if (!state.name.trim()) return "Enter an app name to continue";
       if (!state.slug.trim()) return "Slug is required";
       const descLen = (state.description || "").trim().length;
-      if (descLen > 0 && descLen < 50) return "Description must be at least 50 characters (or leave it empty)";
+      if (descLen === 0) return "App description is required for AI code generation (minimum 50 characters)";
+      if (descLen < 50) return "Description must be at least 50 characters for AI code generation";
       return null;
     }
     case 1:
