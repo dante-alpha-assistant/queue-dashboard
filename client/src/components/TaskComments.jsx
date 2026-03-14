@@ -236,6 +236,35 @@ export default function TaskComments({ taskId }) {
                     }}
                   >{renderBodyWithMentions(c.body)}</ReactMarkdown>
                 </div>
+                {c.attachments && c.attachments.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                    {c.attachments.map((att, i) => (
+                      <div key={i} style={{ position: 'relative' }}>
+                        <a href={att.url} target="_blank" rel="noopener noreferrer" title={att.label || att.type || 'Screenshot'}>
+                          <img
+                            src={att.url}
+                            alt={att.label || att.type || 'screenshot'}
+                            style={{
+                              maxWidth: 240,
+                              maxHeight: 160,
+                              objectFit: 'cover',
+                              borderRadius: 6,
+                              border: '1px solid var(--md-surface-variant, #E7E0EC)',
+                              cursor: 'zoom-in',
+                              display: 'block',
+                            }}
+                            onError={e => { e.target.style.display = 'none'; }}
+                          />
+                        </a>
+                        {att.label && (
+                          <div style={{ fontSize: 10, color: 'var(--md-outline, #79747E)', marginTop: 2, textAlign: 'center' }}>
+                            {att.label}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           );

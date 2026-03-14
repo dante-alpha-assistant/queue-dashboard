@@ -671,7 +671,7 @@ router.get("/tasks/:id/comments", async (req, res) => {
 
 router.post("/tasks/:id/comments", async (req, res) => {
   try {
-    const { body, author, author_type, mentions } = req.body;
+    const { body, author, author_type, mentions, attachments } = req.body;
     if (!body || !body.trim()) return res.status(400).json({ error: "body is required" });
     const insertPayload = {
       task_id: req.params.id,
@@ -682,6 +682,9 @@ router.post("/tasks/:id/comments", async (req, res) => {
     // Only include mentions if the array is non-empty (column may not exist yet)
     if (mentions && mentions.length > 0) {
       insertPayload.mentions = mentions;
+    }
+    if (attachments && attachments.length > 0) {
+      insertPayload.attachments = attachments;
     }
     const { data, error } = await supabase
       .from("task_comments")
@@ -706,7 +709,7 @@ router.post("/tasks/:id/comments", async (req, res) => {
 // Agent reply callback — agents post replies back to task comments
 router.post("/tasks/:id/comments/reply", async (req, res) => {
   try {
-    const { body, author, comment_id } = req.body;
+    const { body, author, comment_id, attachments } = req.body;
     if (!body || !body.trim()) return res.status(400).json({ error: "body is required" });
     if (!author) return res.status(400).json({ error: "author (agent id) is required" });
 
@@ -719,6 +722,9 @@ router.post("/tasks/:id/comments/reply", async (req, res) => {
     // Only include reply_to if provided (column may not exist yet)
     if (comment_id) {
       replyPayload.reply_to = comment_id;
+    }
+    if (attachments && attachments.length > 0) {
+      replyPayload.attachments = attachments;
     }
     const { data, error } = await supabase
       .from("task_comments")
