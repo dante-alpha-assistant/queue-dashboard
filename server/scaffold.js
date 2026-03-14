@@ -280,7 +280,39 @@ function createStepRunner(appId) {
 }
 
 /**
+ * Update a single build step's status in the apps.build_steps JSONB array.
+ * Step IDs must match AppBuildProgress.jsx STAGES ids.
+ * @param {string} appId
+ * @param {string} stepId - github_repo | scaffold | ai_codegen | vercel_setup | vercel_deploy | first_deploy | live
+ * @param {string} status - pending | in_progress | completed | failed
+ */
+async function updateStep(appId, stepId, status) {
+  try {
+    const { data: appRow } = await supabase.from("apps").select("build_steps").eq("id", appId).single();
+    const steps = Array.isArray(appRow?.build_steps) ? [...appRow.build_steps] : [];
+    const idx = steps.findIndex((s) => s.id === stepId);
+    const step = { id: stepId, status, updated_at: new Date().toISOString() };
+    if (idx >= 0) steps[idx] = step; else steps.push(step);
+    await supabase
+      .from("apps")
+      .update({ build_steps: steps, updated_at: new Date().toISOString() })
+      .eq("id", appId);
+    console.log(`[SCAFFOLD] Step "${stepId}" → ${status}`);
+  } catch (err) {
+    // Non-fatal: log but don't crash the pipeline
+    console.warn(`[SCAFFOLD] updateStep failed for "${stepId}": ${err.message}`);
+  }
+}
+
+/**
  * Main scaffold pipeline. Runs async after app record is created.
+ * Steps execute STRICTLY in order. Each step is tracked via build_steps on the app record
+ * so the UI (AppBuildProgress.jsx) can reflect actual progress in real time.
+ *
+ * Execution order:
+ *   app_created → github_repo → scaffold → vercel_setup → vercel_deploy →
+ *   ai_codegen → first_deploy → live
+ *
  * @param {object} app - The app record from Supabase (full row)
  */
 export async function runScaffoldPipeline(app) {
@@ -328,6 +360,13 @@ export async function runScaffoldPipeline(app) {
     let vercelUrl = null;
 
     if ((deploy_target === "vercel" || !deploy_target) && VERCEL_TOKEN) {
+      // Wait 3s for GitHub to fully initialize the repo (this IS the scaffold wait)
+      await new Promise((r) => setTimeout(r, 3000));
+      await updateStep(id, "scaffold", "completed");
+
+      // ── STEP: vercel_setup ───────────────────────────────────────────────────
+      await updateStep(id, "vercel_setup", "in_progress");
+
       console.log(`[SCAFFOLD] Creating Vercel project for "${slug}"`);
       try {
         // Wait 3s for GitHub to fully initialize the repo
@@ -413,6 +452,13 @@ export async function runScaffoldPipeline(app) {
           await steps.fail("setting_up_vercel", deployErr.message);
         }
 
+        // Update vercel_deploy step based on outcome
+        const deploySucceeded = vercelDeployStatus === "ready";
+        await updateStep(id, "vercel_deploy", deploySucceeded ? "completed" : "failed");
+        if (deploySucceeded) {
+          await updateStep(id, "first_deploy", "completed");
+        }
+
         // 5. Add custom subdomain: {slug}.dante.id → cname.vercel-dns.com
         let customDomain = null;
         try {
@@ -441,7 +487,6 @@ export async function runScaffoldPipeline(app) {
         }
 
         // Only set vercel_preview_url if the deployment actually succeeded
-        const deploySucceeded = vercelDeployStatus === "ready";
         await supabase
           .from("apps")
           .update({
@@ -459,13 +504,16 @@ export async function runScaffoldPipeline(app) {
             updated_at: new Date().toISOString(),
           })
           .eq("id", id);
+
+        // Mark app live if deployment succeeded
+        if (deploySucceeded) {
+          await updateStep(id, "live", "completed");
+        }
       } catch (vercelErr) {
         // Non-fatal: log warning, continue with task creation
         console.warn(`[SCAFFOLD] Vercel project creation failed (non-fatal): ${vercelErr.message}`);
         await emitStep(id, "vercel_setup", "failed", vercelErr.message);
       }
-    } else if (!VERCEL_TOKEN) {
-      console.warn("[SCAFFOLD] VERCEL_TOKEN not configured — skipping Vercel project creation");
     }
 
     // 6. Supabase auto-provisioning (if needs_database or detected from description)
@@ -538,7 +586,10 @@ export async function runScaffoldPipeline(app) {
       .update({ status: "building", updated_at: new Date().toISOString() })
       .eq("id", id);
 
-    // 7. AI customization pass — generate pages, API routes, components, navigation
+    // ── STEP: ai_codegen ───────────────────────────────────────────────────────
+    await updateStep(id, "ai_codegen", "in_progress");
+
+    // 9. AI customization pass — generate pages, API routes, components, navigation
     console.log(`[SCAFFOLD] Starting AI codegen pass for "${name}" (task=${task.id})`);
     await steps.start("ai_generating");
     try {

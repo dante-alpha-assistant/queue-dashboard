@@ -558,6 +558,23 @@ appsRouter.get("/:id/build-events", async (req, res) => {
     )
     .subscribe();
 
+  // Poll for app record changes every 3 seconds (build_steps, status, vercel_deploy_status)
+  // This lets the UI reflect scaffold pipeline progress in near-real-time.
+  let lastAppUpdatedAt = null;
+  const appPoll = setInterval(async () => {
+    try {
+      const { data: appRow } = await supabase
+        .from("apps")
+        .select("id, status, vercel_deploy_status, vercel_preview_url, vercel_project_id, build_steps, updated_at, slug, name, custom_domain")
+        .eq("id", appId)
+        .single();
+      if (appRow && appRow.updated_at !== lastAppUpdatedAt) {
+        lastAppUpdatedAt = appRow.updated_at;
+        send("app_update", appRow);
+      }
+    } catch {}
+  }, 3000);
+
   // Poll for new comments every 6 seconds (Realtime IN filter not reliable)
   let lastCommentAt = new Date().toISOString();
   const commentPoll = setInterval(async () => {
@@ -588,6 +605,7 @@ appsRouter.get("/:id/build-events", async (req, res) => {
   // Cleanup on client disconnect
   res.on("close", () => {
     clearInterval(keepAlive);
+    clearInterval(appPoll);
     clearInterval(commentPoll);
     supabase.removeChannel(channel);
     supabase.removeChannel(appChannel);
