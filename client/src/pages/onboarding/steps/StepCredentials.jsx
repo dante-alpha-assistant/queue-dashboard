@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 const inputStyle = {
   width: "100%", padding: "12px 16px", borderRadius: 12,
   border: "1px solid var(--md-surface-variant, #E7E0EC)",
@@ -20,6 +22,20 @@ const CREDENTIAL_OPTIONS = [
   { key: "VERCEL_TOKEN", label: "VERCEL_TOKEN" },
   { key: "KUBECONFIG", label: "KUBECONFIG" },
 ];
+
+/* ── Auto-selection helpers ───────────────────────────── */
+function getAutoReqCreds(deployTarget) {
+  switch (deployTarget) {
+    case "kubernetes":
+      return ["GH_TOKEN", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_MGMT_TOKEN", "KUBECONFIG"];
+    case "vercel":
+      return ["GH_TOKEN", "SUPABASE_SERVICE_ROLE_KEY", "VERCEL_TOKEN"];
+    default:
+      return ["GH_TOKEN", "SUPABASE_SERVICE_ROLE_KEY"];
+  }
+}
+
+const AUTO_QA_CREDS = ["GH_TOKEN", "SUPABASE_SERVICE_ROLE_KEY"];
 
 function CredentialList({ state, dispatch, field, inputField }) {
   return (
@@ -86,23 +102,48 @@ function CredentialList({ state, dispatch, field, inputField }) {
 }
 
 export default function StepCredentials({ state, dispatch }) {
+  const isScratch = state.repoSource === "scratch";
+
+  /* Auto-select credentials for scratch apps based on deploy target */
+  useEffect(() => {
+    if (!isScratch) return;
+    const autoCreds = getAutoReqCreds(state.deployTarget);
+    dispatch({ type: "SET_FIELD", field: "reqCredentials", value: autoCreds });
+    dispatch({ type: "SET_FIELD", field: "qaCredentials", value: AUTO_QA_CREDS });
+  }, [isScratch, state.deployTarget]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="step-fields-stagger" style={{ gap: 24 }}>
-      <div className="step-field" style={{ "--field-index": 0 }}>
+
+      {/* Green info banner — scratch mode only */}
+      {isScratch && (
+        <div className="step-field" style={{
+          "--field-index": 0,
+          padding: "14px 16px", borderRadius: 12,
+          background: "rgba(34,197,94,0.08)",
+          border: "1px solid rgba(34,197,94,0.3)",
+          color: "#166534", fontSize: 13, lineHeight: 1.6,
+          fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+        }}>
+          ✅ <strong>Internal platform credentials will be automatically provided</strong> to agents building your app. Selections below are pre-filled based on your deploy target — you can still customize as needed.
+        </div>
+      )}
+
+      <div className="step-field" style={{ "--field-index": isScratch ? 1 : 0 }}>
         <label style={labelStyle}>Required Credentials</label>
         <CredentialList state={state} dispatch={dispatch} field="reqCredentials" inputField="customCredential" />
       </div>
 
-      <div className="step-field" style={{ "--field-index": 1, height: 1, background: "var(--md-surface-variant, #E7E0EC)" }} />
+      <div className="step-field" style={{ "--field-index": isScratch ? 2 : 1, height: 1, background: "var(--md-surface-variant, #E7E0EC)" }} />
 
-      <div className="step-field" style={{ "--field-index": 2 }}>
+      <div className="step-field" style={{ "--field-index": isScratch ? 3 : 2 }}>
         <label style={labelStyle}>QA Credentials</label>
         <CredentialList state={state} dispatch={dispatch} field="qaCredentials" inputField="customQaCredential" />
       </div>
 
-      <div className="step-field" style={{ "--field-index": 3, height: 1, background: "var(--md-surface-variant, #E7E0EC)" }} />
+      <div className="step-field" style={{ "--field-index": isScratch ? 4 : 3, height: 1, background: "var(--md-surface-variant, #E7E0EC)" }} />
 
-      <div className="step-field" style={{ "--field-index": 4 }}>
+      <div className="step-field" style={{ "--field-index": isScratch ? 5 : 4 }}>
         <label style={labelStyle}>Supabase Project Ref (optional)</label>
         <input
           value={state.supabaseRef}
