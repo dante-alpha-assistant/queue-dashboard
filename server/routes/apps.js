@@ -246,7 +246,7 @@ appsRouter.get("/:id", async (req, res) => {
 // POST /api/apps — create app
 appsRouter.post("/", async (req, res) => {
   try {
-    const { name, slug, description, repos, repo_source, repo_architecture, supabase_project_ref, deploy_target, deploy_config, env_keys, icon, qa_env_keys, required_credentials, required_qa_credentials } = req.body;
+    const { name, slug, description, repos, repo_source, repo_architecture, supabase_project_ref, deploy_target, deploy_config, env_keys, icon, qa_env_keys, required_credentials, required_qa_credentials, needs_database } = req.body;
     if (!name) return res.status(400).json({ error: "name required" });
     if (!slug) return res.status(400).json({ error: "slug required" });
 
@@ -294,6 +294,7 @@ appsRouter.post("/", async (req, res) => {
         repos: reposArray,
         repos_config: reposConfig,
         supabase_project_ref: supabase_project_ref || null,
+        needs_database: needs_database === 'yes' || needs_database === true ? true : false,
         deploy_target: primaryDeployTarget,
         deploy_config: primaryDeployConfig,
         env_keys: env_keys || [],
@@ -605,6 +606,105 @@ appsRouter.get("/:id/tasks", async (req, res) => {
     if (error) throw error;
     res.json(data);
   } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/apps/:id/chat — list chat messages for an app
+appsRouter.get("/:id/chat", async (req, res) => {
+  try {
+    const appId = req.params.id;
+    const limit = parseInt(req.query.limit) || 50;
+
+    const { data, error } = await supabase
+      .from("app_chat_messages")
+      .select("*, agent_tasks(id, status, pull_request_url, title)")
+      .eq("app_id", appId)
+      .order("created_at", { ascending: true })
+      .limit(limit);
+
+    if (error) throw new Error(error.message);
+    res.json(data || []);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/apps/:id/chat — post a user message and create a coding task
+appsRouter.post("/:id/chat", async (req, res) => {
+  try {
+    const { message } = req.body;
+    if (!message?.trim()) return res.status(400).json({ error: "message required" });
+
+    const appId = req.params.id;
+
+    // Get the app
+    const { data: app, error: appError } = await supabase
+      .from("apps")
+      .select("*")
+      .eq("id", appId)
+      .single();
+    if (appError || !app) return res.status(404).json({ error: "App not found" });
+
+    // Save user message
+    const { data: userMsg, error: msgError } = await supabase
+      .from("app_chat_messages")
+      .insert({ app_id: appId, role: "user", content: message.trim() })
+      .select()
+      .single();
+    if (msgError) throw new Error(msgError.message);
+
+    // Build task description
+    const repoList = (app.repos || []).join(", ") || "No repos configured";
+    const taskTitle = `[App: ${app.name}] ${message.trim().slice(0, 80)}`;
+    const taskDescription = [
+      `Conversational change request for app "${app.name}" (slug: ${app.slug}).`,
+      ``,
+      `**User request:** ${message.trim()}`,
+      ``,
+      `**App repos:** ${repoList}`,
+      `**App ID:** ${appId}`,
+      `**Deploy target:** ${app.deploy_target || "none"}`,
+      ``,
+      `Make the requested change, create a PR, and update the task status when done.`,
+      `If the app has no repos configured, reply asking for clarification.`,
+    ].join("\n");
+
+    // Create coding task assigned to neo-worker
+    const { data: task, error: taskError } = await supabase
+      .from("agent_tasks")
+      .insert({
+        title: taskTitle,
+        description: taskDescription,
+        type: "coding",
+        priority: "normal",
+        status: "todo",
+        app_id: appId,
+        metadata: { source: "app_chat", chat_message_id: userMsg.id },
+      })
+      .select()
+      .single();
+    if (taskError) throw new Error(taskError.message);
+
+    // Link user message to task
+    await supabase
+      .from("app_chat_messages")
+      .update({ task_id: task.id })
+      .eq("id", userMsg.id);
+
+    // Save acknowledgment message
+    const shortId = task.id.slice(0, 8);
+    await supabase.from("app_chat_messages").insert({
+      app_id: appId,
+      role: "assistant",
+      content: `On it! I've created task \`${shortId}\` for: "${message.trim()}". An agent will pick this up shortly and make the change. You'll see the PR link here when it's ready.`,
+      task_id: task.id,
+      metadata: { task_id: task.id, ack: true },
+    });
+
+    res.json({ ok: true, task_id: task.id, message_id: userMsg.id });
+  } catch (e) {
+    console.error("App chat error:", e);
     res.status(500).json({ error: e.message });
   }
 });
