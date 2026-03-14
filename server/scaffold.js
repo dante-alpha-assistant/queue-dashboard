@@ -247,46 +247,52 @@ export async function runScaffoldPipeline(app) {
           })
           .eq("id", id);
 
-        try {
-          if (!githubRepoId) {
-            throw new Error("GitHub repo ID not available — cannot trigger Vercel deployment");
-          }
+        if (!githubRepoId) {
+          throw new Error("GitHub repo ID not available — cannot trigger Vercel deployment");
+        }
 
-          console.log(`[SCAFFOLD] Triggering initial Vercel deployment for project ${vercelProjectId} (repoId=${githubRepoId})`);
-          const deployResult = await triggerVercelDeployment({
-            projectId: vercelProjectId,
-            projectName: slug,
-            repoId: githubRepoId,
-            vercelToken: VERCEL_TOKEN,
-            ref: "main",
-          });
+        console.log(`[SCAFFOLD] Triggering initial Vercel deployment for project ${vercelProjectId} (repoId=${githubRepoId})`);
+        const deployResult = await triggerVercelDeployment({
+          projectId: vercelProjectId,
+          projectName: slug,
+          repoId: githubRepoId,
+          vercelToken: VERCEL_TOKEN,
+          ref: "main",
+        });
 
-          vercelDeployId = deployResult.id;
-          console.log(`[SCAFFOLD] Deployment triggered: ${vercelDeployId} — waiting for READY state...`);
+        vercelDeployId = deployResult.id;
+        console.log(`[SCAFFOLD] Deployment triggered: ${vercelDeployId} — waiting for READY state...`);
 
-          // Poll until deployment completes (max 5 min)
-          const deployStatus = await waitForDeployment({
-            deploymentId: vercelDeployId,
-            vercelToken: VERCEL_TOKEN,
-            timeoutMs: 300000,
-            pollIntervalMs: 5000,
-          });
+        // Poll until deployment completes (max 5 min)
+        const deployStatus = await waitForDeployment({
+          deploymentId: vercelDeployId,
+          vercelToken: VERCEL_TOKEN,
+          timeoutMs: 300000,
+          pollIntervalMs: 5000,
+        });
 
-          vercelDeployStatus = deployStatus.readyState.toLowerCase(); // "ready" | "error" | "canceled"
-          vercelDeployedUrl = deployStatus.readyState === "READY"
-            ? `https://${deployStatus.url}`
-            : null;
+        vercelDeployStatus = deployStatus.readyState.toLowerCase(); // "ready" | "error" | "canceled"
+        vercelDeployedUrl = deployStatus.readyState === "READY"
+          ? `https://${deployStatus.url}`
+          : null;
 
-          if (deployStatus.readyState === "READY") {
-            vercelUrl = vercelDeployedUrl || vercelUrl;
-            console.log(`[SCAFFOLD] Deployment READY: ${vercelUrl}`);
-          } else {
-            console.warn(`[SCAFFOLD] Deployment ended with state ${deployStatus.readyState} — will not set live URL`);
-          }
-        } catch (deployErr) {
-          // Non-fatal: log warning, deployment failed but pipeline continues
-          console.warn(`[SCAFFOLD] Initial Vercel deployment failed (non-fatal): ${deployErr.message}`);
-          vercelDeployStatus = "error";
+        if (deployStatus.readyState === "READY") {
+          vercelUrl = vercelDeployedUrl || vercelUrl;
+          console.log(`[SCAFFOLD] Deployment READY: ${vercelUrl}`);
+        } else {
+          // Deployment ended in a non-ready state — persist status and halt pipeline
+          const deployErrMsg = `Vercel deployment ended with state ${deployStatus.readyState}`;
+          console.error(`[SCAFFOLD] ${deployErrMsg}`);
+          await supabase
+            .from("apps")
+            .update({
+              vercel_project_id: vercelProjectId,
+              vercel_deploy_id: vercelDeployId,
+              vercel_deploy_status: vercelDeployStatus,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", id);
+          throw new Error(deployErrMsg);
         }
 
         // 5. Add custom subdomain: {slug}.dante.id → cname.vercel-dns.com
@@ -328,8 +334,18 @@ export async function runScaffoldPipeline(app) {
           })
           .eq("id", id);
       } catch (vercelErr) {
-        // Non-fatal: log warning, continue with task creation
-        console.warn(`[SCAFFOLD] Vercel project creation failed (non-fatal): ${vercelErr.message}`);
+        // Fatal: Vercel setup/deployment failed — halt the pipeline
+        // Update app status to failed before re-throwing
+        console.error(`[SCAFFOLD] Vercel pipeline step failed: ${vercelErr.message}`);
+        await supabase
+          .from("apps")
+          .update({
+            vercel_deploy_status: "error",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", id)
+          .catch(() => {});
+        throw vercelErr;
       }
     } else if (!VERCEL_TOKEN) {
       console.warn("[SCAFFOLD] VERCEL_TOKEN not configured — skipping Vercel project creation");
