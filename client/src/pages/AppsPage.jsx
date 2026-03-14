@@ -218,7 +218,7 @@ function AppFormModal({ app, onSave, onClose }) {
 }
 
 /* ── App Detail View ──────────────────────────────────────── */
-function AppDetailView({ app, onBack, onSave, onArchive, onRestore }) {
+export function AppDetailView({ app, onBack, onSave, onArchive, onRestore }) {
   const [editing, setEditing] = useState(false);
   const [tasks, setTasks] = useState([]);
   const [stats, setStats] = useState(null);
@@ -943,7 +943,7 @@ export default function AppsPage() {
             key={app.id}
             app={app}
             stats={bulkStats[app.id]}
-            onSelect={setSelectedApp}
+            onSelect={(app) => navigate(`/apps/${app.id}`)}
             onEdit={(a) => setFormApp(a)}
             onArchive={handleArchive}
           />

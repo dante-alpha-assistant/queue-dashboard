@@ -16,6 +16,7 @@ import HealthDashboard from "./pages/HealthDashboard";
 import AppsPage from "./pages/AppsPage";
 import AppOnboardingWizard from "./pages/onboarding/AppOnboardingWizard";
 import AppBuildProgress from "./pages/AppBuildProgress";
+import AppDetailPage from "./pages/AppDetailPage";
 import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
 import AppFilter from "./components/AppFilter";
 import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Package, Plus, Rocket, Search, XCircle, Zap } from 'lucide-react';
@@ -50,6 +51,7 @@ function AppRouter() {
     <Routes>
       <Route path="/apps/new" element={<AppOnboardingWizard />} />
       <Route path="/apps/:id/building" element={<AppBuildProgress />} />
+      <Route path="/apps/:id" element={<AppDetailPage />} />
       <Route path="*" element={<AppMain />} />
     </Routes>
   );
