@@ -93,10 +93,24 @@ function AISuggestionCard({ suggestion }) {
           </>
         )}
         {isVercel && (
-          <div style={{ display: "flex", gap: 8, fontSize: 12, color: "var(--md-on-surface-variant, #49454F)" }}>
-            <span style={{ fontWeight: 600, minWidth: 80 }}>URL:</span>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{suggestion.service_name}.vercel.app</span>
-          </div>
+          <>
+            <div style={{ display: "flex", gap: 8, fontSize: 12, color: "var(--md-on-surface-variant, #49454F)" }}>
+              <span style={{ fontWeight: 600, minWidth: 100 }}>Framework:</span>
+              <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>Next.js</span>
+            </div>
+            <div style={{ display: "flex", gap: 8, fontSize: 12, color: "var(--md-on-surface-variant, #49454F)" }}>
+              <span style={{ fontWeight: 600, minWidth: 100 }}>Build:</span>
+              <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>next build</span>
+            </div>
+            <div style={{ display: "flex", gap: 8, fontSize: 12, color: "var(--md-on-surface-variant, #49454F)" }}>
+              <span style={{ fontWeight: 600, minWidth: 100 }}>Root Dir:</span>
+              <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{suggestion.root_dir || "/"}</span>
+            </div>
+            <div style={{ display: "flex", gap: 8, fontSize: 12, color: "var(--md-on-surface-variant, #49454F)" }}>
+              <span style={{ fontWeight: 600, minWidth: 100 }}>Domain:</span>
+              <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{suggestion.service_name}.vercel.app</span>
+            </div>
+          </>
         )}
       </div>
 
@@ -258,7 +272,7 @@ export default function StepDeployTargets({ state, dispatch }) {
           // Also set the primary deployTarget from first repo for backward compat
           const primary = data.repos[0];
           if (primary) {
-            dispatch({ type: "SET_FIELD", field: "deployTarget", value: primary.deploy_target || "kubernetes" });
+            dispatch({ type: "SET_FIELD", field: "deployTarget", value: primary.deploy_target || "vercel" });
             if (primary.deploy_target === "kubernetes") {
               dispatch({ type: "SET_FIELD", field: "k8sNamespace", value: primary.namespace || "apps" });
               dispatch({ type: "SET_FIELD", field: "k8sService", value: primary.service_name || "" });
