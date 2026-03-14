@@ -1409,7 +1409,20 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
                   <span><Package size={14} /></span> {task.repository_url.replace(/https:\/\/github\.com\//, '')}
                 </a>
               )}
-              {!task.pull_request_url?.length && !task.repository_url && (
+              {/* Show artifact URLs from result (repos, deployments, etc.) */}
+              {task.result?.artifacts?.length > 0 && task.result.artifacts.map((artifact, i) => {
+                const url = typeof artifact === 'string' ? artifact : artifact?.url;
+                const type = typeof artifact === 'string' ? 'link' : (artifact?.type || 'link');
+                if (!url) return null;
+                const icon = type === 'github_repo' || type === 'repo' ? '📦' : type === 'deployment' ? '🚀' : '🔗';
+                const label = url.replace(/https:\/\/github\.com\//, '');
+                return (
+                  <a key={`artifact-${i}`} href={url} target="_blank" rel="noopener noreferrer" style={{ color: "#386A20", textDecoration: "none", fontWeight: 500, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+                    <span>{icon}</span> {label}
+                  </a>
+                );
+              })}
+              {!task.pull_request_url?.length && !task.repository_url && !task.result?.artifacts?.length && (
                 <span style={{ color: 'var(--md-outline, #79747E)', fontSize: 13, fontStyle: 'italic' }}>No links</span>
               )}
 
