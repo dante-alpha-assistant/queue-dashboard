@@ -103,6 +103,115 @@ appsRouter.post("/propose-architecture", (req, res) => {
   res.json(result);
 });
 
+// POST /api/apps/suggest-deploy — AI-driven deploy target suggestion (MUST be before /:id)
+appsRouter.post("/suggest-deploy", async (req, res) => {
+  const { name, description, repos } = req.body || {};
+  const repoList = Array.isArray(repos) ? repos : [];
+
+  const NEO_GATEWAY = process.env.NEO_GATEWAY_URL || "http://neo.agents.svc.cluster.local:18789";
+  const NEO_TOKEN = process.env.NEO_GATEWAY_TOKEN || "neo-gw-tok-2026";
+
+  // Keyword-based fallback rules engine
+  function fallbackSuggest(repoList, description) {
+    const desc = (description || "").toLowerCase();
+    const isVercelDesc = /\b(react|next\.?js|nextjs|vue|angular|svelte|static site|landing page|frontend|ui|dashboard)\b/.test(desc);
+    const isK8sDesc = /\b(api|express|fastapi|django|rails|flask|go|golang|database|backend|worker|ml|machine learning|microservice|grpc|graphql|server)\b/.test(desc);
+
+    return repoList.map(repo => {
+      const repoName = (repo.name || "").toLowerCase();
+      let deploy_target = "kubernetes";
+      let reasoning = "Default: kubernetes (safe default for unrecognized patterns)";
+
+      // Check repo name suffix first (most reliable signal)
+      if (/-(frontend|ui|web|client|app)$/.test(repoName)) {
+        deploy_target = "vercel";
+        reasoning = `Repo name suffix suggests frontend: "${repo.name}"`;
+      } else if (/-(api|backend|server|worker|service)$/.test(repoName)) {
+        deploy_target = "kubernetes";
+        reasoning = `Repo name suffix suggests backend: "${repo.name}"`;
+      } else if (isVercelDesc && !isK8sDesc) {
+        deploy_target = "vercel";
+        reasoning = "Description signals frontend framework (React/Next.js/Vue/etc.)";
+      } else if (isK8sDesc) {
+        deploy_target = "kubernetes";
+        reasoning = "Description signals backend/API/database workload";
+      }
+
+      return {
+        name: repo.name,
+        deploy_target,
+        namespace: deploy_target === "kubernetes" ? "apps" : null,
+        service_name: repo.name,
+        reasoning,
+      };
+    });
+  }
+
+  // Try LLM first
+  try {
+    const userPrompt = `Given this app:
+Name: ${name || ""}
+Description: ${description || ""}
+Repos: ${JSON.stringify(repoList)}
+
+Decide the deploy target for each repo. Options:
+- vercel: for frontends, static sites, Next.js apps
+- kubernetes: for backends, APIs, workers, databases
+
+Rules:
+- If repo name ends with "-api", "-backend", "-worker", "-server" → kubernetes
+- If repo name ends with "-frontend", "-ui", "-web", "-client" → vercel
+- If description mentions React, Next.js, Vue, Angular, Svelte, static → vercel
+- If description mentions API, Express, FastAPI, Django, Rails, Go, database → kubernetes
+- If full-stack: frontend repos → vercel, backend repos → kubernetes
+- Default: kubernetes
+
+For kubernetes: namespace = "apps", service_name = repo name
+For vercel: no namespace (null), service_name = repo name
+
+Return ONLY valid JSON, no explanation:
+{ "repos": [{ "name": "repo-name", "deploy_target": "vercel|kubernetes", "namespace": "apps or null", "service_name": "name", "reasoning": "short explanation" }] }`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    const llmResp = await fetch(`${NEO_GATEWAY}/v1/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${NEO_TOKEN}`,
+        "Content-Type": "application/json",
+        "x-openclaw-agent-id": "main",
+      },
+      body: JSON.stringify({
+        model: "openclaw:main",
+        messages: [
+          { role: "system", content: "You are an expert DevOps engineer. Analyze app descriptions and decide deploy targets. Always respond with valid JSON only, no explanation, no markdown." },
+          { role: "user", content: userPrompt },
+        ],
+        stream: false,
+      }),
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeout));
+
+    if (llmResp.ok) {
+      const llmData = await llmResp.json();
+      const content = llmData?.choices?.[0]?.message?.content || "";
+      // Strip possible markdown code blocks
+      const cleaned = content.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "").trim();
+      const parsed = JSON.parse(cleaned);
+      if (parsed && Array.isArray(parsed.repos)) {
+        return res.json({ repos: parsed.repos, source: "llm" });
+      }
+    }
+  } catch (e) {
+    console.warn("[suggest-deploy] LLM call failed, using fallback:", e.message);
+  }
+
+  // Fallback: keyword rules engine
+  const fallbackResult = fallbackSuggest(repoList, description);
+  res.json({ repos: fallbackResult, source: "fallback" });
+});
+
 // GET /api/apps/:id — get single app by id or slug
 appsRouter.get("/:id", async (req, res) => {
   try {
