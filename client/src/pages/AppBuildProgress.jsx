@@ -55,12 +55,24 @@ const STAGES = [
 function getStageStatus(stage, tasks, app) {
   if (stage.id === "app_created") return "completed";
 
-  // Vercel initial deployment tracking
+  // Check build_steps from app record (authoritative for scaffold pipeline steps)
+  // build_steps is written by scaffold.js as each step runs
+  const buildSteps = Array.isArray(app?.build_steps) ? app.build_steps : [];
+  const buildStep = buildSteps.find((s) => s.id === stage.id);
+  if (buildStep) {
+    if (buildStep.status === "done") return "completed";
+    if (buildStep.status === "in_progress") return "in_progress";
+    if (buildStep.status === "failed") return "failed";
+  }
+
+  // Special: vercel_deploy — check app.vercel_deploy_status
+  // NOTE: do NOT use app.status === "deploying" here — it caused premature in_progress display
+  // when earlier steps (github_repo, scaffold, vercel_setup) were still pending.
   if (stage.id === "vercel_deploy") {
     const ds = app?.vercel_deploy_status;
     if (ds === "ready") return "completed";
     if (ds === "error" || ds === "canceled") return "failed";
-    if (ds === "deploying" || app?.status === "deploying") return "in_progress";
+    if (ds === "deploying") return "in_progress";
     return "pending";
   }
 
@@ -73,6 +85,7 @@ function getStageStatus(stage, tasks, app) {
     return "pending";
   }
 
+  // Fallback: match by agent_tasks title (for legacy apps without build_steps)
   const matching = tasks.filter(
     (t) => stage.match && stage.match.test(t.title || "")
   );
@@ -320,6 +333,15 @@ export default function AppBuildProgress() {
         if (["deployed", "completed"].includes(task.status)) {
           fetchApp();
         }
+      } catch {}
+    });
+
+    // app_update: app record changed (build_steps, vercel_deploy_status, status, etc.)
+    es.addEventListener("app_update", (e) => {
+      try {
+        const updatedApp = JSON.parse(e.data);
+        setApp(updatedApp);
+        setLoading(false);
       } catch {}
     });
 

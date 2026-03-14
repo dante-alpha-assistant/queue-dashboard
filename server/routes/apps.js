@@ -535,6 +535,18 @@ appsRouter.get("/:id/build-events", async (req, res) => {
     )
     .subscribe();
 
+  // Realtime channel for app record updates (tracks build_steps, status, vercel_deploy_status)
+  const appChannelName = `app-record-${appId}-${Date.now()}`;
+  const appChannel = supabase.channel(appChannelName)
+    .on(
+      "postgres_changes",
+      { event: "UPDATE", schema: "public", table: "apps", filter: `id=eq.${appId}` },
+      (payload) => {
+        if (payload.new) send("app_update", payload.new);
+      }
+    )
+    .subscribe();
+
   // Poll for new comments every 6 seconds (Realtime IN filter not reliable)
   let lastCommentAt = new Date().toISOString();
   const commentPoll = setInterval(async () => {
@@ -567,6 +579,7 @@ appsRouter.get("/:id/build-events", async (req, res) => {
     clearInterval(keepAlive);
     clearInterval(commentPoll);
     supabase.removeChannel(channel);
+    supabase.removeChannel(appChannel);
   });
 });
 
