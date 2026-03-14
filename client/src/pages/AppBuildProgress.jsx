@@ -111,10 +111,10 @@ function StageRow({ stage, tasks, app, comments }) {
       : [];
 
   const statusColor = {
-    pending: "#6b7280",
-    in_progress: "#60a5fa",
-    completed: "#34d399",
-    failed: "#f87171",
+    pending: "#79747E",
+    in_progress: "#6750A4",
+    completed: "#1B5E20",
+    failed: "#BA1A1A",
   }[status];
 
   const statusIcon = {
@@ -131,8 +131,8 @@ function StageRow({ stage, tasks, app, comments }) {
         alignItems: "flex-start",
         gap: "16px",
         padding: "16px 0",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
-        opacity: status === "pending" ? 0.5 : 1,
+        borderBottom: "1px solid var(--md-outline-variant, #E7E0EC)",
+        opacity: status === "pending" ? 0.55 : 1,
         transition: "opacity 0.3s ease",
       }}
     >
@@ -154,7 +154,7 @@ function StageRow({ stage, tasks, app, comments }) {
               ? "buildPulse 1.5s ease-in-out infinite"
               : "none",
           background:
-            status === "completed" ? `${statusColor}22` : "transparent",
+            status === "completed" ? `${statusColor}18` : "transparent",
         }}
       >
         {statusIcon}
@@ -171,7 +171,10 @@ function StageRow({ stage, tasks, app, comments }) {
           <span style={{ fontSize: "18px" }}>{stage.icon}</span>
           <span
             style={{
-              color: status === "pending" ? "#9ca3af" : "#f3f4f6",
+              color:
+                status === "pending"
+                  ? "var(--md-on-surface-variant, #49454F)"
+                  : "var(--md-on-surface, #1C1B1F)",
               fontWeight: status === "completed" ? "600" : "400",
               fontSize: "16px",
             }}
@@ -182,8 +185,8 @@ function StageRow({ stage, tasks, app, comments }) {
             <span
               style={{
                 fontSize: "12px",
-                color: "#60a5fa",
-                background: "rgba(96, 165, 250, 0.15)",
+                color: "#6750A4",
+                background: "rgba(103, 80, 164, 0.12)",
                 padding: "2px 8px",
                 borderRadius: "12px",
                 animation: "buildBlink 1s ease-in-out infinite",
@@ -200,7 +203,7 @@ function StageRow({ stage, tasks, app, comments }) {
                 key={t.id}
                 style={{
                   fontSize: "12px",
-                  color: "#6b7280",
+                  color: "var(--md-on-surface-variant, #49454F)",
                   marginTop: "2px",
                 }}
               >
@@ -215,9 +218,9 @@ function StageRow({ stage, tasks, app, comments }) {
             style={{
               marginTop: "8px",
               padding: "8px 10px",
-              background: "rgba(96, 165, 250, 0.06)",
+              background: "var(--md-surface-container, #F5F0FB)",
               borderRadius: "6px",
-              borderLeft: "2px solid rgba(96, 165, 250, 0.3)",
+              borderLeft: "2px solid var(--md-primary, #6750A4)",
             }}
           >
             {stageComments.map((c, i) => (
@@ -225,10 +228,16 @@ function StageRow({ stage, tasks, app, comments }) {
                 key={c.id || i}
                 style={{
                   fontSize: "11px",
-                  color: i === stageComments.length - 1 ? "#93c5fd" : "#4b5563",
+                  color:
+                    i === stageComments.length - 1
+                      ? "#6750A4"
+                      : "var(--md-on-surface-variant, #49454F)",
                   fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
                   marginBottom: i < stageComments.length - 1 ? "3px" : 0,
-                  animation: i === stageComments.length - 1 ? "buildBlink 1.5s ease-in-out infinite" : "none",
+                  animation:
+                    i === stageComments.length - 1
+                      ? "buildBlink 1.5s ease-in-out infinite"
+                      : "none",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
@@ -243,14 +252,14 @@ function StageRow({ stage, tasks, app, comments }) {
       <div
         style={{
           color: statusColor,
-          fontSize: "14px",
-          fontWeight: "500",
+          fontSize: "13px",
+          fontWeight: "600",
           flexShrink: 0,
           paddingTop: "2px",
         }}
       >
         {status === "completed" && "Done"}
-        {status === "in_progress" && "Running..."}
+        {status === "in_progress" && "Running…"}
         {status === "failed" && "Failed"}
       </div>
     </div>
@@ -379,15 +388,15 @@ export default function AppBuildProgress() {
       <div
         style={{
           minHeight: "100vh",
-          background: "#0f0f1a",
+          background: "var(--md-surface, #FFFBFE)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "#9ca3af",
+          color: "var(--md-on-surface-variant, #49454F)",
           fontFamily: "'Inter', 'Segoe UI', sans-serif",
         }}
       >
-        Loading...
+        Loading…
       </div>
     );
   }
@@ -397,18 +406,18 @@ export default function AppBuildProgress() {
       <div
         style={{
           minHeight: "100vh",
-          background: "#0f0f1a",
+          background: "var(--md-surface, #FFFBFE)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           flexDirection: "column",
           gap: "16px",
-          color: "#f87171",
+          color: "#BA1A1A",
           fontFamily: "'Inter', 'Segoe UI', sans-serif",
         }}
       >
         <div style={{ fontSize: "24px" }}>⚠️ {error}</div>
-        <Link to="/" style={{ color: "#60a5fa" }}>
+        <Link to="/" style={{ color: "var(--md-primary, #6750A4)" }}>
           ← Back to task board
         </Link>
       </div>
@@ -422,8 +431,8 @@ export default function AppBuildProgress() {
     <div
       style={{
         minHeight: "100vh",
-        background: "#0f0f1a",
-        color: "#f3f4f6",
+        background: "var(--md-surface, #FFFBFE)",
+        color: "var(--md-on-surface, #1C1B1F)",
         fontFamily: "'Inter', 'Segoe UI', sans-serif",
         padding: "40px 20px",
       }}
@@ -449,13 +458,14 @@ export default function AppBuildProgress() {
           <div
             style={{
               fontSize: "12px",
-              color: "#6b7280",
+              color: "var(--md-on-surface-variant, #49454F)",
               marginBottom: "8px",
               letterSpacing: "0.1em",
               textTransform: "uppercase",
               display: "flex",
               alignItems: "center",
               gap: "8px",
+              fontWeight: "500",
             }}
           >
             App Factory
@@ -466,12 +476,17 @@ export default function AppBuildProgress() {
                   width: "6px",
                   height: "6px",
                   borderRadius: "50%",
-                  background: sseConnected ? "#34d399" : "#f59e0b",
+                  background: sseConnected ? "#1B5E20" : "#E65100",
                   display: "inline-block",
                   animation: "liveDot 1.5s ease-in-out infinite",
                 }}
               />
-              <span style={{ fontSize: "11px", color: sseConnected ? "#34d399" : "#f59e0b" }}>
+              <span
+                style={{
+                  fontSize: "11px",
+                  color: sseConnected ? "#1B5E20" : "#E65100",
+                }}
+              >
                 {sseConnected ? "Live" : "Connecting…"}
               </span>
             </span>
@@ -481,16 +496,17 @@ export default function AppBuildProgress() {
               fontSize: "28px",
               fontWeight: "700",
               margin: "0 0 8px",
+              color: "var(--md-on-surface, #1C1B1F)",
             }}
           >
             {liveStatus === "completed"
               ? `🎉 ${appName} is live!`
-              : `Building ${appName}...`}
+              : `Building ${appName}…`}
           </h1>
           {liveStatus !== "completed" && (
             <p
               style={{
-                color: "#9ca3af",
+                color: "var(--md-on-surface-variant, #49454F)",
                 margin: 0,
                 fontSize: "14px",
               }}
@@ -503,7 +519,7 @@ export default function AppBuildProgress() {
         {/* Progress bar */}
         <div
           style={{
-            background: "rgba(255,255,255,0.08)",
+            background: "var(--md-surface-variant, #E7E0EC)",
             borderRadius: "8px",
             height: "8px",
             marginBottom: "32px",
@@ -516,8 +532,8 @@ export default function AppBuildProgress() {
               width: `${progressPct}%`,
               background:
                 liveStatus === "completed"
-                  ? "linear-gradient(90deg, #34d399, #10b981)"
-                  : "linear-gradient(90deg, #60a5fa, #818cf8)",
+                  ? "linear-gradient(90deg, #2E7D32, #1B5E20)"
+                  : "linear-gradient(90deg, #6750A4, #9C4AE2)",
               borderRadius: "8px",
               transition: "width 0.6s ease",
             }}
@@ -527,8 +543,8 @@ export default function AppBuildProgress() {
         {/* Stages list */}
         <div
           style={{
-            background: "rgba(255,255,255,0.03)",
-            border: "1px solid rgba(255,255,255,0.08)",
+            background: "#FFFFFF",
+            border: "1px solid var(--md-outline-variant, #CAC4D0)",
             borderRadius: "12px",
             padding: "8px 24px",
             marginBottom: "24px",
@@ -585,9 +601,8 @@ export default function AppBuildProgress() {
         {liveStatus === "completed" && (
           <div
             style={{
-              background:
-                "linear-gradient(135deg, rgba(52, 211, 153, 0.15), rgba(16, 185, 129, 0.1))",
-              border: "1px solid rgba(52, 211, 153, 0.3)",
+              background: "rgba(27, 94, 32, 0.08)",
+              border: "1px solid rgba(27, 94, 32, 0.3)",
               borderRadius: "12px",
               padding: "24px",
               textAlign: "center",
@@ -599,7 +614,7 @@ export default function AppBuildProgress() {
               style={{
                 margin: "0 0 8px",
                 fontSize: "22px",
-                color: "#34d399",
+                color: "#1B5E20",
                 fontWeight: "700",
               }}
             >
@@ -609,7 +624,7 @@ export default function AppBuildProgress() {
               <>
                 <p
                   style={{
-                    color: "#9ca3af",
+                    color: "var(--md-on-surface-variant, #49454F)",
                     margin: "0 0 16px",
                     fontSize: "14px",
                   }}
@@ -626,8 +641,8 @@ export default function AppBuildProgress() {
                   rel="noopener noreferrer"
                   style={{
                     display: "inline-block",
-                    background: "#34d399",
-                    color: "#0f0f1a",
+                    background: "var(--md-primary, #6750A4)",
+                    color: "#FFFFFF",
                     padding: "12px 28px",
                     borderRadius: "8px",
                     fontWeight: "700",
@@ -647,12 +662,12 @@ export default function AppBuildProgress() {
           <div
             style={{
               textAlign: "center",
-              color: "#6b7280",
+              color: "var(--md-on-surface-variant, #49454F)",
               fontSize: "13px",
               marginBottom: "16px",
             }}
           >
-            Redirecting to dashboard in {countdown}s...{" "}
+            Redirecting to dashboard in {countdown}s…{" "}
             <button
               onClick={() => {
                 clearTimeout(countdownRef.current);
@@ -661,7 +676,7 @@ export default function AppBuildProgress() {
               style={{
                 background: "none",
                 border: "none",
-                color: "#60a5fa",
+                color: "var(--md-primary, #6750A4)",
                 cursor: "pointer",
                 fontSize: "13px",
                 padding: 0,
@@ -677,7 +692,7 @@ export default function AppBuildProgress() {
           <Link
             to="/"
             style={{
-              color: "#6b7280",
+              color: "var(--md-primary, #6750A4)",
               fontSize: "13px",
               textDecoration: "none",
             }}
