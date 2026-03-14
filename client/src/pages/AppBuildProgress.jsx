@@ -1,83 +1,97 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 
-// Step definitions — id matches build_steps state machine step IDs
+// Stages ordered to match the actual pipeline execution sequence in scaffold.js:
+//   app_created → github_repo → vercel_setup → vercel_deploy → first_deploy → scaffold → ai_codegen → live
+//
+// IMPORTANT: order matters — sequential halt logic (getSequentialStatuses) relies on it.
+// If a stage fails, all subsequent stages are forced to "pending" so we never show
+// contradictory states like "Failed + Running simultaneously".
 const STAGES = [
   {
     id: "app_created",
-    stepId: "app_created",
     label: "App Created",
     icon: "🎉",
+    match: null, // always completed immediately
   },
   {
     id: "github_repo",
-    stepId: "creating_repo",
     label: "Creating GitHub Repo",
     icon: "🐙",
-    match: /github|repo/i,
-  },
-  {
-    id: "scaffold",
-    stepId: "scaffolding",
-    label: "Scaffolding Template",
-    icon: "🏗️",
-    match: /scaffold|template|next\.?js|boilerplate/i,
+    match: null, // derived from app.repo_url
   },
   {
     id: "vercel_setup",
-    stepId: "setting_up_vercel",
     label: "Setting Up Vercel",
     icon: "▲",
-    match: /vercel|project.+creat/i,
+    match: null, // derived from app.vercel_project_id
   },
   {
     id: "vercel_deploy",
-    stepId: "deploying",
     label: "Deploying to Vercel",
     icon: "🚀",
+    match: null, // derived from app.vercel_deploy_status
   },
   {
     id: "first_deploy",
-    stepId: "first_deployment",
     label: "First Deployment",
     icon: "⚙️",
-    match: /deploy|build/i,
+    match: null, // derived from vercel_deploy_status = "ready"
+  },
+  {
+    id: "scaffold",
+    label: "Scaffolding Template",
+    icon: "🏗️",
+    match: /scaffold|template|boilerplate/i,
   },
   {
     id: "ai_codegen",
-    stepId: "ai_generating",
     label: "AI Generating Code",
     icon: "🤖",
-    match: /generat|codegen|ai.+code|pages|api.+route/i,
+    match: /generat|codegen|ai.+code|build.+initial|initial.+version/i,
   },
   {
     id: "live",
-    stepId: "live",
     label: "Live!",
     icon: "🌐",
+    match: null, // derived from app.vercel_preview_url or deployed tasks
   },
 ];
 
 /**
- * Get stage status from build_steps state machine (primary).
- * Falls back to task-inference logic for legacy apps without build_steps.
+ * Compute the raw status for a single stage (no halt applied).
+ * Halt logic is applied separately in getSequentialStatuses.
  */
-function getStageStatus(stage, buildSteps, tasks, app) {
-  // Primary: read from build_steps state machine
-  if (buildSteps?.steps) {
-    const step = buildSteps.steps.find((s) => s.id === stage.stepId);
-    if (step) {
-      // Normalize: state machine uses "done", UI uses "completed"
-      if (step.status === "done") return "completed";
-      if (step.status === "in_progress") return "in_progress";
-      if (step.status === "failed") return "failed";
-      return "pending";
-    }
-  }
-
-  // Fallback: legacy task-inference logic (for old apps without build_steps)
+function getStageStatus(stage, tasks, app) {
   if (stage.id === "app_created") return "completed";
 
+  // Check build_steps from app record (authoritative for scaffold pipeline steps)
+  // build_steps is written by scaffold.js as each step runs
+  const buildSteps = Array.isArray(app?.build_steps) ? app.build_steps : [];
+  const buildStep = buildSteps.find((s) => s.id === stage.id);
+  if (buildStep) {
+    if (buildStep.status === "done") return "completed";
+    if (buildStep.status === "in_progress") return "in_progress";
+    if (buildStep.status === "failed") return "failed";
+  }
+
+  // github_repo: completed once repo_url is set on the app
+  if (stage.id === "github_repo") {
+    if (app?.repo_url) return "completed";
+    if (app?.status === "scaffolding" || app?.status === "deploying" || app?.status === "building") return "in_progress";
+    return "pending";
+  }
+
+  // vercel_setup: completed once vercel_project_id is set
+  if (stage.id === "vercel_setup") {
+    if (app?.vercel_project_id) return "completed";
+    if (app?.repo_url && !app?.vercel_project_id && app?.status !== "failed") return "in_progress";
+    return "pending";
+  }
+
+  // vercel_deploy: tracks the initial Vercel deployment attempt
+  // NOTE: do NOT use app.status === "deploying" here — it caused premature in_progress display
+  // when earlier steps (github_repo, scaffold, vercel_setup) were still pending.
   if (stage.id === "vercel_deploy") {
     const ds = app?.vercel_deploy_status;
     if (ds === "ready") return "completed";
@@ -86,14 +100,24 @@ function getStageStatus(stage, buildSteps, tasks, app) {
     return "pending";
   }
 
-  if (stage.id === "live") {
+  // first_deploy: completed only when Vercel is fully READY (a successful deployment)
+  // Never derives from tasks — only from vercel_deploy_status to avoid false matches.
+  if (stage.id === "first_deploy") {
     const ds = app?.vercel_deploy_status;
-    if (ds === "error" || ds === "canceled") return "failed";
+    if (ds === "ready") return "completed";
+    if (ds === "deploying") return "in_progress";
+    // error/canceled/not-set → pending (sequential halt propagates failure from vercel_deploy)
+    return "pending";
+  }
+
+  if (stage.id === "live") {
+    // Live only when we have a confirmed preview URL or a deployed task
     if (app?.vercel_preview_url) return "completed";
     if (tasks.some((t) => t.status === "deployed")) return "completed";
     return "pending";
   }
 
+  // Fallback: match by agent_tasks title (for legacy apps without build_steps)
   const matching = tasks.filter(
     (t) => stage.match && stage.match.test(t.title || "")
   );
@@ -110,6 +134,21 @@ function getStageStatus(stage, buildSteps, tasks, app) {
   return "pending";
 }
 
+/**
+ * Compute all stage statuses with sequential halt logic.
+ * Once a stage fails, ALL subsequent stages are forced to "pending".
+ * This prevents contradictory states like Failed + Running simultaneously.
+ */
+function getSequentialStatuses(stages, tasks, app) {
+  let halted = false;
+  return stages.map((stage) => {
+    if (halted) return "pending";
+    const status = getStageStatus(stage, tasks, app);
+    if (status === "failed") halted = true;
+    return status;
+  });
+}
+
 // Truncate long comment text to one line
 function trimComment(text) {
   if (!text) return "";
@@ -117,16 +156,27 @@ function trimComment(text) {
   return single.length > 90 ? single.slice(0, 87) + "…" : single;
 }
 
-function StageRow({ stage, buildSteps, tasks, app, comments }) {
-  const status = getStageStatus(stage, buildSteps, tasks, app);
-
-  // Get error message from build_steps if failed
-  const failedStep = buildSteps?.steps?.find((s) => s.id === stage.stepId && s.status === "failed");
-  const errorMessage = failedStep?.error || (status === "failed" ? buildSteps?.error_message : null);
-
+// StageRow receives a pre-computed `status` prop (from getSequentialStatuses)
+// so sequential halt logic is applied before rendering — never compute status here.
+function StageRow({ stage, status, tasks, comments, stepData }) {
   const matchingTasks = stage.match
     ? tasks.filter((t) => stage.match.test(t.title || ""))
     : [];
+
+  // Elapsed time for ai_codegen step
+  const [elapsed, setElapsed] = useState(null);
+  useEffect(() => {
+    if (stage.id !== "ai_codegen" || status !== "in_progress" || !stepData?.started_at) return;
+    const update = () => {
+      const secs = Math.floor((Date.now() - new Date(stepData.started_at)) / 1000);
+      const mins = Math.floor(secs / 60);
+      const s = secs % 60;
+      setElapsed(mins > 0 ? `${mins}m ${s}s` : `${s}s`);
+    };
+    update();
+    const t = setInterval(update, 1000);
+    return () => clearInterval(t);
+  }, [stage.id, status, stepData?.started_at]);
 
   // For ai_codegen stage: show recent agent comments (file names / progress)
   const stageComments =
@@ -141,14 +191,14 @@ function StageRow({ stage, buildSteps, tasks, app, comments }) {
     in_progress: "#6750A4",
     completed: "#1B5E20",
     failed: "#BA1A1A",
-  }[status];
+  }[status] || "#79747E";
 
   const statusIcon = {
     pending: "○",
     in_progress: "◉",
     completed: "✓",
     failed: "✗",
-  }[status];
+  }[status] || "○";
 
   return (
     <div
@@ -218,27 +268,13 @@ function StageRow({ stage, buildSteps, tasks, app, comments }) {
                 animation: "buildBlink 1s ease-in-out infinite",
               }}
             >
-              in progress
+              {stage.id === "ai_codegen" && elapsed ? `${elapsed} elapsed` : "in progress"}
             </span>
           )}
+          {status === "in_progress" && stage.id === "ai_codegen" && (
+            <span style={{ fontSize: "11px", color: "#49454F" }}>(may take 5–15 min)</span>
+          )}
         </div>
-        {/* Error message from state machine */}
-        {errorMessage && (
-          <div
-            style={{
-              marginTop: "6px",
-              fontSize: "12px",
-              color: "#BA1A1A",
-              background: "rgba(186, 26, 26, 0.06)",
-              padding: "6px 8px",
-              borderRadius: "4px",
-              borderLeft: "2px solid #BA1A1A",
-              fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-            }}
-          >
-            ⚠️ {errorMessage}
-          </div>
-        )}
         {matchingTasks.length > 0 && (
           <div style={{ marginTop: "4px" }}>
             {matchingTasks.map((t) => (
@@ -253,6 +289,22 @@ function StageRow({ stage, buildSteps, tasks, app, comments }) {
                 {t.title}
               </div>
             ))}
+          </div>
+        )}
+        {/* Error detail for failed steps */}
+        {status === "failed" && stepData?.error && (
+          <div
+            style={{
+              fontSize: "12px",
+              color: "#BA1A1A",
+              marginTop: "6px",
+              padding: "6px 10px",
+              background: "rgba(186, 26, 26, 0.08)",
+              borderRadius: "4px",
+              fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+            }}
+          >
+            ⚠️ {stepData.error}
           </div>
         )}
         {/* AI codegen: live comment feed showing files being created */}
@@ -313,13 +365,13 @@ export default function AppBuildProgress() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [app, setApp] = useState(null);
-  const [buildSteps, setBuildSteps] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [countdown, setCountdown] = useState(null);
   const [sseConnected, setSseConnected] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const taskMapRef = useRef({});
   const countdownRef = useRef(null);
 
@@ -332,9 +384,6 @@ export default function AppBuildProgress() {
       }
       const data = await res.json();
       setApp(data);
-      if (data.build_steps?.steps) {
-        setBuildSteps(data.build_steps);
-      }
     } catch (e) {
       setError(e.message);
     } finally {
@@ -355,18 +404,6 @@ export default function AppBuildProgress() {
 
     es.onopen = () => setSseConnected(true);
     es.onerror = () => setSseConnected(false);
-
-    // app_update: update app state + build_steps
-    es.addEventListener("app_update", (e) => {
-      try {
-        const updatedApp = JSON.parse(e.data);
-        setApp(updatedApp);
-        if (updatedApp.build_steps?.steps) {
-          setBuildSteps(updatedApp.build_steps);
-        }
-        setLoading(false);
-      } catch {}
-    });
 
     // task_update: upsert into task map
     es.addEventListener("task_update", (e) => {
@@ -421,24 +458,39 @@ export default function AppBuildProgress() {
     return () => clearInterval(appInterval);
   }, [fetchApp]);
 
-  // Determine if the app is live
-  const liveStatus = app
-    ? getStageStatus(STAGES[STAGES.length - 1], buildSteps, tasks, app)
-    : "pending";
-
-  // Calculate progress from build_steps (primary) or fallback to stage count
-  const progressPct = (() => {
-    if (buildSteps?.steps) {
-      const total = buildSteps.steps.length;
-      const done = buildSteps.steps.filter((s) => s.status === "done").length;
-      return Math.round((done / total) * 100);
+  const handleRetry = async () => {
+    setRetrying(true);
+    try {
+      const res = await fetch(`/api/apps/${id}/retry`, { method: "POST" });
+      if (res.ok) {
+        setApp((prev) => ({ ...prev, build_steps: [], status: "scaffolding" }));
+        setTasks([]);
+        taskMapRef.current = {};
+      } else {
+        const err = await res.json();
+        alert(`Retry failed: ${err.error}`);
+      }
+    } catch (e) {
+      alert(`Retry failed: ${e.message}`);
+    } finally {
+      setRetrying(false);
     }
-    // Fallback: count completed stages
-    const completedCount = app
-      ? STAGES.filter((s) => getStageStatus(s, null, tasks, app) === "completed").length
-      : 0;
-    return Math.round((completedCount / STAGES.length) * 100);
-  })();
+  };
+
+  // Compute all stage statuses with sequential halt.
+  // Once a stage fails, all subsequent stages are forced to "pending".
+  // Pass stageStatuses[i] to each StageRow — never let StageRow compute its own status.
+  const stageStatuses = app
+    ? getSequentialStatuses(STAGES, tasks, app)
+    : STAGES.map(() => "pending");
+
+  // Derived from sequential statuses (single source of truth)
+  const liveStatus = stageStatuses[STAGES.length - 1];
+  const anyStepFailed = stageStatuses.includes("failed");
+
+  // Derive ai_codegen status for the error banner message
+  const aiCodegenIdx = STAGES.findIndex((s) => s.id === "ai_codegen");
+  const aiCodegenStatus = stageStatuses[aiCodegenIdx];
 
   // Start countdown when live
   useEffect(() => {
@@ -459,6 +511,9 @@ export default function AppBuildProgress() {
     );
     return () => clearTimeout(countdownRef.current);
   }, [countdown, navigate]);
+
+  const completedCount = stageStatuses.filter((s) => s === "completed").length;
+  const progressPct = Math.round((completedCount / STAGES.length) * 100);
 
   if (loading) {
     return (
@@ -546,7 +601,7 @@ export default function AppBuildProgress() {
             }}
           >
             App Factory
-            {/* SSE connection indicator (not app liveness) */}
+            {/* SSE connection indicator — shows stream connectivity, NOT app liveness */}
             <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
               <span
                 style={{
@@ -578,9 +633,11 @@ export default function AppBuildProgress() {
           >
             {liveStatus === "completed"
               ? `🎉 ${appName} is live!`
+              : anyStepFailed
+              ? `⚠️ Build failed for ${appName}`
               : `Building ${appName}…`}
           </h1>
-          {liveStatus !== "completed" && (
+          {liveStatus !== "completed" && !anyStepFailed && (
             <p
               style={{
                 color: "var(--md-on-surface-variant, #49454F)",
@@ -590,6 +647,39 @@ export default function AppBuildProgress() {
             >
               Watch your app come to life in real time
             </p>
+          )}
+          {anyStepFailed && (
+            <>
+              <p
+                style={{
+                  color: "#BA1A1A",
+                  margin: "0 0 16px",
+                  fontSize: "14px",
+                }}
+              >
+                A pipeline step failed. See details below.
+              </p>
+              <button
+                onClick={handleRetry}
+                disabled={retrying}
+                style={{
+                  background: retrying ? "#49454F" : "#BA1A1A",
+                  color: "#FFFFFF",
+                  border: "none",
+                  padding: "10px 24px",
+                  borderRadius: "8px",
+                  fontWeight: "700",
+                  fontSize: "14px",
+                  cursor: retrying ? "not-allowed" : "pointer",
+                  transition: "background 0.2s",
+                }}
+              >
+                {retrying ? "⏳ Restarting…" : "🔄 Retry Build"}
+              </button>
+              <p style={{ fontSize: "12px", color: "#BA1A1A", marginTop: "6px" }}>
+                Restarts from the failed step
+              </p>
+            </>
           )}
         </div>
 
@@ -610,6 +700,8 @@ export default function AppBuildProgress() {
               background:
                 liveStatus === "completed"
                   ? "linear-gradient(90deg, #2E7D32, #1B5E20)"
+                  : anyStepFailed
+                  ? "linear-gradient(90deg, #BA1A1A, #e53935)"
                   : "linear-gradient(90deg, #6750A4, #9C4AE2)",
               borderRadius: "8px",
               transition: "width 0.6s ease",
@@ -617,7 +709,7 @@ export default function AppBuildProgress() {
           />
         </div>
 
-        {/* Stages list */}
+        {/* Stages list — status is pre-computed with sequential halt, passed as prop */}
         <div
           style={{
             background: "#FFFFFF",
@@ -627,14 +719,14 @@ export default function AppBuildProgress() {
             marginBottom: "24px",
           }}
         >
-          {STAGES.map((stage) => (
+          {STAGES.map((stage, i) => (
             <StageRow
               key={stage.id}
               stage={stage}
-              buildSteps={buildSteps}
+              status={stageStatuses[i]}
               tasks={tasks}
-              app={app}
               comments={comments}
+              stepData={app?.build_steps?.find((s) => s.id === stage.id)}
             />
           ))}
         </div>
@@ -657,9 +749,13 @@ export default function AppBuildProgress() {
                   Initial Vercel deployment {app?.vercel_deploy_status === "canceled" ? "was canceled" : "failed"}
                 </div>
                 <div style={{ color: "#f87171", fontSize: "14px", lineHeight: "1.5" }}>
-                  The scaffold triggered a deployment but it did not succeed. The AI code agent task
-                  is still running — its final push to GitHub will trigger a new Vercel deployment automatically.
-                  Check the{" "}
+                  {aiCodegenStatus === "in_progress"
+                    ? "The AI code agent is currently generating code — its final push to GitHub will trigger a new Vercel deployment automatically."
+                    : aiCodegenStatus === "completed"
+                    ? "The AI code agent has finished. A new Vercel deployment should have been triggered by the code push."
+                    : "The scaffold triggered a deployment but it did not succeed. Once AI code generation completes, its push to GitHub will trigger a new Vercel deployment."
+                  }
+                  {" "}Check the{" "}
                   <a
                     href={`https://vercel.com/lautaro450/${app?.slug}`}
                     target="_blank"
