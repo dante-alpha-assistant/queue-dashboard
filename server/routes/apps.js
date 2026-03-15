@@ -19,10 +19,16 @@ function expandCredentials(app) {
 // GET /api/apps — list all apps (optionally filter by status)
 appsRouter.get("/", async (req, res) => {
   try {
-    const status = req.query.status || "active";
     let query = supabase.from("apps").select("*").order("name");
-    if (status !== "all") {
+    const status = req.query.status;
+    if (status === "all") {
+      // No filter — return everything including archived
+    } else if (status && status !== "all") {
+      // Explicit status filter (e.g. ?status=active)
       query = query.eq("status", status);
+    } else {
+      // Default: exclude archived so all active/live/building/etc apps appear
+      query = query.neq("status", "archived");
     }
     const { data, error } = await query;
     if (error) throw error;
