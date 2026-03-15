@@ -1,7 +1,12 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { Image, Paperclip, Upload, X, ZoomIn } from "lucide-react";
+import { Paperclip, Upload, X, ZoomIn } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
-const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+const ACCEPTED_TYPES = [
+  "image/png", "image/jpeg", "image/gif", "image/webp",
+  "text/markdown", "text/plain", "application/pdf",
+  "application/json", "application/octet-stream"
+];
 const MAX_SIZE = 10 * 1024 * 1024;
 
 function fileToBase64(file) {
@@ -11,6 +16,30 @@ function fileToBase64(file) {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+/* ── File type helpers ─────────────────────────────── */
+function getFileType(attachment) {
+  const type = attachment.type || "";
+  const filename = attachment.filename || "";
+  const ext = filename.split(".").pop()?.toLowerCase();
+  if (type.startsWith("image/")) return "image";
+  if (type === "application/pdf" || ext === "pdf") return "pdf";
+  if (type === "application/json" || ext === "json") return "json";
+  if (type === "text/markdown" || ext === "md" || ext === "markdown") return "markdown";
+  if (type === "text/plain" || ext === "txt") return "text";
+  return "binary";
+}
+
+function getFileIcon(fileType) {
+  switch (fileType) {
+    case "image": return "🖼️";
+    case "pdf": return "📋";
+    case "json": return "📊";
+    case "markdown":
+    case "text": return "📄";
+    default: return "📎";
+  }
 }
 
 /* ── Lightbox overlay ──────────────────────────────── */
@@ -53,7 +82,7 @@ function Lightbox({ src, alt, onClose }) {
   );
 }
 
-/* ── Attachment thumbnail ──────────────────────────── */
+/* ── Attachment thumbnail (images) ─────────────────── */
 function AttachmentThumb({ attachment, index, onDelete, readonly }) {
   const [lightbox, setLightbox] = useState(false);
 
@@ -106,6 +135,161 @@ function AttachmentThumb({ attachment, index, onDelete, readonly }) {
   );
 }
 
+/* ── Text/JSON/Markdown preview ────────────────────── */
+function TextPreview({ attachment, fileType, onDelete }) {
+  const [content, setContent] = useState(null);
+  const [expanded, setExpanded] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const load = useCallback(async () => {
+    if (content !== null) {
+      setExpanded(!expanded);
+      return;
+    }
+    setLoading(true);
+    try {
+      const resp = await fetch(attachment.url);
+      const text = await resp.text();
+      setContent(text);
+      setExpanded(true);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [attachment.url, content, expanded]);
+
+  return (
+    <div style={{ border: "1px solid var(--md-surface-variant, #E7E0EC)", borderRadius: 8, overflow: "hidden" }}>
+      <div
+        style={{
+          display: "flex", alignItems: "center", gap: 8, padding: "8px 12px",
+          background: "var(--md-surface-container-low, #F7F2FA)",
+          cursor: "pointer", userSelect: "none",
+        }}
+        onClick={load}
+      >
+        <span style={{ fontSize: 16 }}>{getFileIcon(fileType)}</span>
+        <span style={{ fontSize: 13, fontWeight: 500, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {attachment.filename}
+        </span>
+        {loading && <span style={{ fontSize: 11, color: "var(--md-primary, #6750A4)" }}>Loading...</span>}
+        {!loading && <span style={{ fontSize: 11, color: "var(--md-outline, #79747E)" }}>{expanded ? "▲ Collapse" : "▼ Expand"}</span>}
+        <a
+          href={attachment.url}
+          download={attachment.filename}
+          onClick={(e) => e.stopPropagation()}
+          style={{ fontSize: 11, color: "var(--md-primary, #6750A4)", textDecoration: "none", padding: "2px 6px", borderRadius: 4, border: "1px solid var(--md-primary, #6750A4)" }}
+        >
+          ⬇ Download
+        </a>
+        {onDelete && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            style={{
+              width: 20, height: 20, borderRadius: "50%",
+              background: "rgba(186,26,26,0.85)", border: "none",
+              color: "#fff", cursor: "pointer", fontSize: 10,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0,
+            }}
+            title="Remove attachment"
+          >
+            <X size={10} />
+          </button>
+        )}
+      </div>
+      {error && <div style={{ padding: "8px 12px", color: "#BA1A1A", fontSize: 12 }}>Error: {error}</div>}
+      {expanded && content !== null && (
+        <div style={{ maxHeight: 400, overflow: "auto" }}>
+          {fileType === "markdown" ? (
+            <div style={{ padding: "12px 16px", fontSize: 14, lineHeight: 1.6 }}>
+              <ReactMarkdown>{content}</ReactMarkdown>
+            </div>
+          ) : fileType === "json" ? (
+            <pre style={{ margin: 0, padding: "12px 16px", fontSize: 12, overflowX: "auto", background: "#1e1e1e", color: "#d4d4d4" }}>
+              {(() => { try { return JSON.stringify(JSON.parse(content), null, 2); } catch { return content; } })()}
+            </pre>
+          ) : (
+            <pre style={{ margin: 0, padding: "12px 16px", fontSize: 12, overflowX: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+              {content}
+            </pre>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── PDF preview ───────────────────────────────────── */
+function PDFPreview({ attachment, onDelete }) {
+  const [showEmbed, setShowEmbed] = useState(false);
+
+  return (
+    <div style={{ border: "1px solid var(--md-surface-variant, #E7E0EC)", borderRadius: 8, overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "var(--md-surface-container-low, #F7F2FA)" }}>
+        <span style={{ fontSize: 16 }}>📋</span>
+        <span style={{ fontSize: 13, fontWeight: 500, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {attachment.filename}
+        </span>
+        <button
+          onClick={() => setShowEmbed(!showEmbed)}
+          style={{ fontSize: 11, cursor: "pointer", padding: "2px 6px", borderRadius: 4, border: "1px solid var(--md-outline, #79747E)", background: "none" }}
+        >
+          {showEmbed ? "Hide PDF" : "View PDF"}
+        </button>
+        <a
+          href={attachment.url}
+          download={attachment.filename}
+          style={{ fontSize: 11, color: "var(--md-primary, #6750A4)", textDecoration: "none", padding: "2px 6px", borderRadius: 4, border: "1px solid var(--md-primary, #6750A4)" }}
+        >
+          ⬇ Download
+        </a>
+        {onDelete && (
+          <button
+            onClick={onDelete}
+            style={{
+              width: 20, height: 20, borderRadius: "50%",
+              background: "rgba(186,26,26,0.85)", border: "none",
+              color: "#fff", cursor: "pointer", fontSize: 10,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0,
+            }}
+            title="Remove attachment"
+          >
+            <X size={10} />
+          </button>
+        )}
+      </div>
+      {showEmbed && (
+        <embed src={attachment.url} type="application/pdf" style={{ width: "100%", height: 500, display: "block" }} />
+      )}
+    </div>
+  );
+}
+
+/* ── Attachment item dispatcher ────────────────────── */
+function AttachmentItem({ attachment, index, onDelete, readonly }) {
+  const fileType = getFileType(attachment);
+
+  if (fileType === "image") {
+    return <AttachmentThumb attachment={attachment} index={index} onDelete={onDelete} readonly={readonly} />;
+  }
+
+  const handleDelete = !readonly ? () => onDelete(index) : null;
+
+  return (
+    <div style={{ width: "100%", marginBottom: 8 }}>
+      {fileType === "pdf" ? (
+        <PDFPreview attachment={attachment} onDelete={handleDelete} />
+      ) : (
+        <TextPreview attachment={attachment} fileType={fileType} onDelete={handleDelete} />
+      )}
+    </div>
+  );
+}
+
 /* ── Upload drop zone ──────────────────────────────── */
 function UploadZone({ taskId, onUploaded, disabled }) {
   const [dragging, setDragging] = useState(false);
@@ -120,10 +304,6 @@ function UploadZone({ taskId, onUploaded, disabled }) {
     const errors = [];
 
     for (const file of files) {
-      if (!ACCEPTED_TYPES.includes(file.type)) {
-        errors.push(`${file.name}: unsupported format`);
-        continue;
-      }
       if (file.size > MAX_SIZE) {
         errors.push(`${file.name}: too large (max 10MB)`);
         continue;
@@ -157,7 +337,7 @@ function UploadZone({ taskId, onUploaded, disabled }) {
       const files = [];
       if (e.clipboardData?.files) {
         for (const f of e.clipboardData.files) {
-          if (f.type.startsWith("image/")) files.push(f);
+          files.push(f);
         }
       }
       if (files.length) {
@@ -177,7 +357,7 @@ function UploadZone({ taskId, onUploaded, disabled }) {
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault(); dragCounter.current = 0; setDragging(false);
-          const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"));
+          const files = Array.from(e.dataTransfer.files);
           if (files.length) upload(files);
         }}
         onClick={() => !disabled && !uploading && fileRef.current?.click()}
@@ -198,10 +378,10 @@ function UploadZone({ taskId, onUploaded, disabled }) {
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
             <Upload size={18} style={{ color: "var(--md-outline, #79747E)" }} />
             <div style={{ fontSize: 12, color: "var(--md-on-surface-variant, #49454F)" }}>
-              Drop images, paste, or <span style={{ color: "var(--md-primary, #6750A4)", fontWeight: 600 }}>browse</span>
+              Drop files, paste, or <span style={{ color: "var(--md-primary, #6750A4)", fontWeight: 600 }}>browse</span>
             </div>
             <div style={{ fontSize: 10, color: "var(--md-outline, #79747E)" }}>
-              PNG, JPG, GIF, WebP · Max 10MB
+              Images, MD, TXT, PDF, JSON · Max 10MB
             </div>
           </div>
         )}
@@ -209,7 +389,7 @@ function UploadZone({ taskId, onUploaded, disabled }) {
       <input
         ref={fileRef}
         type="file"
-        accept="image/png,image/jpeg,image/gif,image/webp"
+        accept="image/*,.md,.txt,.pdf,.json"
         multiple
         style={{ display: "none" }}
         onChange={(e) => {
@@ -256,14 +436,32 @@ export default function TaskAttachments({ taskId, attachments: initialAttachment
     }
   }, [taskId, onAttachmentsChange]);
 
+  const imageAttachments = attachments.filter(a => getFileType(a) === "image");
+  const fileAttachments = attachments.filter(a => getFileType(a) !== "image");
+
   return (
     <div>
-      {/* Thumbnails */}
-      {attachments.length > 0 && (
+      {/* Image thumbnails */}
+      {imageAttachments.length > 0 && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-          {attachments.map((a, i) => (
-            <AttachmentThumb key={a.url || i} attachment={a} index={i} onDelete={handleDelete} readonly={readonly} />
-          ))}
+          {imageAttachments.map((a) => {
+            const origIndex = attachments.indexOf(a);
+            return (
+              <AttachmentThumb key={a.url || origIndex} attachment={a} index={origIndex} onDelete={handleDelete} readonly={readonly} />
+            );
+          })}
+        </div>
+      )}
+
+      {/* Non-image file attachments */}
+      {fileAttachments.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          {fileAttachments.map((a) => {
+            const origIndex = attachments.indexOf(a);
+            return (
+              <AttachmentItem key={a.url || origIndex} attachment={a} index={origIndex} onDelete={handleDelete} readonly={readonly} />
+            );
+          })}
         </div>
       )}
 

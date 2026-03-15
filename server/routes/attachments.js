@@ -5,7 +5,11 @@ export const attachmentsRouter = Router();
 
 const BUCKET = "task-attachments";
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
-const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+const ALLOWED_TYPES = [
+  "image/png", "image/jpeg", "image/gif", "image/webp",
+  "text/markdown", "text/plain", "application/pdf",
+  "application/json", "application/octet-stream"
+];
 
 // Ensure bucket exists (called once at startup)
 export async function ensureAttachmentsBucket() {
