@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Package, Plus, Pencil, Archive, RotateCcw, X, Loader2, Search, XCircle, ChevronLeft, Save, BarChart3, ExternalLink, Clock, CheckCircle2, XOctagon, Rocket, Activity, Copy, Globe, Zap } from "lucide-react";
+import { Package, Plus, Pencil, Archive, RotateCcw, X, Loader2, Search, XCircle, ChevronLeft, Save, BarChart3, ExternalLink, Clock, CheckCircle2, XOctagon, Rocket, Activity, Copy, Globe, Zap, Trash2 } from "lucide-react";
 
 const DEPLOY_TARGETS = ["kubernetes", "vercel", "none"];
 const DEPLOY_TARGET_CONFIG = {
@@ -345,8 +345,9 @@ function DeploymentCard({ app, onUpdated }) {
 }
 
 /* ── App Detail View ──────────────────────────────────────── */
-export function AppDetailView({ app, onBack, onSave, onArchive, onRestore }) {
+export function AppDetailView({ app, onBack, onSave, onArchive, onRestore, onRemove }) {
   const [editing, setEditing] = useState(false);
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [tasks, setTasks] = useState([]);
   const [stats, setStats] = useState(null);
   const [loadingTasks, setLoadingTasks] = useState(true);
@@ -404,6 +405,16 @@ export function AppDetailView({ app, onBack, onSave, onArchive, onRestore }) {
       setError(e.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleRemoveConfirmed = async () => {
+    try {
+      await fetch(`/api/apps/${app.id}/remove`, { method: "DELETE" });
+      setShowRemoveConfirm(false);
+      if (onRemove) onRemove(app);
+    } catch (e) {
+      console.error("Remove failed:", e);
     }
   };
 
@@ -500,6 +511,14 @@ export function AppDetailView({ app, onBack, onSave, onArchive, onRestore }) {
                 <Archive size={13} /> Archive
               </button>
             )}
+            <button onClick={() => setShowRemoveConfirm(true)} style={{
+              padding: "8px 16px", borderRadius: 100, border: "1px solid rgba(186,26,26,0.5)",
+              background: "transparent", color: "#BA1A1A", cursor: "pointer",
+              fontSize: 12, fontWeight: 600, fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+              display: "flex", alignItems: "center", gap: 6,
+            }}>
+              <Trash2 size={13} /> Remove
+            </button>
           </div>
         </div>
 
@@ -726,6 +745,43 @@ export function AppDetailView({ app, onBack, onSave, onArchive, onRestore }) {
               }}>
                 {saving && <Loader2 size={14} style={{ animation: "spin 0.8s linear infinite" }} />}
                 <Save size={14} /> Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Remove Confirmation Modal */}
+      {showRemoveConfirm && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }} onClick={() => setShowRemoveConfirm(false)}>
+          <div style={{
+            background: "var(--md-surface, #FFFBFE)", borderRadius: 16, padding: 28, maxWidth: 400, width: "90%",
+            fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+          }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: "0 0 12px", fontSize: 18, fontWeight: 700, color: "var(--md-on-surface)" }}>
+              Remove App?
+            </h3>
+            <p style={{ margin: "0 0 20px", fontSize: 14, color: "var(--md-on-surface-variant)", lineHeight: 1.5 }}>
+              Are you sure? This will permanently delete <strong>{app.name}</strong> and all associated data.
+              Tasks linked to this app will be unlinked. This action cannot be undone.
+            </p>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={() => setShowRemoveConfirm(false)} style={{
+                padding: "8px 20px", borderRadius: 100, border: "1px solid var(--md-surface-variant)",
+                background: "transparent", color: "var(--md-on-surface)", cursor: "pointer",
+                fontSize: 13, fontWeight: 600, fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+              }}>
+                Cancel
+              </button>
+              <button onClick={handleRemoveConfirmed} style={{
+                padding: "8px 20px", borderRadius: 100, border: "none",
+                background: "#BA1A1A", color: "#fff", cursor: "pointer",
+                fontSize: 13, fontWeight: 600, fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+              }}>
+                Remove Permanently
               </button>
             </div>
           </div>
