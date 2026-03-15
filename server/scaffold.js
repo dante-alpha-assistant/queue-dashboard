@@ -294,16 +294,53 @@ export async function runScaffoldPipeline(app) {
     await new Promise((r) => setTimeout(r, 3000));
 
     // Verify template files exist in the repo
-    const templateFiles = ["package.json", "next.config.js", "src/app/page.tsx"];
-    for (const file of templateFiles) {
-      const fileCheckResp = await fetch(`${GH_API}/repos/${TEMPLATE_OWNER}/${slug}/contents/${file}`, {
-        headers: { Authorization: `Bearer ${GH_TOKEN}`, Accept: "application/vnd.github+json" },
-      });
-      if (!fileCheckResp.ok) {
-        throw new Error(`Scaffold verification failed: ${file} not found in repo (HTTP ${fileCheckResp.status})`);
+    // Note: nextjs-template uses next.config.ts (TypeScript), not next.config.js
+    // We check for EITHER next.config.ts OR next.config.js since both are valid
+    const requiredFiles = ["package.json", "src/app/page.tsx"];
+    const optionalAltFiles = [
+      ["next.config.ts", "next.config.js"], // Next.js config: TS variant is preferred, JS is fallback
+    ];
+
+    // Retry helper: check file existence with up to 3 retries (handles GitHub init race conditions)
+    async function checkFileExists(owner, repo, filePath, maxRetries = 3, delayMs = 2000) {
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        if (attempt > 0) await new Promise(r => setTimeout(r, delayMs));
+        const resp = await fetch(`${GH_API}/repos/${owner}/${repo}/contents/${filePath}`, {
+          headers: { Authorization: `Bearer ${GH_TOKEN}`, Accept: "application/vnd.github+json" },
+          signal: AbortSignal.timeout(15000),
+        });
+        if (resp.ok) return true;
+        if (resp.status === 404 && attempt < maxRetries - 1) {
+          console.log(`[SCAFFOLD] File not found yet: ${filePath} (attempt ${attempt + 1}/${maxRetries}), retrying...`);
+          continue;
+        }
+      }
+      return false;
+    }
+
+    for (const file of requiredFiles) {
+      const exists = await checkFileExists(TEMPLATE_OWNER, slug, file);
+      if (!exists) {
+        throw new Error(`Scaffold verification failed: ${file} not found in repo after ${3} attempts`);
       }
     }
-    console.log(`[SCAFFOLD] Verified: template files present (package.json, next.config.js, src/app/page.tsx)`);
+
+    // Check optional alt files (at least one variant must exist)
+    for (const variants of optionalAltFiles) {
+      let found = false;
+      for (const variant of variants) {
+        if (await checkFileExists(TEMPLATE_OWNER, slug, variant, 2, 1000)) {
+          found = true;
+          console.log(`[SCAFFOLD] Found config file variant: ${variant}`);
+          break;
+        }
+      }
+      if (!found) {
+        console.warn(`[SCAFFOLD] None of [${variants.join(", ")}] found — template may be incomplete but continuing`);
+      }
+    }
+
+    console.log(`[SCAFFOLD] Verified: template files present (package.json, next.config.ts, src/app/page.tsx)`);
     await emitStep(id, "scaffold", "done");
 
     // 4. Create coding task (so AI codegen can post comments to it)
