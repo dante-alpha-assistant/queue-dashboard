@@ -67,6 +67,11 @@ export default function AppDetailPage() {
     await refresh();
   };
 
+  const handleRemove = async () => {
+    await fetch(`/api/apps/${id}/remove`, { method: "DELETE" });
+    navigate("/apps");
+  };
+
   if (loading) return <SpeedLoader text="Loading app..." />;
 
   if (notFound) {
@@ -103,6 +108,7 @@ export default function AppDetailPage() {
       onSave={handleSave}
       onArchive={handleArchive}
       onRestore={handleRestore}
+      onRemove={handleRemove}
     />
   );
 }

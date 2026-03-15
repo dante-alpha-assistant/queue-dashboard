@@ -441,6 +441,42 @@ appsRouter.delete("/:id", async (req, res) => {
   }
 });
 
+// DELETE /api/apps/:id/remove — hard delete (permanent)
+appsRouter.delete("/:id/remove", async (req, res) => {
+  try {
+    const appId = req.params.id;
+
+    // Verify app exists first
+    const { data: existingApp, error: fetchError } = await supabase
+      .from("apps")
+      .select("id, name")
+      .eq("id", appId)
+      .single();
+    if (fetchError) {
+      if (fetchError.code === "PGRST116") return res.status(404).json({ error: "App not found" });
+      throw fetchError;
+    }
+
+    // Unlink associated tasks (set app_id=null)
+    const { error: unlinkError } = await supabase
+      .from("agent_tasks")
+      .update({ app_id: null })
+      .eq("app_id", appId);
+    if (unlinkError) throw unlinkError;
+
+    // Hard delete the app record
+    const { error: deleteError } = await supabase
+      .from("apps")
+      .delete()
+      .eq("id", appId);
+    if (deleteError) throw deleteError;
+
+    res.json({ ok: true, deleted: existingApp });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /api/apps/:id/stats — task stats for a single app
 appsRouter.get("/:id/stats", async (req, res) => {
   try {
