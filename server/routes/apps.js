@@ -313,7 +313,7 @@ appsRouter.post("/", async (req, res) => {
       .select()
       .single();
     if (error) {
-      if (error.code === "23505") return res.status(409).json({ error: "App with this name or slug already exists" });
+      if (error.code === "23505") return res.status(409).json({ error: "App with this slug already exists. Please choose a different slug." });
       throw error;
     }
     // Invalidate GitHub repo cache — new app may reference a new repo

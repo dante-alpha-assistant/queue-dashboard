@@ -26,6 +26,10 @@ function slugify(str) {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
+function randomSuffix() {
+  return Math.random().toString(36).slice(2, 6);
+}
+
 function hashColor(str) {
   let h = 0;
   for (let i = 0; i < str.length; i++) {
@@ -252,31 +256,16 @@ function OnboardingStep1({ state, dispatch }) {
     return () => document.removeEventListener("mousedown", handler);
   }, [showEmojiPicker]);
 
-  // Check name uniqueness (debounced)
+  // Check name (names are no longer unique — just validate non-empty)
   const checkName = useCallback((value) => {
     clearTimeout(nameCheckTimer.current);
     if (!value.trim()) { setNameStatus("idle"); return; }
-    setNameStatus("checking");
-    nameCheckTimer.current = setTimeout(async () => {
-      try {
-        const r = await fetch(`/api/apps?name=eq.${encodeURIComponent(value.trim())}`);
-        const data = await r.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setNameStatus("invalid");
-          setNameError("An app with this name already exists");
-        } else {
-          setNameStatus("valid");
-          setNameError("");
-        }
-      } catch {
-        setNameStatus("valid"); // don't block on network error
-        setNameError("");
-      }
-    }, 400);
+    setNameStatus("valid");
+    setNameError("");
   }, []);
 
-  // Check slug uniqueness (on blur)
-  const checkSlug = useCallback(async (value) => {
+  // Check slug uniqueness (on blur); isAuto=true means slug was auto-generated from name
+  const checkSlug = useCallback(async (value, isAuto = false) => {
     if (!value.trim()) { setSlugStatus("idle"); return; }
     const slugRegex = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/;
     if (!slugRegex.test(value)) {
@@ -291,27 +280,35 @@ function OnboardingStep1({ state, dispatch }) {
         const r = await fetch(`/api/apps?slug=eq.${encodeURIComponent(value.trim())}`);
         const data = await r.json();
         if (Array.isArray(data) && data.length > 0) {
-          setSlugStatus("invalid");
-          setSlugError("This slug is already taken");
+          if (isAuto) {
+            // Auto-generated slug is taken — append a random suffix and retry once
+            const newSlug = value.trim() + "-" + randomSuffix();
+            dispatch({ type: "SET_SLUG", value: newSlug });
+            checkSlug(newSlug, true);
+          } else {
+            setSlugStatus("invalid");
+            setSlugError("This slug is already taken");
+          }
         } else {
           setSlugStatus("valid");
           setSlugError("");
+          if (isAuto) dispatch({ type: "SET_SLUG", value: value.trim() });
         }
       } catch {
         setSlugStatus("valid");
         setSlugError("");
       }
     }, 200);
-  }, []);
+  }, [dispatch]);
 
   // When name changes, re-check (and slug auto-updates)
   const handleNameChange = (value) => {
     dispatch({ type: "SET_NAME", value });
     checkName(value);
-    // If slug is auto-generated, auto-validate the new slug
+    // If slug is auto-generated, auto-validate the new slug (with collision auto-fix)
     if (!state.slugManual) {
       const autoSlug = slugify(value);
-      if (autoSlug) checkSlug(autoSlug);
+      if (autoSlug) checkSlug(autoSlug, true);
       else setSlugStatus("idle");
     }
   };
