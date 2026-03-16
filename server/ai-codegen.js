@@ -440,26 +440,36 @@ export async function generateAppCode(appName, appDescription, repoFullName, par
   if (process.env.USE_TASK_PIPELINE !== "false") {
     console.log(`[AI-CODEGEN] Using task-based pipeline for "${appName}" (${repoFullName})`);
 
-    const task = await createCodegenTask({
-      appId: opts.appId,
-      appSlug: opts.appSlug,
-      appName,
-      appDescription,
-      repoFullName,
-      parentTaskId,
-    });
-    console.log(`[AI-CODEGEN] Codegen task created: ${task.id}`);
+    // Use the existing parent task instead of creating a duplicate.
+    // scaffold.js already created a coding task — we just update it and wait.
+    let taskId = parentTaskId;
 
-    await postComment(parentTaskId, `🤖 Dispatched AI codegen task ${task.id}. Waiting for agent to pick up...`);
+    if (!taskId) {
+      // No parent task — create one (standalone codegen call)
+      const task = await createCodegenTask({
+        appId: opts.appId,
+        appSlug: opts.appSlug,
+        appName,
+        appDescription,
+        repoFullName,
+        parentTaskId: null,
+      });
+      taskId = task.id;
+      console.log(`[AI-CODEGEN] Codegen task created: ${taskId}`);
+    } else {
+      console.log(`[AI-CODEGEN] Using existing task ${taskId} (no duplicate)`);
+    }
 
-    const completedTask = await pollCodegenTask(task.id);
-    console.log(`[AI-CODEGEN] Codegen task completed: ${task.id} (status=${completedTask.status})`);
+    await postComment(taskId, `🤖 AI codegen dispatched. Waiting for agent to pick up...`);
+
+    const completedTask = await pollCodegenTask(taskId);
+    console.log(`[AI-CODEGEN] Codegen task completed: ${taskId} (status=${completedTask.status})`);
 
     const prUrlRaw = completedTask.pull_request_url || completedTask.result?.pull_request_url;
     const prUrl = Array.isArray(prUrlRaw) ? prUrlRaw[0] : prUrlRaw;
     if (!prUrl) throw new Error("Codegen task completed but no pull_request_url found in result");
 
-    await postComment(parentTaskId, `✅ Agent completed codegen. PR: ${prUrl}`);
+    await postComment(taskId, `✅ Agent completed codegen. PR: ${prUrl}`);
     return { prUrl, fileCount: 0 };
   }
 
