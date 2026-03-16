@@ -86,7 +86,10 @@ function getStageStatus(stage, tasks, app) {
   // vercel_setup: completed once vercel_project_id is set
   if (stage.id === "vercel_setup") {
     if (app?.vercel_project_id) return "completed";
-    if (app?.repo_url && !app?.vercel_project_id && app?.status !== "failed") return "in_progress";
+    // Do NOT infer in_progress from repo_url — the build_step entry for "vercel_setup"
+    // is authoritative (handled above in the generic buildStep block).
+    // Inferring from repo_url fires prematurely (repo is set right after GitHub creation,
+    // long before Vercel setup actually starts).
     return "pending";
   }
 
@@ -140,16 +143,19 @@ function getStageStatus(stage, tasks, app) {
 
 /**
  * Compute all stage statuses with sequential halt logic.
- * Once a stage fails, ALL subsequent stages are forced to "pending".
- * This prevents contradictory states like Failed + Running simultaneously.
+ * Once a stage fails OR is still running (in_progress), ALL subsequent stages are forced to
+ * "pending". This ensures only one step shows as "Running…" at a time and prevents
+ * contradictory states like Failed + Running simultaneously.
+ * Note: "warning" is non-fatal and does NOT block subsequent stages.
  */
 function getSequentialStatuses(stages, tasks, app) {
   let halted = false;
   return stages.map((stage) => {
     if (halted) return "pending";
     const status = getStageStatus(stage, tasks, app);
-    // Only halt on hard "failed" — "warning" is non-fatal and should NOT block subsequent stages
-    if (status === "failed") halted = true;
+    // Halt all subsequent stages if this stage failed OR is still running
+    // (only one step should show as "Running..." at a time)
+    if (status === "failed" || status === "in_progress") halted = true;
     return status;
   });
 }
