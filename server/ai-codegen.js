@@ -15,13 +15,13 @@ const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
 /**
  * Post a progress comment to a task for the live SSE feed.
  */
-async function postComment(taskId, content) {
+async function postComment(taskId, body) {
   if (!taskId) return;
   try {
     await supabase.from("task_comments").insert({
       task_id: taskId,
       author: "neo-worker",
-      content,
+      body,
     });
   } catch (e) {
     // Non-fatal
@@ -307,20 +307,164 @@ async function openPR(repoFullName, branchName, defaultBranch, prTitle, prDescri
 }
 
 /**
+ * Build a detailed task description for the codegen agent.
+ */
+function buildCodegenTaskDescription(appName, appDescription, repoFullName) {
+  return `## App Factory — AI Codegen Task
+
+**App Name:** ${appName}
+**App Description:** ${appDescription}
+**Repository:** https://github.com/${repoFullName}
+
+## Your Mission
+Generate a complete, domain-specific initial codebase for this application and open a pull request.
+
+## Tech Stack
+- Next.js 15 (App Router, TypeScript)
+- Tailwind CSS v4
+- shadcn/ui (new-york style, zinc color scheme)
+
+## Pre-installed shadcn/ui Components (use only these — do NOT install new ones)
+Button, Card, Input, Label, Dialog, DropdownMenu, Table, Badge, Toaster
+
+## Steps
+1. Clone the repository: \`git clone https://github.com/${repoFullName}\`
+2. Create branch: \`git checkout -b feat/ai-initial-codebase\`
+3. Use Codex (or equivalent) to generate domain-specific pages, routes, and components tailored to the app description
+4. Required files to generate:
+   - \`src/app/page.tsx\` — Main landing/dashboard page with real content
+   - \`src/app/layout.tsx\` — Root layout with sidebar or top nav
+   - At least 2 domain-specific pages (e.g. \`src/app/contacts/page.tsx\`)
+   - At least 1 API route (e.g. \`src/app/api/[resource]/route.ts\`)
+   - \`src/components/Sidebar.tsx\` or \`src/components/Header.tsx\` — navigation component
+5. Commit all generated files
+6. Push the branch and create a PR targeting \`main\`
+
+## Rules
+- Use TypeScript (.tsx/.ts), NOT JavaScript
+- Use Tailwind classes for all styling
+- Import shadcn components from \`@/components/ui/[name]\`
+- Make the UI look polished and professional
+- Add realistic placeholder data arrays for list views
+- **Do NOT add new npm dependencies** — use only pre-installed packages
+- Keep file sizes reasonable (100–300 lines each)
+- Make navigation match the actual pages you create
+
+## PR
+Create a PR with title: \`feat: AI-generated ${appName} initial codebase\`
+The PR should target the \`main\` branch.
+`;
+}
+
+/**
+ * Create a codegen task in agent_tasks for the dispatcher to pick up.
+ */
+async function createCodegenTask({ appId, appSlug, appName, appDescription, repoFullName, parentTaskId }) {
+  const description = buildCodegenTaskDescription(appName, appDescription, repoFullName);
+  const { data, error } = await supabase
+    .from("agent_tasks")
+    .insert({
+      title: `App Factory — Generate initial code for ${appName}`,
+      description,
+      type: "coding",
+      priority: "high",
+      status: "todo",
+      repository_url: `https://github.com/${repoFullName}`,
+      ...(appId && { app_id: appId }),
+      dispatched_by: "app-factory",
+      metadata: {
+        app_id: appId,
+        app_slug: appSlug,
+        pipeline_step: "ai_codegen",
+        parent_task_id: parentTaskId,
+      },
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to create codegen task: ${error.message}`);
+  return data;
+}
+
+/**
+ * Poll an agent_task until it reaches a terminal/ready state.
+ *
+ * @param {string} taskId
+ * @param {number} timeoutMs
+ * @param {number} pollIntervalMs
+ * @returns {Promise<object>} The completed task row
+ */
+async function pollCodegenTask(taskId, timeoutMs = 600000, pollIntervalMs = 10000) {
+  const deadline = Date.now() + timeoutMs;
+  const terminalStatuses = ["qa_testing", "completed", "deployed"];
+
+  while (Date.now() < deadline) {
+    const { data: task, error } = await supabase
+      .from("agent_tasks")
+      .select("id,status,result,pull_request_url")
+      .eq("id", taskId)
+      .single();
+
+    if (error) {
+      console.warn(`[AI-CODEGEN] Poll error for task ${taskId}:`, error.message);
+    } else if (task.status === "failed") {
+      const errMsg = task.result?.error || task.result?.summary || "Unknown error";
+      throw new Error(`Codegen task failed: ${errMsg}`);
+    } else if (terminalStatuses.includes(task.status)) {
+      return task;
+    }
+
+    await new Promise((r) => setTimeout(r, pollIntervalMs));
+  }
+
+  throw new Error(`Codegen task ${taskId} timed out after ${timeoutMs / 1000}s`);
+}
+
+/**
  * Main entry point: run the AI customization pass on a freshly scaffolded repo.
  *
  * @param {string} appName - Human-readable app name
  * @param {string} appDescription - User's description of what the app should do
  * @param {string} repoFullName - GitHub full repo name (e.g. "dante-alpha-assistant/my-crm")
- * @param {string|null} taskId - The agent task ID to post progress comments to
+ * @param {string|null} parentTaskId - The agent task ID to post progress comments to
+ * @param {object} opts - Optional: { appId, appSlug }
  * @returns {Promise<{prUrl: string, fileCount: number}>}
  */
-export async function generateAppCode(appName, appDescription, repoFullName, taskId) {
+export async function generateAppCode(appName, appDescription, repoFullName, parentTaskId, opts = {}) {
   if (!GH_TOKEN) throw new Error("GH_TOKEN not configured");
   if (!appDescription || appDescription.trim().length < 50) {
     throw new Error("App description too short for AI generation (minimum 50 characters)");
   }
 
+  // Task-based pipeline (default enabled; set USE_TASK_PIPELINE=false to use legacy LLM path)
+  if (process.env.USE_TASK_PIPELINE !== "false") {
+    console.log(`[AI-CODEGEN] Using task-based pipeline for "${appName}" (${repoFullName})`);
+
+    const task = await createCodegenTask({
+      appId: opts.appId,
+      appSlug: opts.appSlug,
+      appName,
+      appDescription,
+      repoFullName,
+      parentTaskId,
+    });
+    console.log(`[AI-CODEGEN] Codegen task created: ${task.id}`);
+
+    await postComment(parentTaskId, `🤖 Dispatched AI codegen task ${task.id}. Waiting for agent to pick up...`);
+
+    const completedTask = await pollCodegenTask(task.id);
+    console.log(`[AI-CODEGEN] Codegen task completed: ${task.id} (status=${completedTask.status})`);
+
+    const prUrlRaw = completedTask.pull_request_url || completedTask.result?.pull_request_url;
+    const prUrl = Array.isArray(prUrlRaw) ? prUrlRaw[0] : prUrlRaw;
+    if (!prUrl) throw new Error("Codegen task completed but no pull_request_url found in result");
+
+    await postComment(parentTaskId, `✅ Agent completed codegen. PR: ${prUrl}`);
+    return { prUrl, fileCount: 0 };
+  }
+
+  // --- Legacy direct LLM path (USE_TASK_PIPELINE=false) ---
+  const taskId = parentTaskId;
   console.log(`[AI-CODEGEN] Starting AI customization for "${appName}" (${repoFullName})`);
   await postComment(taskId, `🤖 AI is analyzing "${appName}"...`);
 
