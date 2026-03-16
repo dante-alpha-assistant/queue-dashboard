@@ -79,6 +79,7 @@ const initialState = {
   selectedTemplate: null,
   submitting: false,
   error: null,
+  aiAnalysisLoading: false,
 };
 
 function reducer(state, action) {
@@ -148,6 +149,9 @@ function getStepHint(state) {
     }
     case 1:
       if (state.repoSource !== "scratch" && state.repos.length === 0) return "Select at least one repository";
+      return null;
+    case 2:
+      if (state.aiAnalysisLoading) return "Waiting for AI analysis to complete...";
       return null;
     default:
       return null;
@@ -606,7 +610,14 @@ export default function AppOnboardingWizard() {
                 transition: "all 200ms",
               }}
             >
-              Next <ChevronRight size={18} />
+              {state.step === 2 && state.aiAnalysisLoading ? (
+                <>
+                  <Loader2 size={16} style={{ animation: "spin 0.8s linear infinite" }} />
+                  Analyzing...
+                </>
+              ) : (
+                <>Next <ChevronRight size={18} /></>
+              )}
             </button>
           </div>
         ) : (

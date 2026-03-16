@@ -279,7 +279,6 @@ function ManualConfig({ state, dispatch }) {
 }
 
 export default function StepDeployTargets({ state, dispatch }) {
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showManual, setShowManual] = useState(false);
 
@@ -305,7 +304,7 @@ export default function StepDeployTargets({ state, dispatch }) {
       return;
     }
 
-    setLoading(true);
+    dispatch({ type: "SET_FIELD", field: "aiAnalysisLoading", value: true });
     setError(null);
 
     fetch("/api/apps/suggest-deploy", {
@@ -341,12 +340,12 @@ export default function StepDeployTargets({ state, dispatch }) {
         setError("Could not analyze your app — please configure manually below.");
         setShowManual(true);
       })
-      .finally(() => setLoading(false));
+      .finally(() => dispatch({ type: "SET_FIELD", field: "aiAnalysisLoading", value: false }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Loading state
-  if (loading) {
+  if (state.aiAnalysisLoading) {
     return (
       <div className="step-fields-stagger" style={{ gap: 20 }}>
         <div className="step-field" style={{
