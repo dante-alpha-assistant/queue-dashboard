@@ -359,7 +359,7 @@ export async function runScaffoldPipeline(app) {
     console.log(`[SCAFFOLD] Starting AI codegen pass for "${name}" (task=${task.id})`);
     await emitStep(id, "ai_codegen", "in_progress");
     try {
-      const { prUrl, fileCount } = await generateAppCode(name, description, fullName, task.id);
+      const { prUrl, fileCount } = await generateAppCode(name, description, fullName, task.id, { appId: id, appSlug: slug });
       console.log(`[SCAFFOLD] AI codegen done — ${fileCount} files, PR: ${prUrl}`);
       await emitStep(id, "ai_codegen", "done");
       // Mark coding task as qa_testing and store the PR URL

@@ -275,11 +275,15 @@ function StageRow({ stage, status, tasks, comments, stepData }) {
                 animation: "buildBlink 1s ease-in-out infinite",
               }}
             >
-              {stage.id === "ai_codegen" && elapsed ? `${elapsed} elapsed` : "in progress"}
+              {stage.id === "ai_codegen"
+                ? elapsed
+                  ? `${elapsed} elapsed`
+                  : "Waiting for agent…"
+                : "in progress"}
             </span>
           )}
           {status === "in_progress" && stage.id === "ai_codegen" && (
-            <span style={{ fontSize: "11px", color: "#49454F" }}>(may take 5–15 min)</span>
+            <span style={{ fontSize: "11px", color: "#49454F" }}>(agent is coding — may take 10–20 min)</span>
           )}
         </div>
         {matchingTasks.length > 0 && (
@@ -361,7 +365,7 @@ function StageRow({ stage, status, tasks, comments, stepData }) {
                   whiteSpace: "nowrap",
                 }}
               >
-                📄 {trimComment(c.content)}
+                📄 {trimComment(c.body)}
               </div>
             ))}
           </div>
