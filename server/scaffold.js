@@ -343,54 +343,7 @@ export async function runScaffoldPipeline(app) {
     console.log(`[SCAFFOLD] Verified: template files present (package.json, next.config.ts, src/app/page.tsx)`);
     await emitStep(id, "scaffold", "done");
 
-    // 4. Create coding task (so AI codegen can post comments to it)
-    console.log(`[SCAFFOLD] Creating coding task for "${name}"`);
-    const task = await createCodingTask({
-      appId: id,
-      appName: name,
-      appDescription: description,
-      repoFullName: fullName,
-      deployTarget: deploy_target || "vercel",
-      hasDatabase: false, // Will be updated after Supabase provisioning
-    });
-    console.log(`[SCAFFOLD] Coding task created: ${task.id}`);
-
-    // 5. AI customization pass — generate pages, API routes, components, navigation
-    console.log(`[SCAFFOLD] Starting AI codegen pass for "${name}" (task=${task.id})`);
-    await emitStep(id, "ai_codegen", "in_progress");
-    try {
-      const { prUrl, fileCount } = await generateAppCode(name, description, fullName, task.id, { appId: id, appSlug: slug });
-      console.log(`[SCAFFOLD] AI codegen done — ${fileCount} files, PR: ${prUrl}`);
-      await emitStep(id, "ai_codegen", "done");
-      // Mark coding task as qa_testing and store the PR URL
-      await supabase
-        .from("agent_tasks")
-        .update({
-          status: "qa_testing",
-          pull_request_url: [prUrl],
-          completed_at: new Date().toISOString(),
-          result: {
-            summary: `AI generated ${fileCount} files for ${name}. PR: ${prUrl}`,
-            artifacts: [{ type: "pr", url: prUrl }],
-          },
-        })
-        .eq("id", task.id);
-    } catch (codegenErr) {
-      // Non-fatal: log the error, leave task in 'todo' for manual pickup
-      console.warn(`[SCAFFOLD] AI codegen failed (non-fatal): ${codegenErr.message}`);
-      await emitStep(id, "ai_codegen", "failed", codegenErr.message);
-      await supabase
-        .from("agent_tasks")
-        .update({
-          result: {
-            summary: `AI codegen attempted but failed: ${codegenErr.message}. Task left in todo for manual pickup.`,
-          },
-        })
-        .eq("id", task.id)
-        .catch(() => {});
-    }
-
-    // 6. Create Vercel project (if deploy_target=vercel and VERCEL_TOKEN is set)
+    // 4. Create Vercel project (if deploy_target=vercel and VERCEL_TOKEN is set)
     let vercelProjectId = null;
     let vercelUrl = null;
 
@@ -511,7 +464,7 @@ export async function runScaffoldPipeline(app) {
           await emitStep(id, "vercel_deploy", "warning", deployErr.message);
         }
 
-        // 5. Add custom subdomain: {slug}.dante.id → cname.vercel-dns.com
+        // 4c. Add custom subdomain: {slug}.dante.id → cname.vercel-dns.com
         let customDomain = null;
         try {
           const subdomain = `${slug}.dante.id`;
@@ -578,6 +531,55 @@ export async function runScaffoldPipeline(app) {
     } else if (!VERCEL_TOKEN) {
       console.warn("[SCAFFOLD] VERCEL_TOKEN not configured — skipping Vercel project creation");
     }
+
+    // 5. Create coding task (so AI codegen can post comments to it)
+    console.log(`[SCAFFOLD] Creating coding task for "${name}"`);
+    const task = await createCodingTask({
+      appId: id,
+      appName: name,
+      appDescription: description,
+      repoFullName: fullName,
+      deployTarget: deploy_target || "vercel",
+      hasDatabase: false, // Will be updated after Supabase provisioning
+    });
+    console.log(`[SCAFFOLD] Coding task created: ${task.id}`);
+
+    // 6. AI customization pass — generate pages, API routes, components, navigation
+    console.log(`[SCAFFOLD] Starting AI codegen pass for "${name}" (task=${task.id})`);
+    await emitStep(id, "ai_codegen", "in_progress");
+    try {
+      const { prUrl, fileCount } = await generateAppCode(name, description, fullName, task.id, { appId: id, appSlug: slug });
+      console.log(`[SCAFFOLD] AI codegen done — ${fileCount} files, PR: ${prUrl}`);
+      await emitStep(id, "ai_codegen", "done");
+      // Mark coding task as qa_testing and store the PR URL
+      await supabase
+        .from("agent_tasks")
+        .update({
+          status: "qa_testing",
+          pull_request_url: [prUrl],
+          completed_at: new Date().toISOString(),
+          result: {
+            summary: `AI generated ${fileCount} files for ${name}. PR: ${prUrl}`,
+            artifacts: [{ type: "pr", url: prUrl }],
+          },
+        })
+        .eq("id", task.id);
+    } catch (codegenErr) {
+      // Non-fatal: log the error, leave task in 'todo' for manual pickup
+      console.warn(`[SCAFFOLD] AI codegen failed (non-fatal): ${codegenErr.message}`);
+      await emitStep(id, "ai_codegen", "failed", codegenErr.message);
+      await supabase
+        .from("agent_tasks")
+        .update({
+          result: {
+            summary: `AI codegen attempted but failed: ${codegenErr.message}. Task left in todo for manual pickup.`,
+          },
+        })
+        .eq("id", task.id)
+        .catch(() => {});
+    }
+
+    
 
     // 6. Supabase auto-provisioning (if needs_database or detected from description)
     const shouldProvisionDb = needs_database || detectNeedsDatabase(description || "");
