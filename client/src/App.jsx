@@ -14,12 +14,13 @@ import BatchDeployModal from "./components/BatchDeployModal";
 import Pingboard from "./pages/Pingboard";
 import HealthDashboard from "./pages/HealthDashboard";
 import AppsPage from "./pages/AppsPage";
+import SettingsPage from "./pages/SettingsPage";
 import AppOnboardingWizard from "./pages/onboarding/AppOnboardingWizard";
 import AppBuildProgress from "./pages/AppBuildProgress";
 import AppDetailPage from "./pages/AppDetailPage";
 import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
 import AppFilter from "./components/AppFilter";
-import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Package, Plus, Rocket, Search, XCircle, Zap } from 'lucide-react';
+import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Package, Plus, Rocket, Search, Settings, XCircle, Zap } from 'lucide-react';
 
 const MOBILE_TABS = [
   { key: "todo", label: "Todo", icon: "📋" },
@@ -52,6 +53,7 @@ function AppRouter() {
       <Route path="/apps/new" element={<AppOnboardingWizard />} />
       <Route path="/apps/:id/building" element={<AppBuildProgress />} />
       <Route path="/apps/:id" element={<AppDetailPage />} />
+      <Route path="/settings" element={<SettingsPage />} />
       <Route path="*" element={<AppMain />} />
     </Routes>
   );
@@ -171,9 +173,10 @@ function AppMain() {
     { key: "pingboard", label: "Pingboard", Icon: Bot },
     { key: "health", label: "Health", Icon: HeartPulse },
     { key: "apps", label: "Apps", Icon: Package },
+    { key: "settings", label: "Settings", Icon: Settings },
   ];
 
-  if (view === "pingboard" || view === "health" || view === "apps") {
+  if (view === "pingboard" || view === "health" || view === "apps" || view === "settings") {
     return (
       <div style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
         <div className="header-glass" style={{
@@ -198,7 +201,7 @@ function AppMain() {
           ))}
         </div>
         <div style={{ paddingTop: 42 }}>
-          {view === "pingboard" ? <Pingboard /> : view === "apps" ? <AppsPage /> : <HealthDashboard />}
+          {view === "pingboard" ? <Pingboard /> : view === "apps" ? <AppsPage /> : view === "settings" ? <SettingsPage /> : <HealthDashboard />}
         </div>
       </div>
     );
@@ -305,6 +308,9 @@ function AppMain() {
               </button>
               <button onClick={() => setView("apps")} className="nav-tab" style={{ padding: "4px 8px" }}>
                 <Package size={16} strokeWidth={1.8} />
+              </button>
+              <button onClick={() => setView("settings")} className="nav-tab" style={{ padding: "4px 8px" }}>
+                <Settings size={16} strokeWidth={1.8} />
               </button>
             </div>
           </div>
