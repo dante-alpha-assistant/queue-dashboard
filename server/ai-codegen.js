@@ -460,17 +460,12 @@ export async function generateAppCode(appName, appDescription, repoFullName, par
       console.log(`[AI-CODEGEN] Using existing task ${taskId} (no duplicate)`);
     }
 
-    await postComment(taskId, `🤖 AI codegen dispatched. Waiting for agent to pick up...`);
+    await postComment(taskId, `🤖 AI codegen task dispatched. Agent will pick it up and auto-deploy when done.`);
 
-    const completedTask = await pollCodegenTask(taskId);
-    console.log(`[AI-CODEGEN] Codegen task completed: ${taskId} (status=${completedTask.status})`);
-
-    const prUrlRaw = completedTask.pull_request_url || completedTask.result?.pull_request_url;
-    const prUrl = Array.isArray(prUrlRaw) ? prUrlRaw[0] : prUrlRaw;
-    if (!prUrl) throw new Error("Codegen task completed but no pull_request_url found in result");
-
-    await postComment(taskId, `✅ Agent completed codegen. PR: ${prUrl}`);
-    return { prUrl, fileCount: 0 };
+    // Fire-and-forget: don't poll. The dispatcher handles:
+    // qa_testing → completed (auto-QA-skip) → deployed (auto-deploy)
+    console.log(`[AI-CODEGEN] Task ${taskId} dispatched — returning immediately (no poll)`);
+    return { prUrl: null, fileCount: 0 };
   }
 
   // --- Legacy direct LLM path (USE_TASK_PIPELINE=false) ---
