@@ -309,6 +309,23 @@ ${dbNote}
     console.log(`[SCAFFOLD] Task ${i + 1}/${taskDefs.length}: ${data.id} — ${def.title} (status: ${data.status})`);
   }
 
+  // Create depends_on relationships: task[i] depends_on task[i-1]
+  for (let i = 1; i < createdTasks.length; i++) {
+    const { error: relErr } = await supabase
+      .from("task_relationships")
+      .insert({
+        source_task_id: createdTasks[i].id,
+        target_task_id: createdTasks[i - 1].id,
+        relationship_type: "depends_on",
+        created_by: "app-factory",
+      });
+    if (relErr) {
+      console.error(`[SCAFFOLD] Failed to create depends_on relationship ${i}: ${relErr.message}`);
+    } else {
+      console.log(`[SCAFFOLD] Task ${i + 1} depends_on Task ${i}`);
+    }
+  }
+
   return createdTasks;
 }
 
