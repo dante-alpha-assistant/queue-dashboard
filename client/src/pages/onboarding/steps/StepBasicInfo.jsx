@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import TemplateGallery, { TEMPLATES } from "./TemplateGallery";
 
 const inputStyle = {
@@ -23,6 +23,7 @@ const sectionHeaderStyle = {
 
 export default function StepBasicInfo({ state, dispatch }) {
   const nameRef = useRef(null);
+  const isExisting = state.repoSource === "existing";
 
   useEffect(() => {
     // Focus name input with a small delay to allow animation — only on scratch
@@ -31,6 +32,14 @@ export default function StepBasicInfo({ state, dispatch }) {
       return () => clearTimeout(timer);
     }
   }, [state.selectedTemplate]);
+
+  function handleStartingPointSelect(value) {
+    dispatch({ type: "SET_FIELD", field: "repoSource", value });
+    if (value === "existing") {
+      // Clear template selection when switching to existing mode
+      dispatch({ type: "SET_FIELD", field: "selectedTemplate", value: null });
+    }
+  }
 
   function handleTemplateSelect(templateId) {
     dispatch({ type: "SET_FIELD", field: "selectedTemplate", value: templateId });
@@ -51,15 +60,79 @@ export default function StepBasicInfo({ state, dispatch }) {
 
   return (
     <div className="step-fields-stagger">
-      {/* Template gallery */}
+      {/* Starting point cards */}
       <div className="step-field" style={{ "--field-index": 0 }}>
         <div style={sectionHeaderStyle}>
           <span>Choose a starting point</span>
         </div>
-        <TemplateGallery
-          selectedTemplate={state.selectedTemplate ?? null}
-          onSelect={handleTemplateSelect}
-        />
+        <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+          {/* Start from scratch card */}
+          <button
+            onClick={() => handleStartingPointSelect("scratch")}
+            style={{
+              flex: 1, padding: "16px 18px", borderRadius: 14, cursor: "pointer", textAlign: "left",
+              border: `2px solid ${!isExisting ? "#7C3AED" : "#E2E8F0"}`,
+              background: !isExisting ? "rgba(124,58,237,0.06)" : "#FFFFFF",
+              boxShadow: !isExisting ? "0 2px 12px rgba(124,58,237,0.12)" : "0 1px 3px rgba(0,0,0,0.06)",
+              transition: "all 200ms", display: "flex", flexDirection: "column", gap: 8,
+              fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 10,
+                background: !isExisting ? "#7C3AED" : "#F1F5F9",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 18, transition: "all 200ms",
+              }}>✨</div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: !isExisting ? "#7C3AED" : "#111827" }}>
+                  Start from scratch
+                </div>
+                <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>
+                  Describe your app, AI builds it
+                </div>
+              </div>
+            </div>
+          </button>
+          {/* Connect existing app card */}
+          <button
+            onClick={() => handleStartingPointSelect("existing")}
+            style={{
+              flex: 1, padding: "16px 18px", borderRadius: 14, cursor: "pointer", textAlign: "left",
+              border: `2px solid ${isExisting ? "#7C3AED" : "#E2E8F0"}`,
+              background: isExisting ? "rgba(124,58,237,0.06)" : "#FFFFFF",
+              boxShadow: isExisting ? "0 2px 12px rgba(124,58,237,0.12)" : "0 1px 3px rgba(0,0,0,0.06)",
+              transition: "all 200ms", display: "flex", flexDirection: "column", gap: 8,
+              fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 10,
+                background: isExisting ? "#7C3AED" : "#F1F5F9",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 18, transition: "all 200ms",
+              }}>🔗</div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: isExisting ? "#7C3AED" : "#111827" }}>
+                  Connect existing app
+                </div>
+                <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>
+                  Link to an already-deployed app
+                </div>
+              </div>
+            </div>
+          </button>
+        </div>
+
+        {/* Template gallery — only shown for scratch mode */}
+        {!isExisting && (
+          <TemplateGallery
+            selectedTemplate={state.selectedTemplate ?? null}
+            onSelect={handleTemplateSelect}
+          />
+        )}
       </div>
 
       {/* Divider */}
@@ -107,7 +180,7 @@ export default function StepBasicInfo({ state, dispatch }) {
         </span>
       </div>
 
-      <div className="step-field" style={{ "--field-index": 4 }}>
+      {!isExisting && <div className="step-field" style={{ "--field-index": 4 }}>
         <label style={labelStyle}>Description *</label>
         {(() => {
           const descLen = (state.description || "").trim().length;
@@ -172,7 +245,7 @@ export default function StepBasicInfo({ state, dispatch }) {
             </>
           );
         })()}
-      </div>
+      </div>}
 
       <div className="step-field" style={{ "--field-index": 5 }}>
         <label style={labelStyle}>Icon / Emoji (optional)</label>

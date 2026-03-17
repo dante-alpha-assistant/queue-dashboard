@@ -283,7 +283,8 @@ export default function StepDeployTargets({ state, dispatch }) {
   const [showManual, setShowManual] = useState(false);
 
   useEffect(() => {
-    // Skip if suggestions already loaded
+    // Skip for existing mode and if suggestions already loaded
+    if (state.repoSource === "existing") return;
     if (state.aiSuggestions) return;
 
     // Build repos list for the API call
@@ -343,6 +344,58 @@ export default function StepDeployTargets({ state, dispatch }) {
       .finally(() => dispatch({ type: "SET_FIELD", field: "aiAnalysisLoading", value: false }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // "existing" mode — simplified deploy URL entry (after all hooks)
+  if (state.repoSource === "existing") {
+    return (
+      <div className="step-fields-stagger" style={{ gap: 20 }}>
+        <div className="step-field" style={{ "--field-index": 0 }}>
+          <div style={{
+            padding: "24px 22px", borderRadius: 16,
+            border: "1px solid rgba(124,58,237,0.2)",
+            background: "rgba(124,58,237,0.03)",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 12, background: "#7C3AED",
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
+              }}>🔗</div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#111827" }}>Existing Deployment</div>
+                <div style={{ fontSize: 12, color: "#6B7280" }}>Link your already-deployed project URL</div>
+              </div>
+            </div>
+            <label style={labelStyle}>Vercel Project or Deployment URL (optional)</label>
+            <input
+              value={state.existingDeployUrl || ""}
+              onChange={e => dispatch({ type: "SET_FIELD", field: "existingDeployUrl", value: e.target.value })}
+              placeholder="https://my-project.vercel.app or project-name"
+              style={{
+                width: "100%", padding: "12px 16px", borderRadius: 12,
+                border: "1px solid var(--md-surface-variant, #E7E0EC)",
+                background: "var(--md-surface, #FFFBFE)",
+                color: "var(--md-on-surface, #1C1B1F)", fontSize: 14,
+                fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                outline: "none", boxSizing: "border-box",
+                transition: "border-color 200ms, box-shadow 200ms",
+              }}
+              onFocus={e => {
+                e.target.style.borderColor = "#7C3AED";
+                e.target.style.boxShadow = "0 0 0 3px rgba(124,58,237,0.12)";
+              }}
+              onBlur={e => {
+                e.target.style.borderColor = "var(--md-surface-variant, #E7E0EC)";
+                e.target.style.boxShadow = "none";
+              }}
+            />
+            <span style={{ fontSize: 11, color: "#6B7280", marginTop: 6, display: "block" }}>
+              e.g., https://my-project.vercel.app — leave blank to configure later
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Loading state
   if (state.aiAnalysisLoading) {
