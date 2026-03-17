@@ -102,6 +102,7 @@ function RepoList({ repos, isSelected, onToggle, loading, emptyMsg }) {
 export default function StepConnectRepos({ state, dispatch }) {
   const userSearchTimer = useState(null)[0];
   const [oauthError, setOauthError] = useState(null);
+  const [repoLoadError, setRepoLoadError] = useState(null);
   const [connectingOAuth, setConnectingOAuth] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -109,12 +110,15 @@ export default function StepConnectRepos({ state, dispatch }) {
   const searchUserRepos = useCallback(async (q) => {
     if (!state.githubToken) return;
     dispatch({ type: "SET_FIELD", field: "userRepoLoading", value: true });
+    setRepoLoadError(null);
     try {
       const resp = await fetch(`/api/github/user-repos?token=${encodeURIComponent(state.githubToken)}&q=${encodeURIComponent(q)}`);
-      if (!resp.ok) throw new Error("Search failed");
-      dispatch({ type: "SET_FIELD", field: "userRepoResults", value: await resp.json() });
-    } catch {
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data?.error || `GitHub repo load failed (${resp.status})`);
+      dispatch({ type: "SET_FIELD", field: "userRepoResults", value: Array.isArray(data) ? data : [] });
+    } catch (e) {
       dispatch({ type: "SET_FIELD", field: "userRepoResults", value: [] });
+      setRepoLoadError(e.message || "Could not load repositories");
     } finally {
       dispatch({ type: "SET_FIELD", field: "userRepoLoading", value: false });
     }
@@ -379,7 +383,9 @@ export default function StepConnectRepos({ state, dispatch }) {
                 isSelected={isSelected}
                 onToggle={onToggle}
                 loading={state.userRepoLoading}
-                emptyMsg={state.userRepoSearch ? "No repos found" : "Loading your repos..."}
+                emptyMsg={repoLoadError || (state.userRepoLoading
+                  ? "Loading your repos..."
+                  : (state.userRepoSearch ? "No repos found" : "No repositories available"))}
               />
             </div>
           </>
@@ -611,7 +617,9 @@ export default function StepConnectRepos({ state, dispatch }) {
                   isSelected={isSelected}
                   onToggle={onToggle}
                   loading={state.userRepoLoading}
-                  emptyMsg={state.userRepoSearch ? "No repos found" : "Loading your repos..."}
+                  emptyMsg={repoLoadError || (state.userRepoLoading
+                    ? "Loading your repos..."
+                    : (state.userRepoSearch ? "No repos found" : "No repositories available"))}
                 />
               </div>
             </>
