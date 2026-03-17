@@ -225,56 +225,157 @@ export default function StepConnectRepos({ state, dispatch }) {
     );
   };
 
-  // ── "Connect existing app" simplified UI ─────────────────
+  // ── "Connect existing app" — reuse GitHub OAuth connect flow ─────
   if (state.startingMode === "existing") {
     return (
       <div className="step-fields-stagger" style={{ gap: 18 }}>
-        <div className="step-field" style={{ "--field-index": 0 }}>
-          <div style={{
-            padding: "20px 22px", borderRadius: 16,
+        {!state.githubToken ? (
+          <div className="step-field" style={{
+            "--field-index": 0,
+            display: "flex", flexDirection: "column", alignItems: "center",
+            gap: 14, padding: "32px 24px",
             border: "1px solid #E2E8F0",
-            background: "#FFFFFF",
-            display: "flex", flexDirection: "column", gap: 6,
+            borderRadius: 16, background: "#FFFFFF",
+            textAlign: "center",
           }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", marginBottom: 2 }}>
-              Existing GitHub Repository
-            </div>
-            <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 12 }}>
-              Enter the URL of your existing GitHub repository. We&apos;ll link it without creating a new one.
-            </div>
-            <label style={{
-              fontSize: 12, fontWeight: 600, color: "#49454F",
-              marginBottom: 4, display: "block", textTransform: "uppercase", letterSpacing: "0.04em",
+            <div style={{
+              width: 56, height: 56, borderRadius: 16,
+              background: "#F1F5F9",
+              display: "flex", alignItems: "center", justifyContent: "center",
             }}>
-              Repository URL <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optional)</span>
-            </label>
-            <input
-              type="url"
-              value={state.existingRepoUrl || ""}
-              onChange={e => dispatch({ type: "SET_FIELD", field: "existingRepoUrl", value: e.target.value })}
-              placeholder="https://github.com/owner/my-repo"
+              <Github size={28} color="#6B7280" />
+            </div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", marginBottom: 4 }}>
+                Connect your GitHub account
+              </div>
+              <div style={{ fontSize: 13, color: "#6B7280", lineHeight: 1.6 }}>
+                Connect to browse and select the repository for your existing app.<br />
+                We&apos;ll request read-only access. You can revoke it any time in GitHub settings.
+              </div>
+            </div>
+            {oauthError && (
+              <div style={{
+                padding: "10px 16px", borderRadius: 10,
+                background: "rgba(179,38,30,0.06)", color: "#DC2626",
+                fontSize: 13, fontWeight: 500, border: "1px solid rgba(179,38,30,0.2)",
+                width: "100%", boxSizing: "border-box",
+              }}>
+                {oauthError}
+              </div>
+            )}
+            <button
+              onClick={handleConnectGitHub}
+              disabled={connectingOAuth}
               style={{
-                width: "100%", padding: "12px 16px", borderRadius: 12,
-                border: "1px solid #E2E8F0", background: "#FFFFFF",
-                color: "#111827", fontSize: 14,
+                display: "inline-flex", alignItems: "center", gap: 10,
+                padding: "12px 24px", borderRadius: 100, border: "none",
+                background: connectingOAuth ? "#E2E8F0" : "#24292F",
+                color: connectingOAuth ? "#9CA3AF" : "#fff",
+                cursor: connectingOAuth ? "not-allowed" : "pointer",
+                fontSize: 14, fontWeight: 700,
                 fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
-                outline: "none", boxSizing: "border-box",
-                transition: "border-color 200ms, box-shadow 200ms",
+                boxShadow: connectingOAuth ? "none" : "0 2px 10px rgba(0,0,0,0.15)",
+                transition: "all 150ms",
               }}
-              onFocus={e => {
-                e.target.style.borderColor = "#7C3AED";
-                e.target.style.boxShadow = "0 0 0 3px rgba(124,58,237,0.12)";
-              }}
-              onBlur={e => {
-                e.target.style.borderColor = "#E2E8F0";
-                e.target.style.boxShadow = "none";
-              }}
-            />
-            <span style={{ fontSize: 11, color: "#6B7280", marginTop: 4 }}>
-              Leave blank to add a repository later.
-            </span>
+            >
+              {connectingOAuth
+                ? <><Loader2 size={16} style={{ animation: "spin 0.8s linear infinite" }} /> Connecting...</>
+                : <><Github size={16} /> Connect with GitHub</>
+              }
+            </button>
           </div>
-        </div>
+        ) : (
+          <>
+            {/* Connected user badge */}
+            <div className="step-field" style={{
+              "--field-index": 0,
+              display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
+              borderRadius: 12, background: "rgba(124,58,237,0.06)",
+              border: "1px solid rgba(124,58,237,0.2)",
+            }}>
+              {state.githubUser?.avatar_url && (
+                <img src={state.githubUser.avatar_url} alt="" style={{ width: 28, height: 28, borderRadius: "50%" }} />
+              )}
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>
+                  Connected as <span style={{ color: "#7C3AED" }}>@{state.githubUser?.login || "you"}</span>
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  dispatch({ type: "SET_FIELD", field: "githubToken", value: null });
+                  dispatch({ type: "SET_FIELD", field: "githubUser", value: null });
+                  dispatch({ type: "SET_FIELD", field: "userRepoResults", value: [] });
+                  dispatch({ type: "SET_FIELD", field: "repos", value: [] });
+                }}
+                style={{
+                  fontSize: 12, color: "#6B7280", background: "none",
+                  border: "none", cursor: "pointer", padding: "4px 8px", borderRadius: 6,
+                  fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                }}
+              >
+                Disconnect
+              </button>
+            </div>
+
+            {/* Selected repos pills */}
+            {state.repos.length > 0 && (
+              <div className="step-field" style={{ "--field-index": 1, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {state.repos.map(r => (
+                  <span key={r.full_name} style={{
+                    display: "inline-flex", alignItems: "center", gap: 8,
+                    padding: "6px 14px", borderRadius: 100,
+                    background: "#7C3AED", color: "#fff",
+                    fontSize: 13, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace",
+                  }}>
+                    {r.name}
+                    <button onClick={() => dispatch({ type: "TOGGLE_REPO", repo: r })} style={{
+                      background: "none", border: "none", color: "rgba(255,255,255,0.7)",
+                      cursor: "pointer", padding: 0, display: "flex", fontSize: 16, lineHeight: 1,
+                    }}>×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* User repo search */}
+            <div className="step-field" style={{ "--field-index": 2, position: "relative" }}>
+              <div style={{ position: "absolute", left: 14, top: 14, color: "#9CA3AF", pointerEvents: "none", zIndex: 1 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+              </div>
+              <input
+                value={state.userRepoSearch || ""}
+                onChange={e => dispatch({ type: "SET_FIELD", field: "userRepoSearch", value: e.target.value })}
+                placeholder={`Search @${state.githubUser?.login || "your"} repos...`}
+                style={inputStyle}
+                onFocus={e => {
+                  e.target.style.borderColor = "#7C3AED";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(124,58,237,0.12)";
+                }}
+                onBlur={e => {
+                  e.target.style.borderColor = "#E2E8F0";
+                  e.target.style.boxShadow = "none";
+                }}
+              />
+              {state.userRepoLoading && (
+                <Loader2 size={16} style={{ position: "absolute", right: 14, top: 14, animation: "spin 0.8s linear infinite", color: "#9CA3AF" }} />
+              )}
+            </div>
+
+            <div className="step-field" style={{ "--field-index": 3 }}>
+              <RepoList
+                repos={state.userRepoResults || []}
+                isSelected={isSelected}
+                onToggle={onToggle}
+                loading={state.userRepoLoading}
+                emptyMsg={state.userRepoSearch ? "No repos found" : "Loading your repos..."}
+              />
+            </div>
+          </>
+        )}
       </div>
     );
   }
