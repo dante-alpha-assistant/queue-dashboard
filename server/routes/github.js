@@ -183,7 +183,7 @@ githubRouter.get("/callback", async (req, res) => {
 });
 
 // GET /api/github/user-repos?token=XXX&q=YYY
-// Returns repos for the authenticated user (using the OAuth token)
+// Returns repos the authenticated user can access (owned + collaborator + org member)
 githubRouter.get("/user-repos", async (req, res) => {
   const { token, q = "" } = req.query;
   if (!token) return res.status(401).json({ error: "Missing token" });
@@ -193,43 +193,50 @@ githubRouter.get("/user-repos", async (req, res) => {
   if (cached) return res.json(cached);
 
   try {
-    let repos;
-    if (q.trim()) {
-      // Search user repos
-      const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(q)}+user:@me&per_page=30`;
-      const resp = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/vnd.github+json",
-          "User-Agent": "queue-dashboard",
-        },
-      });
+    const affiliation = "owner,collaborator,organization_member";
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "User-Agent": "queue-dashboard",
+    };
+
+    let repos = [];
+    for (let page = 1; page <= 2; page++) {
+      const url = `https://api.github.com/user/repos?sort=updated&per_page=100&page=${page}&affiliation=${encodeURIComponent(affiliation)}`;
+      const resp = await fetch(url, { headers });
       if (!resp.ok) return res.status(resp.status).json({ error: `GitHub API error: ${resp.status}` });
-      const data = await resp.json();
-      repos = data.items || [];
-    } else {
-      const url = `https://api.github.com/user/repos?sort=updated&per_page=50&affiliation=owner`;
-      const resp = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/vnd.github+json",
-          "User-Agent": "queue-dashboard",
-        },
-      });
-      if (!resp.ok) return res.status(resp.status).json({ error: `GitHub API error: ${resp.status}` });
-      repos = await resp.json();
+      const pageRepos = await resp.json();
+      if (!Array.isArray(pageRepos) || pageRepos.length === 0) break;
+      repos.push(...pageRepos);
+      if (pageRepos.length < 100) break;
     }
 
-    const result = repos.map((r) => ({
-      full_name: r.full_name,
-      name: r.name,
-      description: r.description,
-      language: r.language,
-      updated_at: r.updated_at,
-      default_branch: r.default_branch,
-      html_url: r.html_url,
-      private: r.private,
-    }));
+    const query = q.trim().toLowerCase();
+    if (query) {
+      repos = repos.filter((r) => {
+        const haystack = [r.full_name, r.name, r.description].filter(Boolean).join("\n").toLowerCase();
+        return haystack.includes(query);
+      });
+    }
+
+    const seen = new Set();
+    const result = repos
+      .filter((r) => {
+        if (!r?.full_name || seen.has(r.full_name)) return false;
+        seen.add(r.full_name);
+        return true;
+      })
+      .map((r) => ({
+        full_name: r.full_name,
+        name: r.name,
+        description: r.description,
+        language: r.language,
+        updated_at: r.updated_at,
+        default_branch: r.default_branch,
+        html_url: r.html_url,
+        private: r.private,
+        owner_login: r.owner?.login || null,
+      }));
 
     setCache(cacheKey, result);
     res.json(result);
