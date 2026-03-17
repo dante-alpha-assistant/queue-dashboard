@@ -174,17 +174,21 @@ async function decomposeAppIntoTasks({ appName, appDescription, repoFullName, de
     + "App Description: " + (appDescription || "No description provided.") + "\n"
     + "Stack: Next.js 15 + TypeScript + Tailwind CSS v4 + shadcn/ui\n"
     + "Repo: https://github.com/" + repoFullName + "\n\n"
-    + "Decompose this app into 3-6 focused, sequential coding tasks. Each task should be completable in one PR by a single developer.\n\n"
+    + "Decompose this app into 3-6 focused coding tasks. Each task should be completable in one PR by a single developer. Prefer parallelizable tasks whenever possible.\n\n"
     + "Rules:\n"
     + "- Task 1 should ALWAYS be the layout/navigation shell (sidebar, header, routing)\n"
     + "- Subsequent tasks should each handle one domain feature (e.g. Customers CRUD, Deals Pipeline)\n"
     + "- Each task should specify which files/routes to create\n"
-    + "- Tasks are executed sequentially - later tasks can depend on earlier ones\n"
+    + "- Analyze dependencies carefully before adding them\n"
+    + "- ONLY add a dependency when Task B truly cannot be developed until Task A is completed\n"
+    + "- Do NOT add dependencies just because tasks are related or because they belong to the same app\n"
+    + "- Prefer independent tasks that can be developed in parallel after the layout shell is done\n"
     + "- Keep tasks focused: one feature per task, not the whole app\n"
     + "- Include API routes (/src/app/api/) where needed\n"
     + "- Every task must ensure the app builds (npm run build)\n\n"
-    + "Respond with ONLY a JSON array, no markdown, no explanation:\n"
-    + JSON.stringify([{title: "Short task title", description: "Detailed description..."}]) + "\n";
+    + "Respond with ONLY a JSON array, no markdown, no explanation. Each item must use this shape:\n"
+    + JSON.stringify([{title: "Short task title", description: "Detailed description...", dependsOnIndexes: [1]}]) + "\n"
+    + "Use dependsOnIndexes only when strictly necessary. Indexes are 1-based and refer to earlier tasks. Use an empty array or omit the field when there is no hard dependency.\n";
 
   let llmResponse;
   try {
@@ -241,7 +245,7 @@ async function decomposeAppIntoTasks({ appName, appDescription, repoFullName, de
 
 /**
  * Create multiple coding tasks for an app by decomposing via LLM.
- * Tasks have order field and dependency chain.
+ * Dependencies are only created when explicitly required by the task plan.
  */
 async function createMultipleCodingTasks({ appId, appName, appDescription, repoFullName, deployTarget, hasDatabase }) {
   console.log(`[SCAFFOLD] Decomposing "${appName}" into multiple tasks...`);
@@ -257,8 +261,9 @@ async function createMultipleCodingTasks({ appId, appName, appDescription, repoF
   
   for (let i = 0; i < taskDefs.length; i++) {
     const def = taskDefs[i];
-    const isFirst = i === 0;
-    const prevTask = createdTasks[createdTasks.length - 1];
+    const dependencyIndexes = Array.isArray(def.dependsOnIndexes)
+      ? [...new Set(def.dependsOnIndexes.map((n) => Number(n)).filter((n) => Number.isInteger(n) && n >= 1 && n <= taskDefs.length && n < i + 1))]
+      : [];
     
     const fullDescription = `${def.description}
 
@@ -289,10 +294,9 @@ ${dbNote}
         app_task_order: i + 1,
         app_task_total: taskDefs.length,
         app_name: appName,
+        depends_on_indexes: dependencyIndexes,
       },
     };
-
-    // Dependencies tracked via metadata.app_task_order (depends_on column not in schema)
 
     const { data, error } = await supabase
       .from("agent_tasks")
@@ -306,23 +310,32 @@ ${dbNote}
     }
     
     createdTasks.push(data);
-    console.log(`[SCAFFOLD] Task ${i + 1}/${taskDefs.length}: ${data.id} — ${def.title} (status: ${data.status})`);
+    console.log(`[SCAFFOLD] Task ${i + 1}/${taskDefs.length}: ${data.id} — ${def.title} (status: ${data.status}, deps: ${dependencyIndexes.join(",") || "none"})`);
   }
 
-  // Create depends_on relationships: task[i] depends_on task[i-1]
-  for (let i = 1; i < createdTasks.length; i++) {
-    const { error: relErr } = await supabase
-      .from("task_relationships")
-      .insert({
-        source_task_id: createdTasks[i].id,
-        target_task_id: createdTasks[i - 1].id,
-        relationship_type: "depends_on",
-        created_by: "app-factory",
-      });
-    if (relErr) {
-      console.error(`[SCAFFOLD] Failed to create depends_on relationship ${i}: ${relErr.message}`);
-    } else {
-      console.log(`[SCAFFOLD] Task ${i + 1} depends_on Task ${i}`);
+  for (let i = 0; i < createdTasks.length; i++) {
+    const dependencyIndexes = Array.isArray(taskDefs[i]?.dependsOnIndexes)
+      ? [...new Set(taskDefs[i].dependsOnIndexes.map((n) => Number(n)).filter((n) => Number.isInteger(n) && n >= 1 && n < i + 1 && n <= createdTasks.length))]
+      : [];
+
+    for (const depIndex of dependencyIndexes) {
+      const targetTask = createdTasks[depIndex - 1];
+      const sourceTask = createdTasks[i];
+      if (!targetTask || !sourceTask) continue;
+
+      const { error: relErr } = await supabase
+        .from("task_relationships")
+        .insert({
+          source_task_id: sourceTask.id,
+          target_task_id: targetTask.id,
+          relationship_type: "depends_on",
+          created_by: "app-factory",
+        });
+      if (relErr) {
+        console.error(`[SCAFFOLD] Failed to create depends_on relationship ${i + 1} -> ${depIndex}: ${relErr.message}`);
+      } else {
+        console.log(`[SCAFFOLD] Task ${i + 1} depends_on Task ${depIndex}`);
+      }
     }
   }
 
