@@ -160,7 +160,260 @@ async function createGitHubRepo(slug, description) {
  * Auto-create a coding task for the new app.
  * The task will be picked up by neo-worker to build the custom pages.
  */
-async function createCodingTask({ appId, appName, appDescription, repoFullName, deployTarget, hasDatabase }) {
+
+/**
+ * Use LLM to decompose an app description into multiple focused coding tasks.
+ * Returns an array of {title, description} objects.
+ */
+async function decomposeAppIntoTasks({ appName, appDescription, repoFullName, deployTarget }) {
+  const CHAT_WORKER_URL = process.env.NEO_CHAT_WORKER_URL || "http://neo-chat-worker.agents.svc.cluster.local:18789";
+  const CHAT_WORKER_TOKEN = process.env.NEO_CHAT_WORKER_TOKEN || "neo-chat-worker-gw-tok-2026";
+
+  const prompt = `You are a senior software architect decomposing an app into coding tasks for a team of AI agents.
+
+App Name: ${appName}
+App Description: ${appDescription || "No description provided."}
+Stack: Next.js 15 + TypeScript + Tailwind CSS v4 + shadcn/ui
+Repo: https://github.com/${repoFullName}
+
+Decompose this app into 3-6 focused, sequential coding tasks. Each task should be completable in one PR by a single developer.
+
+Rules:
+- Task 1 should ALWAYS be the layout/navigation shell (sidebar, header, routing)
+- Subsequent tasks should each handle one domain feature (e.g., "Customers CRUD", "Deals Pipeline")
+- Each task should specify which files/routes to create
+- Tasks are executed sequentially - later tasks can depend on earlier ones
+- Keep tasks focused: one feature per task, not the whole app
+- Include API routes (/src/app/api/) where needed
+- Every task must ensure the app builds (npm run build)
+
+Respond with ONLY a JSON array, no markdown, no explanation:
+[
+  {"title": "Short task title", "description": "Detailed description of what to build, which files to create, acceptance criteria"},
+  ...
+]`;
+
+  let llmResponse;
+  try {
+    console.log("[DECOMPOSE] Calling neo-chat-worker for task decomposition...");
+    const resp = await fetch(`${CHAT_WORKER_URL}/v1/chat/completions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${CHAT_WORKER_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "current", max_tokens: 4096, messages: [{ role: "user", content: prompt }] }),
+    });
+    if (!resp.ok) throw new Error(`neo-chat-worker ${resp.status}`);
+    const data = await resp.json();
+    llmResponse = data.choices?.[0]?.message?.content || "";
+    console.log("[DECOMPOSE] Got response from neo-chat-worker");
+  } catch (e) {
+    console.warn("[DECOMPOSE] neo-chat-worker failed:", e.message);
+  }
+
+  if (!llmResponse) {
+    const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
+    if (OPENROUTER_KEY) {
+      try {
+        console.log("[DECOMPOSE] Falling back to OpenRouter...");
+        const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${OPENROUTER_KEY}`, "Content-Type": "application/json", "HTTP-Referer": "https://tasks.dante.id" },
+          body: JSON.stringify({ model: "anthropic/claude-sonnet-4-5", max_tokens: 4096, messages: [{ role: "user", content: prompt }] }),
+        });
+        if (resp.ok) { const data = await resp.json(); llmResponse = data.choices?.[0]?.message?.content || ""; }
+      } catch (e) { console.warn("[DECOMPOSE] OpenRouter failed:", e.message); }
+    }
+  }
+
+  if (!llmResponse) {
+    console.warn("[DECOMPOSE] All backends failed, single task fallback");
+    return [{ title: "Build initial version", description: appDescription || "Build the app as described." }];
+  }
+
+  let cleaned = llmResponse.trim();
+  if (cleaned.startsWith("```")) cleaned = cleaned.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+  try {
+    const tasks = JSON.parse(cleaned);
+    if (!Array.isArray(tasks) || tasks.length === 0) throw new Error("Empty");
+    console.log("[DECOMPOSE] Decomposed into " + tasks.length + " tasks");
+    return tasks.slice(0, 6);
+  } catch (e) {
+    console.warn("[DECOMPOSE] Parse failed, single task fallback. Response:", cleaned.slice(0, 200));
+    return [{ title: "Build initial version", description: appDescription || "Build the app as described." }];
+  }
+}) {
+  const GH_TOKEN_LOCAL = process.env.GH_TOKEN;
+  const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
+  const NEO_GATEWAY = process.env.NEO_GATEWAY_URL || "http://neo.agents.svc.cluster.local:18789";
+  const NEO_TOKEN = process.env.NEO_GATEWAY_TOKEN || "neo-gw-tok-2026";
+
+  const prompt = `You are a senior software architect decomposing an app into coding tasks for a team of AI agents.
+
+App Name: ${appName}
+App Description: ${appDescription || "No description provided."}
+Stack: Next.js 15 + TypeScript + Tailwind CSS v4 + shadcn/ui
+Repo: https://github.com/${repoFullName}
+
+Decompose this app into 3-6 focused, sequential coding tasks. Each task should be completable in one PR by a single developer.
+
+Rules:
+- Task 1 should ALWAYS be the layout/navigation shell (sidebar, header, routing)
+- Subsequent tasks should each handle one domain feature (e.g., "Customers CRUD", "Deals Pipeline")
+- Each task should specify which files/routes to create
+- Tasks are executed sequentially — later tasks can depend on earlier ones
+- Keep tasks focused: one feature per task, not the whole app
+- Include API routes (/src/app/api/) where needed
+- Every task must ensure the app builds (npm run build)
+
+Respond with ONLY a JSON array, no markdown, no explanation:
+[
+  {"title": "Short task title", "description": "Detailed description of what to build, which files to create, acceptance criteria"},
+  ...
+]`;
+
+  let llmResponse;
+  
+  // Try OpenRouter first
+  if (OPENROUTER_KEY) {
+    try {
+      const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${OPENROUTER_KEY}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://tasks.dante.id",
+          "X-Title": "App Factory Task Decomposition",
+        },
+        body: JSON.stringify({
+          model: "anthropic/claude-sonnet-4-5",
+          max_tokens: 4096,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        llmResponse = data.choices?.[0]?.message?.content || "";
+      }
+    } catch (e) {
+      console.warn("[DECOMPOSE] OpenRouter failed:", e.message);
+    }
+  }
+
+  // Fallback to Neo gateway
+  if (!llmResponse) {
+    const resp = await fetch(`${NEO_GATEWAY}/v1/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${NEO_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "anthropic/claude-sonnet-4-5",
+        max_tokens: 4096,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    if (!resp.ok) throw new Error(`LLM decompose failed (${resp.status})`);
+    const data = await resp.json();
+    llmResponse = data.choices?.[0]?.message?.content || "";
+  }
+
+  // Parse JSON from response (handle markdown code blocks)
+  let cleaned = llmResponse.trim();
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+  }
+  
+  try {
+    const tasks = JSON.parse(cleaned);
+    if (!Array.isArray(tasks) || tasks.length === 0) throw new Error('Empty array');
+    return tasks.slice(0, 6); // Cap at 6
+  } catch (e) {
+    console.warn("[DECOMPOSE] Failed to parse LLM response, falling back to single task");
+    return [{
+      title: `Build initial version of ${appName}`,
+      description: appDescription || "Build the app as described."
+    }];
+  }
+}
+
+async function createCodingTask({ appId, appName, appDescription, repoFullName, deployTarget, hasDatabase }
+
+/**
+ * Create multiple coding tasks for an app by decomposing via LLM.
+ * Tasks have order field and dependency chain.
+ */
+async function createMultipleCodingTasks({ appId, appName, appDescription, repoFullName, deployTarget, hasDatabase }) {
+  console.log(`[SCAFFOLD] Decomposing "${appName}" into multiple tasks...`);
+  
+  const taskDefs = await decomposeAppIntoTasks({ appName, appDescription, repoFullName, deployTarget });
+  console.log(`[SCAFFOLD] Decomposed into ${taskDefs.length} tasks`);
+
+  const dbNote = hasDatabase
+    ? `\n## Database\nSupabase has been auto-provisioned. Use \`supabase\` from \`@/lib/supabase\` for data access.\n`
+    : '';
+
+  const createdTasks = [];
+  
+  for (let i = 0; i < taskDefs.length; i++) {
+    const def = taskDefs[i];
+    const isFirst = i === 0;
+    const prevTask = createdTasks[createdTasks.length - 1];
+    
+    const fullDescription = `${def.description}
+
+## Context
+- App: ${appName} (task ${i + 1} of ${taskDefs.length})
+- Repo: https://github.com/${repoFullName}
+- Stack: Next.js 15 + TypeScript + Tailwind CSS v4 + shadcn/ui
+- Pre-installed components: button, card, input, label, dialog, table, badge
+${dbNote}
+## Rules
+- Use the existing scaffold as starting point
+- Create a feature branch: \`feat/${def.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}\`
+- Ensure \`npm run build\` passes
+- Create a PR when done
+- Deploy target: ${deployTarget || "vercel"}`;
+
+    const taskData = {
+      title: `[${appName}] ${def.title}`,
+      description: fullDescription,
+      type: "coding",
+      priority: "normal",
+      status: isFirst ? "todo" : "blocked",
+      deploy_target: deployTarget || "vercel",
+      repository_url: `https://github.com/${repoFullName}`,
+      app_id: appId,
+      dispatched_by: "app-factory",
+      metadata: {
+        app_task_order: i + 1,
+        app_task_total: taskDefs.length,
+        app_name: appName,
+      },
+    };
+
+    // If not first task, add dependency on previous task
+    if (prevTask) {
+      taskData.depends_on = [prevTask.id];
+    }
+
+    const { data, error } = await supabase
+      .from("agent_tasks")
+      .insert(taskData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error(`[SCAFFOLD] Failed to create task ${i + 1}: ${error.message}`);
+      continue;
+    }
+    
+    createdTasks.push(data);
+    console.log(`[SCAFFOLD] Task ${i + 1}/${taskDefs.length}: ${data.id} — ${def.title} (status: ${data.status})`);
+  }
+
+  return createdTasks;
+}
+) {
   const dbNote = hasDatabase
     ? `\n## Database\nSupabase has been auto-provisioned for this app:\n- Schema: \`${repoFullName.split('/')[1]}\`\n- Client: \`/src/lib/supabase.ts\` (already pushed to repo)\n- Env vars: injected into Vercel automatically\n- Use \`supabase\` from \`@/lib/supabase\` for data access\n`
     : '';
@@ -345,15 +598,16 @@ export async function runScaffoldPipeline(app) {
 
     // 4. Create coding task (so AI codegen can post comments to it)
     console.log(`[SCAFFOLD] Creating coding task for "${name}"`);
-    const task = await createCodingTask({
+    const tasks = await createMultipleCodingTasks({
       appId: id,
       appName: name,
       appDescription: description,
       repoFullName: fullName,
       deployTarget: deploy_target || "vercel",
-      hasDatabase: false, // Will be updated after Supabase provisioning
+      hasDatabase: false,
     });
-    console.log(`[SCAFFOLD] Coding task created: ${task.id}`);
+    console.log(`[SCAFFOLD] Created ${tasks.length} coding tasks for "${name}"`);
+    const task = tasks[0]; // First task for AI codegen reference
 
     // 5. AI customization pass — generate pages, API routes, components, navigation
     console.log(`[SCAFFOLD] Starting AI codegen pass for "${name}" (task=${task.id})`);
