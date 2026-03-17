@@ -28,6 +28,23 @@ function generateShortId() {
 
 const DEFAULT_REQ_CREDS = ["GH_TOKEN"];
 const DEFAULT_QA_CREDS = ["GH_TOKEN", "SUPABASE_SERVICE_ROLE_KEY"];
+const GITHUB_OAUTH_STORAGE_KEY = "app-onboarding-github-oauth";
+
+function getPersistedGitHubAuth() {
+  try {
+    const raw = localStorage.getItem(GITHUB_OAUTH_STORAGE_KEY);
+    if (!raw) return { githubToken: null, githubUser: null, repoSource: "scratch" };
+    const parsed = JSON.parse(raw);
+    if (!parsed?.githubToken) return { githubToken: null, githubUser: null, repoSource: "scratch" };
+    return {
+      githubToken: parsed.githubToken,
+      githubUser: parsed.githubUser || null,
+      repoSource: "github",
+    };
+  } catch {
+    return { githubToken: null, githubUser: null, repoSource: "scratch" };
+  }
+}
 
 /** Auto-select credentials for scratch mode based on deploy target */
 function getAutoCredentials(deployTarget) {
@@ -185,8 +202,10 @@ export default function AppOnboardingWizard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialUrlStep = parseInt(searchParams.get("step"), 10);
+  const persistedGitHubAuth = getPersistedGitHubAuth();
   const initialWizardState = {
     ...initialState,
+    ...persistedGitHubAuth,
     step: !isNaN(initialUrlStep) && initialUrlStep >= 1 && initialUrlStep <= STEP_COUNT
       ? initialUrlStep - 1
       : initialState.step,
@@ -238,6 +257,20 @@ export default function AppOnboardingWizard() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.deployTarget, state.repoSource]);
+
+  // Persist GitHub OAuth session so users do not need to reconnect every time.
+  useEffect(() => {
+    try {
+      if (state.githubToken) {
+        localStorage.setItem(GITHUB_OAUTH_STORAGE_KEY, JSON.stringify({
+          githubToken: state.githubToken,
+          githubUser: state.githubUser,
+        }));
+      } else {
+        localStorage.removeItem(GITHUB_OAUTH_STORAGE_KEY);
+      }
+    } catch {}
+  }, [state.githubToken, state.githubUser]);
 
   // Escape key
   useEffect(() => {
