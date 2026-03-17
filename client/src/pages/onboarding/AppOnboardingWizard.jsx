@@ -80,6 +80,10 @@ const initialState = {
   submitting: false,
   error: null,
   aiAnalysisLoading: false,
+  // Starting mode
+  startingMode: "scratch",   // "scratch" | "existing"
+  existingRepoUrl: "",
+  existingDeployUrl: "",
 };
 
 function reducer(state, action) {
@@ -127,6 +131,15 @@ function reducer(state, action) {
       if (!val || state[field].includes(val)) return state;
       return { ...state, [field]: [...state[field], val], [action.inputField]: "" };
     }
+    case "SET_STARTING_MODE":
+      return {
+        ...state,
+        startingMode: action.value,
+        repos: [],
+        repoSource: "scratch",
+        existingRepoUrl: "",
+        existingDeployUrl: "",
+      };
     case "SET_STEP":
       return { ...state, step: action.step, error: null };
     case "RESET":
@@ -142,12 +155,17 @@ function getStepHint(state) {
     case 0: {
       if (!state.name.trim()) return "Enter an app name to continue";
       if (!state.slug.trim()) return "Slug is required";
-      const descLen = (state.description || "").trim().length;
-      if (descLen === 0) return "App description is required for AI code generation (minimum 50 characters)";
-      if (descLen < 50) return "Description must be at least 50 characters for AI code generation";
+      // Existing apps don't require a description
+      if (state.startingMode !== "existing") {
+        const descLen = (state.description || "").trim().length;
+        if (descLen === 0) return "App description is required for AI code generation (minimum 50 characters)";
+        if (descLen < 50) return "Description must be at least 50 characters for AI code generation";
+      }
       return null;
     }
     case 1:
+      // Existing apps: repo URL is optional, always valid
+      if (state.startingMode === "existing") return null;
       if (state.repoSource !== "scratch" && state.repos.length === 0) return "Select at least one repository";
       return null;
     case 2:
@@ -247,9 +265,11 @@ export default function AppOnboardingWizard() {
 
   const handleNext = useCallback(() => {
     const isScratch = state.repoSource === "scratch";
+    const isExisting = state.startingMode === "existing";
     if (state.step < STEP_COUNT - 1 && canProceed(state)) {
-      // Skip credentials step (index 3) for scratch mode
-      if (isScratch && state.step === 2) {
+      // For existing apps: step 0 → step 1 → step 2 → step 4 (skip credentials)
+      // For scratch apps: step 2 → step 4 (skip credentials)
+      if ((isScratch || isExisting) && state.step === 2) {
         goToStep(4);
       } else {
         goToStep(state.step + 1);
@@ -259,9 +279,10 @@ export default function AppOnboardingWizard() {
 
   const handleBack = useCallback(() => {
     const isScratch = state.repoSource === "scratch";
+    const isExisting = state.startingMode === "existing";
     if (state.step > 0) {
-      // Skip credentials step (index 3) for scratch mode
-      if (isScratch && state.step === 4) {
+      // Skip credentials step (index 3) for scratch/existing mode
+      if ((isScratch || isExisting) && state.step === 4) {
         goToStep(2);
       } else {
         goToStep(state.step - 1);
@@ -274,6 +295,45 @@ export default function AppOnboardingWizard() {
     dispatch({ type: "SET_FIELD", field: "error", value: null });
 
     try {
+      // ── "Connect existing app" path — skip scaffold pipeline ──────────────
+      if (state.startingMode === "existing") {
+        const existingRepos = state.existingRepoUrl.trim()
+          ? [state.existingRepoUrl.trim()]
+          : [];
+        const existingDeployConfig = state.existingDeployUrl.trim()
+          ? { url: state.existingDeployUrl.trim() }
+          : {};
+        const body = {
+          name: state.name.trim(),
+          slug: state.slug.trim(),
+          description: state.description.trim() || null,
+          icon: state.icon || null,
+          repos: existingRepos,
+          repo_source: "existing",
+          deploy_target: "none",
+          deploy_config: existingDeployConfig,
+          env_keys: [],
+          qa_env_keys: [],
+          supabase_project_ref: null,
+          needs_database: false,
+        };
+        const resp = await fetch("/api/apps", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(err.error || `Failed (${resp.status})`);
+        }
+        const created = await resp.json();
+        setCreatedApp(created);
+        setSuccess(true);
+        setTimeout(() => { navigate(`/apps/${created.id}`); }, 1500);
+        return;
+      }
+
+      // ── Standard "Start from scratch" path ────────────────────────────────
       const deployConfig = {};
       if (state.deployTarget === "kubernetes") {
         deployConfig.namespace = state.k8sNamespace;

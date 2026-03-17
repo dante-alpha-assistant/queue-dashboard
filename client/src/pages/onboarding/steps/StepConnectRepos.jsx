@@ -225,6 +225,60 @@ export default function StepConnectRepos({ state, dispatch }) {
     );
   };
 
+  // ── "Connect existing app" simplified UI ─────────────────
+  if (state.startingMode === "existing") {
+    return (
+      <div className="step-fields-stagger" style={{ gap: 18 }}>
+        <div className="step-field" style={{ "--field-index": 0 }}>
+          <div style={{
+            padding: "20px 22px", borderRadius: 16,
+            border: "1px solid #E2E8F0",
+            background: "#FFFFFF",
+            display: "flex", flexDirection: "column", gap: 6,
+          }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", marginBottom: 2 }}>
+              Existing GitHub Repository
+            </div>
+            <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 12 }}>
+              Enter the URL of your existing GitHub repository. We&apos;ll link it without creating a new one.
+            </div>
+            <label style={{
+              fontSize: 12, fontWeight: 600, color: "#49454F",
+              marginBottom: 4, display: "block", textTransform: "uppercase", letterSpacing: "0.04em",
+            }}>
+              Repository URL <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optional)</span>
+            </label>
+            <input
+              type="url"
+              value={state.existingRepoUrl || ""}
+              onChange={e => dispatch({ type: "SET_FIELD", field: "existingRepoUrl", value: e.target.value })}
+              placeholder="https://github.com/owner/my-repo"
+              style={{
+                width: "100%", padding: "12px 16px", borderRadius: 12,
+                border: "1px solid #E2E8F0", background: "#FFFFFF",
+                color: "#111827", fontSize: 14,
+                fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                outline: "none", boxSizing: "border-box",
+                transition: "border-color 200ms, box-shadow 200ms",
+              }}
+              onFocus={e => {
+                e.target.style.borderColor = "#7C3AED";
+                e.target.style.boxShadow = "0 0 0 3px rgba(124,58,237,0.12)";
+              }}
+              onBlur={e => {
+                e.target.style.borderColor = "#E2E8F0";
+                e.target.style.boxShadow = "none";
+              }}
+            />
+            <span style={{ fontSize: 11, color: "#6B7280", marginTop: 4 }}>
+              Leave blank to add a repository later.
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="step-fields-stagger" style={{ gap: 18 }}>
 

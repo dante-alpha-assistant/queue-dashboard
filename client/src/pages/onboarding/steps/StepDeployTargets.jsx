@@ -282,6 +282,61 @@ export default function StepDeployTargets({ state, dispatch }) {
   const [error, setError] = useState(null);
   const [showManual, setShowManual] = useState(false);
 
+  // ── "Connect existing app" simplified UI ─────────────────
+  if (state.startingMode === "existing") {
+    return (
+      <div className="step-fields-stagger" style={{ gap: 18 }}>
+        <div className="step-field" style={{ "--field-index": 0 }}>
+          <div style={{
+            padding: "20px 22px", borderRadius: 16,
+            border: "1px solid var(--md-surface-variant, #E7E0EC)",
+            background: "var(--md-surface, #FFFBFE)",
+            display: "flex", flexDirection: "column", gap: 6,
+          }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", marginBottom: 2 }}>
+              Existing Deployment
+            </div>
+            <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 12 }}>
+              Optionally link your existing deployment URL for monitoring and reference.
+            </div>
+            <label style={{
+              fontSize: 12, fontWeight: 600, color: "#49454F",
+              marginBottom: 4, display: "block", textTransform: "uppercase", letterSpacing: "0.04em",
+            }}>
+              Deployment URL <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optional)</span>
+            </label>
+            <input
+              type="url"
+              value={state.existingDeployUrl || ""}
+              onChange={e => dispatch({ type: "SET_FIELD", field: "existingDeployUrl", value: e.target.value })}
+              placeholder="https://my-app.vercel.app"
+              style={{
+                width: "100%", padding: "12px 16px", borderRadius: 12,
+                border: "1px solid var(--md-surface-variant, #E7E0EC)",
+                background: "var(--md-surface, #FFFBFE)",
+                color: "var(--md-on-surface, #1C1B1F)", fontSize: 14,
+                fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                outline: "none", boxSizing: "border-box",
+                transition: "border-color 200ms, box-shadow 200ms",
+              }}
+              onFocus={e => {
+                e.target.style.borderColor = "var(--md-primary, #6750A4)";
+                e.target.style.boxShadow = "0 0 0 3px rgba(103,80,164,0.12)";
+              }}
+              onBlur={e => {
+                e.target.style.borderColor = "var(--md-surface-variant, #E7E0EC)";
+                e.target.style.boxShadow = "none";
+              }}
+            />
+            <span style={{ fontSize: 11, color: "var(--md-on-surface-variant)", marginTop: 4 }}>
+              Leave blank to skip deployment linking. You can add this later from the app settings.
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   useEffect(() => {
     // Skip if suggestions already loaded
     if (state.aiSuggestions) return;
