@@ -184,7 +184,14 @@ function canProceed(state) {
 export default function AppOnboardingWizard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const initialUrlStep = parseInt(searchParams.get("step"), 10);
+  const initialWizardState = {
+    ...initialState,
+    step: !isNaN(initialUrlStep) && initialUrlStep >= 1 && initialUrlStep <= STEP_COUNT
+      ? initialUrlStep - 1
+      : initialState.step,
+  };
+  const [state, dispatch] = useReducer(reducer, initialWizardState);
   const [slideDir, setSlideDir] = useState("none"); // "left", "right", "none"
   const [animating, setAnimating] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -192,21 +199,15 @@ export default function AppOnboardingWizard() {
   const contentRef = useRef(null);
   const hasChanges = state.name || state.repos.length > 0 || state.description;
 
-  // Sync step from URL
-  useEffect(() => {
-    const urlStep = parseInt(searchParams.get("step"), 10);
-    if (!isNaN(urlStep) && urlStep >= 1 && urlStep <= STEP_COUNT && urlStep - 1 !== state.step) {
-      dispatch({ type: "SET_STEP", step: urlStep - 1 });
-    }
-  }, []); // Only on mount
-
-  // Update URL when step changes
+  // Update URL when step changes, while preserving OAuth callback params until the callback handler clears them.
   useEffect(() => {
     const currentUrlStep = parseInt(searchParams.get("step"), 10);
     if (currentUrlStep !== state.step + 1) {
-      setSearchParams({ step: state.step + 1 }, { replace: true });
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set("step", String(state.step + 1));
+      setSearchParams(nextParams, { replace: true });
     }
-  }, [state.step]);
+  }, [state.step, searchParams, setSearchParams]);
 
   // Browser back/forward
   useEffect(() => {
