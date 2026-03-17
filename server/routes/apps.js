@@ -252,7 +252,7 @@ appsRouter.get("/:id", async (req, res) => {
 // POST /api/apps — create app
 appsRouter.post("/", async (req, res) => {
   try {
-    const { name, slug, description, repos, repo_source, repo_architecture, supabase_project_ref, deploy_target, deploy_config, env_keys, icon, qa_env_keys, required_credentials, required_qa_credentials, needs_database } = req.body;
+    const { name, slug, description, repos, repo_source, repo_architecture, supabase_project_ref, deploy_target, deploy_config, env_keys, icon, qa_env_keys, required_credentials, required_qa_credentials, needs_database, existing_repo_url, existing_deploy_url } = req.body;
     if (!name) return res.status(400).json({ error: "name required" });
     if (!slug) return res.status(400).json({ error: "slug required" });
 
@@ -309,6 +309,8 @@ appsRouter.post("/", async (req, res) => {
         required_credentials: { coding: codingCreds, qa: qaCreds },
         repo_source: repo_source || "scratch",
         repo_architecture: repo_architecture || null,
+        existing_repo_url: existing_repo_url || null,
+        existing_deploy_url: existing_deploy_url || null,
       })
       .select()
       .single();

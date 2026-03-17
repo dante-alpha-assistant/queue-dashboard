@@ -77,6 +77,8 @@ const initialState = {
   supabaseRef: "",
   needsDatabase: false,
   selectedTemplate: null,
+  existingRepoUrl: "",
+  existingDeployUrl: "",
   submitting: false,
   error: null,
   aiAnalysisLoading: false,
@@ -142,9 +144,11 @@ function getStepHint(state) {
     case 0: {
       if (!state.name.trim()) return "Enter an app name to continue";
       if (!state.slug.trim()) return "Slug is required";
-      const descLen = (state.description || "").trim().length;
-      if (descLen === 0) return "App description is required for AI code generation (minimum 50 characters)";
-      if (descLen < 50) return "Description must be at least 50 characters for AI code generation";
+      if (state.repoSource !== "existing") {
+        const descLen = (state.description || "").trim().length;
+        if (descLen === 0) return "App description is required for AI code generation (minimum 50 characters)";
+        if (descLen < 50) return "Description must be at least 50 characters for AI code generation";
+      }
       return null;
     }
     case 1:
@@ -246,10 +250,10 @@ export default function AppOnboardingWizard() {
   }, [state.step, animating]);
 
   const handleNext = useCallback(() => {
-    const isScratch = state.repoSource === "scratch";
+    const skipCredentials = state.repoSource === "scratch" || state.repoSource === "existing";
     if (state.step < STEP_COUNT - 1 && canProceed(state)) {
-      // Skip credentials step (index 3) for scratch mode
-      if (isScratch && state.step === 2) {
+      // Skip credentials step (index 3) for scratch and existing modes
+      if (skipCredentials && state.step === 2) {
         goToStep(4);
       } else {
         goToStep(state.step + 1);
@@ -258,10 +262,10 @@ export default function AppOnboardingWizard() {
   }, [state, goToStep]);
 
   const handleBack = useCallback(() => {
-    const isScratch = state.repoSource === "scratch";
+    const skipCredentials = state.repoSource === "scratch" || state.repoSource === "existing";
     if (state.step > 0) {
-      // Skip credentials step (index 3) for scratch mode
-      if (isScratch && state.step === 4) {
+      // Skip credentials step (index 3) for scratch and existing modes
+      if (skipCredentials && state.step === 4) {
         goToStep(2);
       } else {
         goToStep(state.step - 1);
@@ -343,6 +347,8 @@ export default function AppOnboardingWizard() {
         template_repo: state.selectedTemplate
           ? (TEMPLATES.find(t => t.id === state.selectedTemplate)?.githubTemplate || null)
           : null,
+        existing_repo_url: state.existingRepoUrl?.trim() || null,
+        existing_deploy_url: state.existingDeployUrl?.trim() || null,
       };
 
       const resp = await fetch("/api/apps", {
@@ -588,7 +594,7 @@ export default function AppOnboardingWizard() {
         <span style={{
           fontSize: 13, fontWeight: 600, color: "#94A3B8",
         }}>
-          {state.repoSource === "scratch"
+          {(state.repoSource === "scratch" || state.repoSource === "existing")
             ? `Step ${state.step === 4 ? 4 : state.step + 1} of 4`
             : `Step ${state.step + 1} of ${STEP_COUNT}`}
         </span>

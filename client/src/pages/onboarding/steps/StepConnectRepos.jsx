@@ -225,6 +225,62 @@ export default function StepConnectRepos({ state, dispatch }) {
     );
   };
 
+  // "existing" mode — just show a URL input, no repo picker
+  if (state.repoSource === "existing") {
+    return (
+      <div className="step-fields-stagger" style={{ gap: 18 }}>
+        <div className="step-field" style={{ "--field-index": 0 }}>
+          <div style={{
+            padding: "24px 22px", borderRadius: 16,
+            border: "1px solid #E9D5FF",
+            background: "linear-gradient(135deg, rgba(124,58,237,0.04) 0%, rgba(139,92,246,0.02) 100%)",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 12, background: "#7C3AED",
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
+              }}>🔗</div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#111827" }}>Connect Existing App</div>
+                <div style={{ fontSize: 12, color: "#6B7280" }}>Link your already-deployed GitHub repository</div>
+              </div>
+            </div>
+            <label style={{
+              fontSize: 12, fontWeight: 600, color: "#49454F",
+              marginBottom: 6, display: "block", textTransform: "uppercase", letterSpacing: "0.04em",
+            }}>
+              GitHub Repository URL (optional)
+            </label>
+            <input
+              value={state.existingRepoUrl || ""}
+              onChange={e => dispatch({ type: "SET_FIELD", field: "existingRepoUrl", value: e.target.value })}
+              placeholder="https://github.com/owner/repo"
+              style={{
+                width: "100%", padding: "12px 16px", borderRadius: 12,
+                border: "1px solid #E2E8F0", background: "#FFFFFF",
+                color: "#111827", fontSize: 14,
+                fontFamily: "'JetBrains Mono', 'Fira Mono', monospace",
+                outline: "none", boxSizing: "border-box",
+                transition: "border-color 200ms, box-shadow 200ms",
+              }}
+              onFocus={e => {
+                e.target.style.borderColor = "#7C3AED";
+                e.target.style.boxShadow = "0 0 0 3px rgba(124,58,237,0.12)";
+              }}
+              onBlur={e => {
+                e.target.style.borderColor = "#E2E8F0";
+                e.target.style.boxShadow = "none";
+              }}
+            />
+            <span style={{ fontSize: 11, color: "#6B7280", marginTop: 6, display: "block" }}>
+              e.g., https://github.com/your-org/my-app — leave blank to add later
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="step-fields-stagger" style={{ gap: 18 }}>
 
