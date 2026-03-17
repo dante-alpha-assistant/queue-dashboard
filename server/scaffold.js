@@ -280,7 +280,7 @@ ${dbNote}
       description: fullDescription,
       type: "coding",
       priority: "normal",
-      status: isFirst ? "todo" : "blocked",
+      status: "todo",  // All tasks start as todo
       deploy_target: deployTarget || "vercel",
       repository_url: `https://github.com/${repoFullName}`,
       app_id: appId,
@@ -292,10 +292,7 @@ ${dbNote}
       },
     };
 
-    // If not first task, add dependency on previous task
-    if (prevTask) {
-      taskData.depends_on = [prevTask.id];
-    }
+    // Dependencies tracked via metadata.app_task_order (depends_on column not in schema)
 
     const { data, error } = await supabase
       .from("agent_tasks")
