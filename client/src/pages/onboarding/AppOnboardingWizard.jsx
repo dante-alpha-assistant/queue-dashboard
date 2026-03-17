@@ -29,6 +29,7 @@ function generateShortId() {
 const DEFAULT_REQ_CREDS = ["GH_TOKEN"];
 const DEFAULT_QA_CREDS = ["GH_TOKEN", "SUPABASE_SERVICE_ROLE_KEY"];
 const GITHUB_OAUTH_STORAGE_KEY = "app-onboarding-github-oauth";
+const ONBOARDING_DRAFT_STORAGE_KEY = "app-onboarding-draft";
 
 function getPersistedGitHubAuth() {
   try {
@@ -43,6 +44,17 @@ function getPersistedGitHubAuth() {
     };
   } catch {
     return { githubToken: null, githubUser: null, repoSource: "scratch" };
+  }
+}
+
+function getPersistedOnboardingDraft() {
+  try {
+    const raw = localStorage.getItem(ONBOARDING_DRAFT_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
   }
 }
 
@@ -202,13 +214,15 @@ export default function AppOnboardingWizard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialUrlStep = parseInt(searchParams.get("step"), 10);
+  const persistedDraft = getPersistedOnboardingDraft();
   const persistedGitHubAuth = getPersistedGitHubAuth();
   const initialWizardState = {
     ...initialState,
+    ...persistedDraft,
     ...persistedGitHubAuth,
     step: !isNaN(initialUrlStep) && initialUrlStep >= 1 && initialUrlStep <= STEP_COUNT
       ? initialUrlStep - 1
-      : initialState.step,
+      : (typeof persistedDraft.step === "number" ? persistedDraft.step : initialState.step),
   };
   const [state, dispatch] = useReducer(reducer, initialWizardState);
   const [slideDir, setSlideDir] = useState("none"); // "left", "right", "none"
@@ -272,6 +286,36 @@ export default function AppOnboardingWizard() {
     } catch {}
   }, [state.githubToken, state.githubUser]);
 
+  // Persist onboarding draft across the GitHub OAuth redirect.
+  useEffect(() => {
+    try {
+      localStorage.setItem(ONBOARDING_DRAFT_STORAGE_KEY, JSON.stringify({
+        step: state.step,
+        name: state.name,
+        slug: state.slug,
+        slugSuffix: state.slugSuffix,
+        slugManual: state.slugManual,
+        description: state.description,
+        icon: state.icon,
+        repoSource: state.repoSource,
+        repos: state.repos,
+        userRepoSearch: state.userRepoSearch,
+        deployTarget: state.deployTarget,
+        k8sNamespace: state.k8sNamespace,
+        k8sService: state.k8sService,
+        vercelProject: state.vercelProject,
+        reqCredentials: state.reqCredentials,
+        qaCredentials: state.qaCredentials,
+        supabaseRef: state.supabaseRef,
+        needsDatabase: state.needsDatabase,
+        selectedTemplate: state.selectedTemplate,
+        startingMode: state.startingMode,
+        existingRepoUrl: state.existingRepoUrl,
+        existingDeployUrl: state.existingDeployUrl,
+      }));
+    } catch {}
+  }, [state]);
+
   // Escape key
   useEffect(() => {
     const handler = (e) => {
@@ -283,6 +327,7 @@ export default function AppOnboardingWizard() {
 
   const handleClose = useCallback(() => {
     if (hasChanges && !confirm("Discard changes? Your progress will be lost.")) return;
+    try { localStorage.removeItem(ONBOARDING_DRAFT_STORAGE_KEY); } catch {}
     navigate("/");
   }, [hasChanges, navigate]);
 
@@ -361,6 +406,7 @@ export default function AppOnboardingWizard() {
           throw new Error(err.error || `Failed (${resp.status})`);
         }
         const created = await resp.json();
+        try { localStorage.removeItem(ONBOARDING_DRAFT_STORAGE_KEY); } catch {}
         setCreatedApp(created);
         setSuccess(true);
         setTimeout(() => { navigate(`/apps/${created.id}`); }, 1500);
@@ -451,6 +497,7 @@ export default function AppOnboardingWizard() {
       }
 
       const created = await resp.json();
+      try { localStorage.removeItem(ONBOARDING_DRAFT_STORAGE_KEY); } catch {}
       setCreatedApp(created);
       setSuccess(true);
 
