@@ -169,6 +169,74 @@ async function decomposeAppIntoTasks({ appName, appDescription, repoFullName, de
   const CHAT_WORKER_URL = process.env.NEO_CHAT_WORKER_URL || "http://neo-chat-worker.agents.svc.cluster.local:18789";
   const CHAT_WORKER_TOKEN = process.env.NEO_CHAT_WORKER_TOKEN || "neo-chat-worker-gw-tok-2026";
 
+  const prompt = "You are a senior software architect decomposing an app into coding tasks for AI agents.\n\n"
+    + "App Name: " + appName + "\n"
+    + "App Description: " + (appDescription || "No description provided.") + "\n"
+    + "Stack: Next.js 15 + TypeScript + Tailwind CSS v4 + shadcn/ui\n"
+    + "Repo: https://github.com/" + repoFullName + "\n\n"
+    + "Decompose this app into 3-6 focused, sequential coding tasks. Each task should be completable in one PR by a single developer.\n\n"
+    + "Rules:\n"
+    + "- Task 1 should ALWAYS be the layout/navigation shell (sidebar, header, routing)\n"
+    + "- Subsequent tasks should each handle one domain feature (e.g. Customers CRUD, Deals Pipeline)\n"
+    + "- Each task should specify which files/routes to create\n"
+    + "- Tasks are executed sequentially - later tasks can depend on earlier ones\n"
+    + "- Keep tasks focused: one feature per task, not the whole app\n"
+    + "- Include API routes (/src/app/api/) where needed\n"
+    + "- Every task must ensure the app builds (npm run build)\n\n"
+    + "Respond with ONLY a JSON array, no markdown, no explanation:\n"
+    + JSON.stringify([{title: "Short task title", description: "Detailed description..."}]) + "\n";
+
+  let llmResponse;
+  try {
+    console.log("[DECOMPOSE] Calling neo-chat-worker for task decomposition...");
+    const resp = await fetch(CHAT_WORKER_URL + "/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + CHAT_WORKER_TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "current", max_tokens: 4096, messages: [{ role: "user", content: prompt }] }),
+    });
+    if (!resp.ok) throw new Error("neo-chat-worker " + resp.status);
+    const data = await resp.json();
+    llmResponse = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
+    console.log("[DECOMPOSE] Got response from neo-chat-worker");
+  } catch (e) {
+    console.warn("[DECOMPOSE] neo-chat-worker failed:", e.message);
+  }
+
+  if (!llmResponse) {
+    const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
+    if (OPENROUTER_KEY) {
+      try {
+        console.log("[DECOMPOSE] Falling back to OpenRouter...");
+        const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + OPENROUTER_KEY, "Content-Type": "application/json", "HTTP-Referer": "https://tasks.dante.id" },
+          body: JSON.stringify({ model: "anthropic/claude-sonnet-4-5", max_tokens: 4096, messages: [{ role: "user", content: prompt }] }),
+        });
+        if (resp.ok) { const data = await resp.json(); llmResponse = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || ""; }
+      } catch (e) { console.warn("[DECOMPOSE] OpenRouter failed:", e.message); }
+    }
+  }
+
+  if (!llmResponse) {
+    console.warn("[DECOMPOSE] All backends failed, single task fallback");
+    return [{ title: "Build initial version", description: appDescription || "Build the app as described." }];
+  }
+
+  let cleaned = llmResponse.trim();
+  if (cleaned.startsWith("```")) cleaned = cleaned.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+  try {
+    const tasks = JSON.parse(cleaned);
+    if (!Array.isArray(tasks) || tasks.length === 0) throw new Error("Empty");
+    console.log("[DECOMPOSE] Decomposed into " + tasks.length + " tasks");
+    return tasks.slice(0, 6);
+  } catch (e) {
+    console.warn("[DECOMPOSE] Parse failed, single task fallback. Response:", cleaned.slice(0, 200));
+    return [{ title: "Build initial version", description: appDescription || "Build the app as described." }];
+  }
+}) {
+  const CHAT_WORKER_URL = process.env.NEO_CHAT_WORKER_URL || "http://neo-chat-worker.agents.svc.cluster.local:18789";
+  const CHAT_WORKER_TOKEN = process.env.NEO_CHAT_WORKER_TOKEN || "neo-chat-worker-gw-tok-2026";
+
   const prompt = `You are a senior software architect decomposing an app into coding tasks for a team of AI agents.
 
 App Name: ${appName}
