@@ -239,6 +239,14 @@ export default function StepConnectRepos({ state, dispatch }) {
             textAlign: "center",
           }}>
             <div style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              padding: "6px 12px", borderRadius: 999,
+              background: "rgba(124,58,237,0.08)", color: "#7C3AED",
+              fontSize: 12, fontWeight: 700,
+            }}>
+              EXISTING APP MODE
+            </div>
+            <div style={{
               width: 56, height: 56, borderRadius: 16,
               background: "#F1F5F9",
               display: "flex", alignItems: "center", justifyContent: "center",
@@ -247,11 +255,11 @@ export default function StepConnectRepos({ state, dispatch }) {
             </div>
             <div>
               <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", marginBottom: 4 }}>
-                Connect your GitHub account
+                Select the repo for your existing app
               </div>
               <div style={{ fontSize: 13, color: "#6B7280", lineHeight: 1.6 }}>
-                Connect to browse and select the repository for your existing app.<br />
-                We&apos;ll request read-only access. You can revoke it any time in GitHub settings.
+                You are linking an already-existing app, not creating a new one.<br />
+                GitHub here is only used to choose the repo. AI scaffolding and AI deploy-target selection are skipped in this mode.
               </div>
             </div>
             {oauthError && (

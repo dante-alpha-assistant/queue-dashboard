@@ -293,11 +293,21 @@ export default function StepDeployTargets({ state, dispatch }) {
             background: "var(--md-surface, #FFFBFE)",
             display: "flex", flexDirection: "column", gap: 6,
           }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 8,
+                padding: "4px 10px", borderRadius: 999,
+                background: "rgba(124,58,237,0.08)", color: "#7C3AED",
+                fontSize: 11, fontWeight: 700,
+              }}>
+                EXISTING APP MODE
+              </div>
+            </div>
             <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", marginBottom: 2 }}>
-              Existing Deployment
+              Existing Deployment URL
             </div>
             <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 12 }}>
-              Optionally link your existing deployment URL for monitoring and reference.
+              This step is only for linking an already deployed app. AI deploy-target selection is skipped in existing-app mode.
             </div>
             <label style={{
               fontSize: 12, fontWeight: 600, color: "#49454F",
