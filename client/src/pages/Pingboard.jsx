@@ -61,7 +61,87 @@ if (typeof document !== "undefined" && !document.getElementById(styleId)) {
   document.head.appendChild(style);
 }
 import OrgChart from "../components/OrgChart";
-import { AlertTriangle, BarChart3, Bot, Building2, CheckCircle2, ClipboardList, FlaskConical, Puzzle, Rocket, Search, Timer, Wrench, XCircle } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bot, Building2, CheckCircle2, ClipboardList, FlaskConical, Puzzle, Rocket, Search, Timer, Wifi, WifiOff, Wrench, XCircle, ZapOff } from 'lucide-react';
+
+/* ─── Health Error Badge ─── */
+function ErrorBadge({ error, statusCode, reachable, size = "normal" }) {
+  if (!error && reachable !== false) return null;
+
+  const isSmall = size === "small";
+  let label = error || "error";
+  let color = "#BA1A1A";
+  let bg = "rgba(186,26,26,0.12)";
+  let border = "rgba(186,26,26,0.35)";
+
+  if (error === "timeout") { label = "⏱ timeout"; color = "#E65100"; bg = "rgba(230,81,0,0.1)"; border = "rgba(230,81,0,0.3)"; }
+  else if (error === "unreachable") { label = "⚡ unreachable"; color = "#BA1A1A"; }
+  else if (error === "offline") { label = "📴 offline"; color = "#79747E"; bg = "rgba(121,116,126,0.1)"; border = "rgba(121,116,126,0.3)"; }
+  else if (error && error.startsWith("model:")) { label = `🤖 ${error}`; color = "#E65100"; bg = "rgba(230,81,0,0.1)"; border = "rgba(230,81,0,0.3)"; }
+  else if (statusCode === 401) { label = "🔑 401"; color = "#E65100"; bg = "rgba(230,81,0,0.1)"; border = "rgba(230,81,0,0.3)"; }
+  else if (statusCode === 403) { label = "🚫 403"; color = "#BA1A1A"; }
+  else if (statusCode >= 500) { label = `💥 ${statusCode}`; color = "#BA1A1A"; }
+  else if (statusCode) { label = `⚠ ${statusCode}`; color = "#E65100"; bg = "rgba(230,81,0,0.1)"; border = "rgba(230,81,0,0.3)"; }
+
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 3,
+      padding: isSmall ? "1px 6px" : "2px 8px",
+      borderRadius: 8,
+      fontSize: isSmall ? 9 : 10,
+      fontWeight: 700,
+      background: bg,
+      color,
+      border: `1px solid ${border}`,
+      letterSpacing: "0.2px",
+      whiteSpace: "nowrap",
+      fontFamily: "'JetBrains Mono', monospace",
+    }}>
+      {label}
+    </span>
+  );
+}
+
+/* ─── Health Alert Bar ─── */
+function HealthAlertBar({ healthChecks }) {
+  if (!healthChecks) return null;
+  const issues = Object.values(healthChecks).filter(h => h.hasIssue);
+  if (issues.length === 0) return null;
+
+  return (
+    <div style={{
+      marginBottom: 16,
+      padding: "12px 16px",
+      borderRadius: 12,
+      background: "rgba(186,26,26,0.06)",
+      border: "1px solid rgba(186,26,26,0.25)",
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 12,
+    }}>
+      <div style={{ flexShrink: 0, marginTop: 1 }}>
+        <AlertTriangle size={16} color="#BA1A1A" />
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#BA1A1A", marginBottom: 6 }}>
+          {issues.length} agent{issues.length !== 1 ? "s" : ""} with health issues
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {issues.map(h => (
+            <div key={h.name} style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "3px 10px", borderRadius: 20,
+              background: "var(--md-surface)", border: "1px solid rgba(186,26,26,0.2)",
+              fontSize: 12, fontWeight: 600,
+            }}>
+              <span style={{ color: "var(--md-on-background)" }}>{h.name}</span>
+              <ErrorBadge error={h.error} statusCode={h.statusCode} reachable={h.reachable} size="small" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const STATUS_COLORS = {
   online: "#2E7D32",
@@ -264,7 +344,7 @@ function HumanCard({ agent, replicas, liveTasks = [] }) {
 }
 
 /* ─── Manager Card ─── */
-function ManagerCard({ agent, replicas, liveTasks = [] }) {
+function ManagerCard({ agent, replicas, liveTasks = [], healthCheck = null }) {
   const load = liveTasks.length || agent.current_load || 0;
   const maxCap = agent.max_capacity || 0;
   const caps = Array.isArray(agent.capabilities) ? agent.capabilities : [];
@@ -297,6 +377,11 @@ function ManagerCard({ agent, replicas, liveTasks = [] }) {
           <div style={{ fontSize: 11, color: "#7c4dff", fontWeight: 600, marginTop: 2 }}>
             {agent.role || "Engineering Manager"}
           </div>
+          {healthCheck?.hasIssue && (
+            <div style={{ marginTop: 4 }}>
+              <ErrorBadge error={healthCheck.error} statusCode={healthCheck.statusCode} reachable={healthCheck.reachable} size="small" />
+            </div>
+          )}
         </div>
         {maxCap > 0 && <CapacityBar load={load} max={maxCap} />}
         <CurrentTaskPreview tasks={liveTasks} />
@@ -318,20 +403,23 @@ function ManagerCard({ agent, replicas, liveTasks = [] }) {
 }
 
 /* ─── Worker Card ─── */
-function WorkerCard({ agent, liveTasks = [] }) {
+function WorkerCard({ agent, liveTasks = [], healthCheck = null }) {
   const load = liveTasks.length || agent.current_load || 0;
   const maxCap = agent.max_capacity || 0;
   const caps = Array.isArray(agent.capabilities) ? agent.capabilities : [];
   const statusColor = STATUS_COLORS[agent.status] || "#79747E";
   const isWorking = liveTasks.length > 0;
+  const hasError = healthCheck?.hasIssue;
 
   return (
     <div
       style={{
-        background: "var(--md-surface-container)",
+        background: hasError ? "rgba(186,26,26,0.03)" : "var(--md-surface-container)",
         borderRadius: 14, padding: 16,
-        border: `1px solid ${isWorking ? "rgba(46, 125, 50, 0.3)" : "var(--md-surface-variant)"}`,
-        borderLeft: `3px solid ${statusColor}`,
+        border: hasError
+          ? "1px solid rgba(186,26,26,0.3)"
+          : `1px solid ${isWorking ? "rgba(46, 125, 50, 0.3)" : "var(--md-surface-variant)"}`,
+        borderLeft: `3px solid ${hasError ? "#BA1A1A" : statusColor}`,
         textAlign: "center", width: 200, position: "relative", transition: "all 200ms",
       }}
       onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.1)"; }}
@@ -351,6 +439,11 @@ function WorkerCard({ agent, liveTasks = [] }) {
           <div style={{ fontSize: 10, color: "var(--md-on-surface-variant)", fontWeight: 500, marginTop: 1 }}>
             {agent.role || "Worker"}
           </div>
+          {healthCheck?.hasIssue && (
+            <div style={{ marginTop: 4 }}>
+              <ErrorBadge error={healthCheck.error} statusCode={healthCheck.statusCode} reachable={healthCheck.reachable} size="small" />
+            </div>
+          )}
         </div>
         {maxCap > 0 && <CapacityBar load={load} max={maxCap} />}
         <CurrentTaskPreview tasks={liveTasks} compact />
@@ -383,7 +476,7 @@ function VerticalConnector({ height = 32, color = "var(--md-surface-variant)", d
 }
 
 /* ─── Org Chart Tree View ─── */
-function OrgChartTree({ agents, allReplicas, loading: replicasLoading, liveStatus = {} }) {
+function OrgChartTree({ agents, allReplicas, loading: replicasLoading, liveStatus = {}, healthChecks = {} }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
@@ -422,10 +515,11 @@ function OrgChartTree({ agents, allReplicas, loading: replicasLoading, liveStatu
     const type = getCardType(agent);
     const agentId = agent.id || agent.name;
     const tasks = liveStatus[agentId] || liveStatus[agent.name] || [];
+    const hc = healthChecks[agent.name] || healthChecks[agentId] || null;
     switch (type) {
       case "human": return <HumanCard agent={agent} replicas={allReplicas[agentId]} liveTasks={tasks} />;
-      case "manager": return <ManagerCard agent={agent} replicas={allReplicas[agentId]} liveTasks={tasks} />;
-      default: return <WorkerCard agent={agent} liveTasks={tasks} />;
+      case "manager": return <ManagerCard agent={agent} replicas={allReplicas[agentId]} liveTasks={tasks} healthCheck={hc} />;
+      default: return <WorkerCard agent={agent} liveTasks={tasks} healthCheck={hc} />;
     }
   }
 
@@ -901,12 +995,13 @@ function ReplicaCard({ pod, activeTasks, animState, hasActiveTasks }) {
 }
 
 /* ─── Agent Tile (Grid View) ─── */
-function AgentTile({ agent, isSelected, onClick, liveTasks = [] }) {
+function AgentTile({ agent, isSelected, onClick, liveTasks = [], healthCheck = null }) {
   const caps = Array.isArray(agent.capabilities) ? agent.capabilities : [];
   const load = liveTasks.length || agent.current_load || 0;
   const maxCap = agent.max_capacity || 0;
   const statusColor = STATUS_COLORS[agent.status] || "#79747E";
   const isWorking = liveTasks.length > 0;
+  const hasError = healthCheck?.hasIssue;
 
   return (
     <div
@@ -914,10 +1009,15 @@ function AgentTile({ agent, isSelected, onClick, liveTasks = [] }) {
       style={{
         background: "var(--md-surface-container)",
         borderRadius: 16, padding: 20, cursor: "pointer",
-        border: isSelected ? "2px solid var(--md-primary)" : "1px solid var(--md-surface-variant)",
+        border: isSelected
+          ? "2px solid var(--md-primary)"
+          : hasError
+          ? "1px solid rgba(186,26,26,0.4)"
+          : "1px solid var(--md-surface-variant)",
         transition: "all 200ms ease", textAlign: "center",
         position: "relative", minHeight: 160,
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8,
+        background: hasError ? "rgba(186,26,26,0.03)" : "var(--md-surface-container)",
       }}
       onMouseEnter={(e) => {
         if (!isSelected) e.currentTarget.style.border = "1px solid var(--md-primary)";
@@ -958,6 +1058,11 @@ function AgentTile({ agent, isSelected, onClick, liveTasks = [] }) {
         <div style={{ fontSize: 11, color: statusColor, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
           {STATUS_LABELS[agent.status] || agent.status}
         </div>
+        {healthCheck?.hasIssue && (
+          <div style={{ marginTop: 4 }}>
+            <ErrorBadge error={healthCheck.error} statusCode={healthCheck.statusCode} reachable={healthCheck.reachable} />
+          </div>
+        )}
       </div>
 
       {maxCap > 0 && <CapacityBar load={load} max={maxCap} style={{ marginTop: 4 }} />}
@@ -990,6 +1095,7 @@ export default function Pingboard() {
   const [allReplicas, setAllReplicas] = useState({});
   const [allReplicasLoading, setAllReplicasLoading] = useState(false);
   const [liveStatus, setLiveStatus] = useState({});
+  const [healthChecks, setHealthChecks] = useState({});
   const [replicas, setReplicas] = useState(null);
   const [replicasLoading, setReplicasLoading] = useState(false);
   const prevPodsRef = useRef([]);
@@ -1073,13 +1179,24 @@ export default function Pingboard() {
     }
   }, []);
 
+  const fetchHealthChecks = useCallback(async () => {
+    try {
+      const res = await fetch("/api/agents/health-checks");
+      if (res.ok) setHealthChecks(await res.json());
+    } catch (e) {
+      console.error("Failed to fetch health checks:", e);
+    }
+  }, []);
+
   useEffect(() => {
     fetchAgents();
     fetchLiveStatus();
+    fetchHealthChecks();
     const interval = setInterval(fetchAgents, 10000);
     const liveInterval = setInterval(fetchLiveStatus, 30000);
-    return () => { clearInterval(interval); clearInterval(liveInterval); };
-  }, [fetchAgents, fetchLiveStatus]);
+    const healthInterval = setInterval(fetchHealthChecks, 60000); // probe every 60s
+    return () => { clearInterval(interval); clearInterval(liveInterval); clearInterval(healthInterval); };
+  }, [fetchAgents, fetchLiveStatus, fetchHealthChecks]);
 
   useEffect(() => {
     if (viewMode === "orgchart") {
@@ -1255,9 +1372,12 @@ export default function Pingboard() {
           </div>
         </div>
 
+        {/* Health alert bar */}
+        <HealthAlertBar healthChecks={healthChecks} />
+
         {/* View content */}
         {viewMode === "orgchart" ? (
-          <OrgChartTree agents={filtered} allReplicas={allReplicas} loading={allReplicasLoading} liveStatus={liveStatus} />
+          <OrgChartTree agents={filtered} allReplicas={allReplicas} loading={allReplicasLoading} liveStatus={liveStatus} healthChecks={healthChecks} />
         ) : viewMode === "pipeline" ? (
           <PipelineView />
         ) : (
@@ -1282,6 +1402,7 @@ export default function Pingboard() {
                       isSelected={selectedAgent?.name === agent.name}
                       onClick={() => handleSelectAgent(agent)}
                       liveTasks={liveStatus[agent.id || agent.name] || liveStatus[agent.name] || []}
+                      healthCheck={healthChecks[agent.name] || healthChecks[agent.id] || null}
                     />
                   ))}
                 </div>
@@ -1305,6 +1426,20 @@ export default function Pingboard() {
                     <div style={{ fontSize: 12, color: STATUS_COLORS[selectedAgent.status], fontWeight: 600 }}>
                       {STATUS_LABELS[selectedAgent.status] || selectedAgent.status}
                     </div>
+                    {(() => {
+                      const hc = healthChecks[selectedAgent.name] || healthChecks[selectedAgent.id];
+                      if (!hc?.hasIssue) return null;
+                      return (
+                        <div style={{ marginTop: 4 }}>
+                          <ErrorBadge error={hc.error} statusCode={hc.statusCode} reachable={hc.reachable} />
+                          {hc.lastHeartbeatAge != null && (
+                            <span style={{ fontSize: 10, color: "var(--md-on-surface-variant)", marginLeft: 6 }}>
+                              last heartbeat {Math.floor(hc.lastHeartbeatAge / 60)}m ago
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                   <button
                     onClick={() => setSelectedAgent(null)}

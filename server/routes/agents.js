@@ -481,6 +481,102 @@ agentsRouter.get("/:name/stats", async (req, res) => {
   }
 });
 
+// ─── Health Checks: probe each agent's gateway endpoint ───
+// Results: { [name]: { reachable, statusCode, latencyMs, error, modelHealth, lastHeartbeatAge } }
+const _healthCache = { data: null, expiresAt: 0 };
+
+agentsRouter.get("/health-checks", async (req, res) => {
+  try {
+    const now = Date.now();
+    // Cache for 30s to avoid hammering agents
+    if (_healthCache.data && _healthCache.expiresAt > now) {
+      return res.json(_healthCache.data);
+    }
+
+    const { data: agents, error } = await supabase
+      .from("agent_cards")
+      .select("id, name, status, endpoint_url, metadata, last_heartbeat")
+      .order("name");
+    if (error) throw error;
+
+    const TIMEOUT_MS = 5000;
+
+    async function probeAgent(agent) {
+      const url = agent.endpoint_url;
+      const start = Date.now();
+      let statusCode = null;
+      let reachable = false;
+      let errMsg = null;
+
+      if (url && !url.includes("localhost") && !url.includes("127.0.0.1")) {
+        try {
+          const controller = new AbortController();
+          const tid = setTimeout(() => controller.abort(), TIMEOUT_MS);
+          const resp = await fetch(url, { signal: controller.signal, redirect: "manual" });
+          clearTimeout(tid);
+          statusCode = resp.status;
+          // 401 means gateway is alive (auth required) → reachable
+          reachable = statusCode < 500 || statusCode === 401 || statusCode === 403;
+          if (statusCode >= 500) errMsg = `HTTP ${statusCode}`;
+          else if (statusCode === 403) errMsg = "403 Forbidden";
+          else if (statusCode === 401) errMsg = null; // expected without auth
+        } catch (e) {
+          errMsg = e.name === "AbortError" ? "timeout" : "unreachable";
+          reachable = false;
+        }
+      } else {
+        // No endpoint or localhost — skip probe but still report metadata health
+        reachable = null; // unknown
+      }
+
+      // Heartbeat age
+      let lastHeartbeatAge = null;
+      if (agent.last_heartbeat) {
+        lastHeartbeatAge = Math.floor((now - new Date(agent.last_heartbeat).getTime()) / 1000);
+      }
+
+      // Model health from metadata
+      const modelHealth = agent.metadata?.model_health || null;
+      const modelHealthAt = agent.metadata?.model_health_at || null;
+      const modelError = modelHealth && modelHealth !== "ok" ? modelHealth : null;
+
+      // Determine overall health
+      let overallError = null;
+      if (errMsg) overallError = errMsg;
+      else if (modelError) overallError = `model: ${modelError}`;
+      else if (agent.status === "offline") overallError = "offline";
+
+      return {
+        name: agent.name,
+        status: agent.status,
+        reachable,
+        statusCode,
+        latencyMs: reachable && statusCode ? Date.now() - start : null,
+        error: overallError,
+        modelHealth,
+        modelHealthAt,
+        lastHeartbeatAge,
+        hasIssue: !!overallError || (reachable === false && agent.status !== "disabled"),
+      };
+    }
+
+    const probeable = (agents || []).filter(a => a.status !== "disabled");
+    const results = await Promise.all(probeable.map(probeAgent));
+
+    const healthMap = {};
+    for (const r of results) {
+      healthMap[r.name] = r;
+    }
+
+    _healthCache.data = healthMap;
+    _healthCache.expiresAt = now + 30_000;
+
+    res.json(healthMap);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Full card + recent tasks
 agentsRouter.get("/:name", async (req, res) => {
   try {
