@@ -13,16 +13,30 @@ import { appsRouter } from "./routes/apps.js";
 import { appCredentialsRouter } from "./routes/app-credentials.js";
 import { githubRouter } from "./routes/github.js";
 import { requireAuth } from "./middleware/auth.js";
+import { attachUserSupabase } from "./lib/user-supabase.js";
 import { router as settingsRouter } from "./routes/settings.js";
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "20mb" }));
 
-// Auth middleware — protect all /api/* routes except public endpoints
+// Auth middleware — protect all /api/* routes except public endpoints  
 app.use("/api", (req, res, next) => {
-  if (req.path.startsWith("/health") || req.path.startsWith("/tasks") || req.path.startsWith("/deploy") || req.path.startsWith("/apps") || req.path.startsWith("/github") || req.path.startsWith("/attachments") || req.path.startsWith("/agents")) return next();
-  return requireAuth(req, res, next);
+  // Public endpoints that don't require authentication
+  if (req.path.startsWith("/health") || req.path.startsWith("/apps") || req.path.startsWith("/github") || req.path.startsWith("/attachments") || req.path.startsWith("/agents")) {
+    return next();
+  }
+  
+  // Deploy endpoints require auth but not user supabase (use service role)
+  if (req.path.startsWith("/deploy")) {
+    return requireAuth(req, res, next);
+  }
+  
+  // All other endpoints require auth + user-scoped supabase client
+  return requireAuth(req, res, (err) => {
+    if (err) return next(err);
+    return attachUserSupabase(req, res, next);
+  });
 });
 
 app.use("/api", router);

@@ -206,7 +206,7 @@ router.get("/tasks/counts-by-period", async (req, res) => {
     const ALWAYS_INCLUDE_STATUSES = ["todo", "in_progress", "qa_testing", "blocked"];
 
     const buildQuery = (since) => {
-      let q = req.supabase.from("agent_tasks").select("id", { count: "exact", head: true }).neq("status", "deprecated");
+      let q = supabase.from("agent_tasks").select("id", { count: "exact", head: true }).neq("status", "deprecated");
       if (projectId !== "all") q = q.eq("project_id", projectId);
       if (since) {
         q = q.or(`created_at.gte.${since},status.in.(${ALWAYS_INCLUDE_STATUSES.join(",")})`);
@@ -281,7 +281,7 @@ router.get("/repositories", async (req, res) => {
 // Stats
 router.get("/stats", async (req, res) => {
   try {
-    let query = req.supabase.from("agent_tasks").select("status");
+    let query = supabase.from("agent_tasks").select("status");
     if (req.query.project_id) query = query.eq("project_id", req.query.project_id);
     const { data, error } = await query;
     if (error) throw error;
@@ -411,79 +411,22 @@ router.get("/tasks/:id", async (req, res) => {
   }
 });
 
-// Stop task — sets paused=true, signals dispatcher to close agent session
-router.post("/tasks/:id/stop", async (req, res) => {
-  try {
-    const { data: current, error: fetchErr } = await supabase
-      .from("agent_tasks")
-      .select("id, status, assigned_agent, paused")
-      .eq("id", req.params.id)
-      .single();
-    if (fetchErr || !current) return res.status(404).json({ error: "Task not found" });
-
-    const prevAgent = current.assigned_agent;
-    const now = new Date().toISOString();
-
-    const { data: updated, error: updateErr } = await supabase
-      .from("agent_tasks")
-      .update({ status: "todo", assigned_agent: null, started_at: null, paused: true, updated_at: now })
-      .eq("id", req.params.id)
-      .select()
-      .single();
-    if (updateErr) throw updateErr;
-
-    // Log activity
-    await supabase.from("task_activity_log").insert({
-      task_id: req.params.id,
-      field: "stop",
-      old_value: current.status,
-      new_value: "paused (manual stop)",
-      changed_by: req.body?.changed_by || "dashboard",
-      changed_at: now,
-    }).catch(() => {});
-
-    // Notify dispatcher to close agent session (fire-and-forget)
-    if (prevAgent) {
-      fetch(`${DISPATCHER_URL}/api/stop-task`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId: req.params.id, agentName: prevAgent }),
-        signal: AbortSignal.timeout(3000),
-      }).catch(() => {});
-    }
-
-    res.json({ ok: true, task: updated });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
 router.patch("/tasks/:id", async (req, res) => {
   try {
     const updates = { ...req.body, updated_at: new Date().toISOString() };
 
-    // === STATUS REGRESSION GUARD + PAUSED GUARD ===
+    // === STATUS REGRESSION GUARD ===
     // Block completed/deployed → todo/in_progress transitions via API
-    // Also block agents from overriding a manual stop (paused=true)
-    const FORWARD_STATUSES = ["in_progress", "qa_testing", "completed", "deployed", "done"];
-    const needsCurrentCheck = updates.status === "todo" || updates.status === "in_progress" ||
-      (updates.status && FORWARD_STATUSES.includes(updates.status));
-    if (needsCurrentCheck) {
+    // These can only happen through the reopen_task RPC (dashboard UI)
+    if (updates.status === "todo" || updates.status === "in_progress") {
       const { data: current } = await supabase
         .from("agent_tasks")
-        .select("status, paused")
+        .select("status")
         .eq("id", req.params.id)
         .single();
       if (current && (current.status === "completed" || current.status === "deployed")) {
         return res.status(403).json({
           error: `Status regression blocked: ${current.status} → ${updates.status}. Use the Reopen button in the dashboard to reopen completed/deployed tasks.`,
-        });
-      }
-      // Paused guard: block agents from progressing a manually-stopped task
-      if (current && current.paused === true && FORWARD_STATUSES.includes(updates.status) && updates.paused !== false) {
-        console.warn(`[PAUSED-GUARD] Blocking status update ${updates.status} on paused task ${req.params.id}`);
-        return res.status(409).json({
-          error: "Task is paused — resume it before updating status",
         });
       }
     }
@@ -724,7 +667,7 @@ router.post("/deploy/batch", async (req, res) => {
     // Fetch the tasks to deploy
     const { data: tasks, error: fetchErr } = await supabase
       .from("agent_tasks")
-      .select("id, title, status, pull_request_url, repository_url, deploy_target, type, app_id")
+      .select("id, title, status, pull_request_url, repository_url, deploy_target, type")
       .in("id", taskIds);
 
     if (fetchErr) return res.status(500).json({ error: fetchErr.message });
@@ -767,9 +710,6 @@ router.post("/deploy/batch", async (req, res) => {
       });
     }
 
-    // Inherit app_id from the first deployable task that has one
-    const appId = deployable.find(t => t.app_id)?.app_id || null;
-
     // Create the parent deploy task
     const { data: deployTask, error: createErr } = await supabase
       .from("agent_tasks")
@@ -778,7 +718,6 @@ router.post("/deploy/batch", async (req, res) => {
         type: "deploy",
         priority: "urgent",
         status: "todo",
-        app_id: appId,
         deploy_target: deployable[0].deploy_target || "kubernetes",
         description: `Merge and deploy ${deployable.length} PRs:\n\n${deployable.map(t => `- ${t.title} (${getPrUrl(t)})`).join("\n")}`,
         metadata: {
@@ -800,7 +739,7 @@ router.post("/deploy/batch", async (req, res) => {
       created_by: "system",
     }));
 
-    const { error: relErr } = await req.supabase.from("task_relationships").insert(relationships);
+    const { error: relErr } = await supabase.from("task_relationships").insert(relationships);
     if (relErr) console.error("[BATCH_DEPLOY] Relationship insert error:", relErr.message);
 
     // Set all deployable tasks to "deploying"
@@ -828,7 +767,7 @@ router.post("/deploy/:id", async (req, res) => {
   try {
     const { data: task, error: fetchErr } = await supabase
       .from("agent_tasks")
-      .select("id, title, status, pull_request_url, repository_url, deploy_target, type, app_id")
+      .select("id, title, status, pull_request_url, repository_url, deploy_target, type")
       .eq("id", req.params.id)
       .single();
 
@@ -850,7 +789,7 @@ router.post("/deploy/:id", async (req, res) => {
 
     // For deploy_target "none" — just mark deployed directly
     if (deployTarget === "none") {
-      await req.supabase.from("agent_tasks")
+      await supabase.from("agent_tasks")
         .update({ status: "deployed", updated_at: new Date().toISOString() })
         .eq("id", req.params.id);
       return res.json({ ok: true, message: "No deployment needed — marked deployed" });
@@ -864,7 +803,6 @@ router.post("/deploy/:id", async (req, res) => {
         type: "deploy",
         priority: "urgent",
         status: "todo",
-        app_id: task.app_id || null,
         deploy_target: deployTarget,
         description: `Deploy task ${task.id}:\n- ${task.title}\n- PR: ${prUrl || "none"}\n- Target: ${deployTarget}`,
         metadata: {
@@ -879,7 +817,7 @@ router.post("/deploy/:id", async (req, res) => {
     if (createErr) return res.status(500).json({ ok: false, error: createErr.message });
 
     // Link via deployed_by relationship
-    await req.supabase.from("task_relationships").insert({
+    await supabase.from("task_relationships").insert({
       source_task_id: task.id,
       target_task_id: deployTask.id,
       relationship_type: "deployed_by",
@@ -887,7 +825,7 @@ router.post("/deploy/:id", async (req, res) => {
     });
 
     // Set task to deploying
-    await req.supabase.from("agent_tasks")
+    await supabase.from("agent_tasks")
       .update({ status: "deploying", updated_at: new Date().toISOString() })
       .eq("id", req.params.id);
 
@@ -1193,7 +1131,7 @@ router.get("/tasks/:id/activity", async (req, res) => {
         const entryTime = new Date(entry.changed_at).getTime();
         const hasMatchingError = errorEntries.some(e => Math.abs(new Date(e.changed_at).getTime() - entryTime) < 2000);
         if (!hasMatchingError) {
-          const { data: task } = await req.supabase.from("agent_tasks").select("error").eq("id", req.params.id).single();
+          const { data: task } = await supabase.from("agent_tasks").select("error").eq("id", req.params.id).single();
           if (task?.error) entry.reason = task.error;
         }
       }
