@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { AlertTriangle, BarChart3, CheckCircle2, ClipboardList, Clock, FileText, Image, Lightbulb, Link, Package, Pencil, RefreshCw, Timer, Wrench, XCircle, Pause, Rocket } from "lucide-react";
+import { AlertTriangle, BarChart3, CheckCircle2, ClipboardList, Clock, FileText, Image, Lightbulb, Link, Maximize2, Minimize2, Package, Pencil, RefreshCw, Timer, Wrench, XCircle, Pause, Rocket } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -907,6 +907,9 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   const [editingDeployUrl, setEditingDeployUrl] = useState(false);
   const [deployUrlDraft, setDeployUrlDraft] = useState(task.deployment_url || '');
   const [savingDeployUrl, setSavingDeployUrl] = useState(false);
+  const [isFullPage, setIsFullPage] = useState(false);
+
+  const toggleFullPage = useCallback(() => setIsFullPage(fp => !fp), []);
 
   // Auto-clear deploy success after 3s
   useEffect(() => {
@@ -946,7 +949,15 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
 
   useEffect(() => { ensureModalStyles(); }, []);
   useEffect(() => {
-    const handler = (e) => { if (e.key === 'Escape') handleClose(); };
+    const handler = (e) => {
+      if (e.key === 'Escape') handleClose();
+      if (e.key === 'f' || e.key === 'F') {
+        const tag = document.activeElement?.tagName?.toLowerCase();
+        if (tag !== 'input' && tag !== 'textarea' && !document.activeElement?.isContentEditable) {
+          setIsFullPage(fp => !fp);
+        }
+      }
+    };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [onClose]);
@@ -1124,7 +1135,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   if (hasQA) tabs.push({ key: 'qa', label: 'QA' });
   if (hasFilteredMetadata) tabs.push({ key: 'meta', label: 'Meta' });
 
-  const useWideLayout = !isMobile && !isTablet;
+  const useWideLayout = isFullPage || (!isMobile && !isTablet);
 
   /* ── Overlay ──────────────────────────────────────────── */
 
@@ -1154,6 +1165,19 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
     display: "flex", flexDirection: "column",
     position: "relative",
   };
+
+  const effectiveOverlayStyle = isFullPage
+    ? { ...overlayStyle, background: 'transparent', backdropFilter: 'none', WebkitBackdropFilter: 'none' }
+    : overlayStyle;
+  const effectivePanelStyle = isFullPage
+    ? {
+        position: 'fixed', inset: 0, width: '100vw', height: '100vh',
+        maxWidth: '100vw', maxHeight: '100vh', borderRadius: 0,
+        background: 'var(--md-surface, #FFFBFE)', display: 'flex',
+        flexDirection: 'column', overflow: 'hidden', zIndex: 201,
+        fontFamily: "'Roboto', system-ui, -apple-system, sans-serif",
+      }
+    : panelStyle;
 
   /* ── Sidebar content ──────────────────────────────────── */
   const sidebarContent = (
@@ -1696,8 +1720,8 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
   );
 
   return (
-    <div className={isMobile ? 'tdm-mobile-panel' : 'tdm-overlay'} style={overlayStyle} onClick={isMobile ? undefined : handleClose}>
-      <div className={isMobile ? undefined : 'tdm-panel'} style={panelStyle} onClick={e => e.stopPropagation()}>
+    <div className={isMobile ? 'tdm-mobile-panel' : 'tdm-overlay'} style={effectiveOverlayStyle} onClick={isMobile ? undefined : (isFullPage ? undefined : handleClose)}>
+      <div className={isMobile ? undefined : 'tdm-panel'} style={effectivePanelStyle} onClick={e => e.stopPropagation()}>
 
         {/* ── Status accent bar ───────────────────────────── */}
         {!isMobile && (
@@ -1807,6 +1831,15 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
                 setActionProcessing={setActionProcessing}
               />
               {!isMobile && <span className="tdm-kbd">esc</span>}
+              <button onClick={toggleFullPage} title={isFullPage ? 'Exit full-page (F)' : 'Full-page view (F)'} style={{
+                background: "transparent", border: "1px solid var(--md-surface-variant, #E7E0EC)",
+                cursor: "pointer", color: "var(--md-outline, #79747E)", padding: 0,
+                width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center",
+                borderRadius: 8, transition: 'all 0.15s', flexShrink: 0,
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--md-surface-container-low, #F7F2FA)'; e.currentTarget.style.color = 'var(--md-on-surface, #1C1B1F)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--md-outline, #79747E)'; }}
+              >{isFullPage ? <Minimize2 size={14} /> : <Maximize2 size={14} />}</button>
               <button onClick={handleClose} style={{
                 background: "transparent", border: "1px solid var(--md-surface-variant, #E7E0EC)",
                 cursor: "pointer", fontSize: 12, color: "var(--md-outline, #79747E)", padding: 0,
