@@ -128,7 +128,20 @@ Rules:
 - Add realistic placeholder data arrays for list views
 - Keep file sizes reasonable (100-300 lines each)
 - Make navigation match the actual pages you create
-- Do NOT add new npm dependencies — use only what's pre-installed`;
+- Do NOT add new npm dependencies — use only what's pre-installed
+
+CRITICAL — DATABASE & AUTH RULES (violations will break the app):
+- NEVER use Prisma, TypeORM, Drizzle, Sequelize, or any ORM
+- NEVER use SQLite, MySQL, or any local file-based database (file:./dev.db etc.)
+- NEVER generate a prisma/ directory, schema.prisma, or any migration files
+- For ALL data storage: use the Supabase client via \`@/lib/supabase\` (already set up)
+- For ALL authentication (login, signup, sessions): use Supabase Auth (@supabase/supabase-js)
+  - Login: \`supabase.auth.signInWithPassword({ email, password })\`
+  - Signup: \`supabase.auth.signUp({ email, password })\`
+  - Session: \`supabase.auth.getSession()\`
+- Database queries: use \`supabase.from('table').select()\`, NOT raw SQL or ORM methods
+- If the app needs user accounts or login pages, implement them with Supabase Auth only
+- NEVER write code that calls \`prisma.user.findUnique()\` or any prisma.* method`;
 }
 
 /**
@@ -350,6 +363,19 @@ Button, Card, Input, Label, Dialog, DropdownMenu, Table, Badge, Toaster
 - Keep file sizes reasonable (100–300 lines each)
 - Make navigation match the actual pages you create
 
+## CRITICAL — Database & Auth Rules (MUST follow — violations cause runtime crashes)
+- **NEVER use Prisma, TypeORM, Drizzle, Sequelize, or any ORM**
+- **NEVER use SQLite, MySQL, or any local/file-based database** (no \`file:./dev.db\`, no \`DATABASE_URL\` pointing to a .db file)
+- **NEVER generate a \`prisma/\` directory, \`schema.prisma\`, or migration files**
+- For ALL data storage: use the **Supabase client** via \`@/lib/supabase\` (already configured via env vars)
+  - Queries: \`supabase.from('table').select()\`, \`.insert()\`, \`.update()\`, \`.delete()\`
+- For ALL authentication (login, signup, sessions): use **Supabase Auth**
+  - Login: \`supabase.auth.signInWithPassword({ email, password })\`
+  - Signup: \`supabase.auth.signUp({ email, password })\`
+  - Current user: \`supabase.auth.getUser()\`
+- If you need login/signup pages, implement them with Supabase Auth — NOT Prisma/SQLite
+- If you need DB tables, describe them in comments — do NOT create local DB files
+
 ## PR
 Create a PR with title: \`feat: AI-generated ${appName} initial codebase\`
 The PR should target the \`main\` branch.
@@ -510,6 +536,21 @@ export async function generateAppCode(appName, appDescription, repoFullName, par
 
   const files = plan.files || [];
   if (files.length === 0) throw new Error("LLM returned no files to create");
+
+  // Guard: reject any Prisma/SQLite-based files — these break on Vercel/serverless deployments
+  const prismaViolations = files.filter(
+    (f) =>
+      f.path.startsWith("prisma/") ||
+      f.path === "schema.prisma" ||
+      /prisma\.client|@prisma\/client|provider\s*=\s*["']sqlite["']|file:\.\/.*\.db/.test(f.content || "")
+  );
+  if (prismaViolations.length > 0) {
+    const paths = prismaViolations.map((f) => f.path).join(", ");
+    console.warn(`[AI-CODEGEN] ⚠️  Prisma/SQLite files detected (${paths}) — rejecting and re-generating with stricter prompt`);
+    await postComment(taskId, `⚠️ AI generated Prisma/SQLite code (${paths}). This is not supported on Vercel — these files have been removed.`);
+    // Strip the offending files rather than failing hard
+    files.splice(0, files.length, ...files.filter((f) => !prismaViolations.includes(f)));
+  }
 
   await postComment(taskId, `📦 Planning ${files.length} files: ${files.map((f) => f.path).join(", ")}`);
 
