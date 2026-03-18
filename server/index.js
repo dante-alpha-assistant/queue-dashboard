@@ -12,6 +12,7 @@ import { attachmentsRouter, ensureAttachmentsBucket } from "./routes/attachments
 import { appsRouter } from "./routes/apps.js";
 import { githubRouter } from "./routes/github.js";
 import { requireAuth } from "./middleware/auth.js";
+import { router as settingsRouter } from "./routes/settings.js";
 
 const app = express();
 app.use(cors());
@@ -32,6 +33,7 @@ app.use("/api/skills", skillsRouter);
 app.use("/api", attachmentsRouter);
 app.use("/api/apps", appsRouter);
 app.use("/api/github", githubRouter);
+app.use("/api/settings", settingsRouter);
 
 // Serve static frontend in production
 import { serveStatic } from "./static.js";

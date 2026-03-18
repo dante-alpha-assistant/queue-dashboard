@@ -1,4 +1,5 @@
-import { Settings, Zap, Hand, Info, Database } from "lucide-react";
+import { useState } from "react";
+import { Settings, Zap, Hand, Info, Database, KeyRound, RotateCcw, CheckCircle, AlertCircle } from "lucide-react";
 
 const DEPLOYMENT_RULES = [
   {
@@ -63,6 +64,184 @@ function DeployBadge({ mode, color }) {
       {isAuto ? <Zap size={11} /> : <Hand size={11} />}
       {isAuto ? "Auto" : "Manual"}
     </span>
+  );
+}
+
+function TokenRotationSection() {
+  const [token, setToken] = useState("");
+  const [status, setStatus] = useState("idle"); // idle | loading | success | error
+  const [message, setMessage] = useState("");
+  const [taskId, setTaskId] = useState(null);
+
+  const handleDeploy = async () => {
+    if (!token.trim()) return;
+    setStatus("loading");
+    setMessage("");
+    setTaskId(null);
+    try {
+      const resp = await fetch("/api/settings/rotate-claude-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: token.trim() }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Request failed");
+      setStatus("success");
+      setTaskId(data.taskId);
+      setMessage(data.message);
+      setToken("");
+    } catch (e) {
+      setStatus("error");
+      setMessage(e.message);
+    }
+  };
+
+  return (
+    <div style={{
+      background: "var(--md-surface)",
+      borderRadius: 16,
+      border: "1px solid var(--md-surface-variant)",
+      overflow: "hidden",
+      marginBottom: 20,
+    }}>
+      {/* Header */}
+      <div style={{
+        padding: "16px 20px",
+        borderBottom: "1px solid var(--md-surface-variant)",
+        display: "flex", alignItems: "center", gap: 10,
+      }}>
+        <KeyRound size={16} style={{ color: "var(--md-primary)" }} />
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 15 }}>🔐 Claude OAuth Token Rotation</div>
+          <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)", marginTop: 1 }}>
+            Dispatch a setup task to rotate the Anthropic token across all agents via GitOps
+          </div>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div style={{ padding: "20px" }}>
+        {/* Info note */}
+        <div style={{
+          background: "rgba(103,80,164,0.08)",
+          border: "1px solid rgba(103,80,164,0.2)",
+          borderRadius: 10,
+          padding: "10px 14px",
+          fontSize: 12,
+          color: "var(--md-on-surface-variant)",
+          marginBottom: 18,
+          lineHeight: 1.5,
+        }}>
+          This will dispatch a <code style={{ background: "var(--md-surface-variant)", padding: "1px 5px", borderRadius: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>setup</code> task
+          to <strong>setup-agent</strong>, which will rotate the Anthropic OAuth token across
+          agents <strong>neo</strong>, <strong>neo-worker</strong>, and <strong>ifra-worker</strong> via GitOps sealed secrets.
+        </div>
+
+        {/* Input */}
+        <div style={{ marginBottom: 14 }}>
+          <label style={{
+            display: "block",
+            fontSize: 12,
+            fontWeight: 600,
+            color: "var(--md-on-surface-variant)",
+            marginBottom: 6,
+            textTransform: "uppercase",
+            letterSpacing: "0.5px",
+          }}>
+            New Claude OAuth Token
+          </label>
+          <input
+            type="password"
+            value={token}
+            onChange={e => { setToken(e.target.value); if (status !== "idle") setStatus("idle"); }}
+            placeholder="sk-ant-oat01-..."
+            disabled={status === "loading"}
+            style={{
+              width: "100%",
+              padding: "10px 14px",
+              borderRadius: 10,
+              border: "1px solid var(--md-surface-variant)",
+              background: "var(--md-background)",
+              color: "var(--md-on-surface)",
+              fontSize: 13,
+              fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+              outline: "none",
+              boxSizing: "border-box",
+              opacity: status === "loading" ? 0.6 : 1,
+            }}
+          />
+        </div>
+
+        {/* Button */}
+        <button
+          onClick={handleDeploy}
+          disabled={status === "loading" || !token.trim()}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "10px 20px",
+            borderRadius: 10,
+            border: "none",
+            background: (status === "loading" || !token.trim()) ? "var(--md-surface-variant)" : "var(--md-primary)",
+            color: (status === "loading" || !token.trim()) ? "var(--md-on-surface-variant)" : "var(--md-on-primary)",
+            fontWeight: 600,
+            fontSize: 13,
+            cursor: (status === "loading" || !token.trim()) ? "not-allowed" : "pointer",
+            transition: "background 0.15s",
+          }}
+        >
+          <RotateCcw size={14} style={{ animation: status === "loading" ? "spin 1s linear infinite" : "none" }} />
+          {status === "loading" ? "Dispatching..." : "Deploy Claude OAuth Token"}
+        </button>
+
+        {/* Status message */}
+        {status === "success" && (
+          <div style={{
+            marginTop: 14,
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 8,
+            padding: "10px 14px",
+            borderRadius: 10,
+            background: "rgba(22,163,74,0.1)",
+            border: "1px solid rgba(22,163,74,0.25)",
+            color: "#16a34a",
+            fontSize: 13,
+          }}>
+            <CheckCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+            <div>
+              <div style={{ fontWeight: 600 }}>{message}</div>
+              {taskId && (
+                <div style={{ fontSize: 11, marginTop: 3, opacity: 0.8, fontFamily: "'JetBrains Mono', monospace" }}>
+                  Task ID: {taskId}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {status === "error" && (
+          <div style={{
+            marginTop: 14,
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 8,
+            padding: "10px 14px",
+            borderRadius: 10,
+            background: "rgba(220,38,38,0.1)",
+            border: "1px solid rgba(220,38,38,0.25)",
+            color: "#dc2626",
+            fontSize: 13,
+          }}>
+            <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+            <div style={{ fontWeight: 500 }}>{message}</div>
+          </div>
+        )}
+      </div>
+
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+    </div>
   );
 }
 
@@ -175,6 +354,8 @@ export default function SettingsPage() {
             </table>
           </div>
         </div>
+
+        <TokenRotationSection />
 
         {/* Future notice */}
         <div style={{
