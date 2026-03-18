@@ -1403,6 +1403,20 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
               {task.result?.artifacts?.length > 0 && task.result.artifacts.map((artifact, i) => {
                 const url = typeof artifact === 'string' ? artifact : artifact?.url;
                 const type = typeof artifact === 'string' ? 'link' : (artifact?.type || 'link');
+                const content = artifact?.content;
+                const filename = artifact?.filename || 'artifact.md';
+                // Content artifact: render as downloadable file
+                if (content && type === 'markdown') {
+                  const blob = new Blob([content], { type: 'text/markdown' });
+                  const downloadUrl = URL.createObjectURL(blob);
+                  return (
+                    <div key={`artifact-${i}`} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <a href={downloadUrl} download={filename} style={{ color: "#386A20", textDecoration: "none", fontWeight: 500, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+                        <span>📄</span> {filename} ({(content.length / 1024).toFixed(1)}KB)
+                      </a>
+                    </div>
+                  );
+                }
                 if (!url) return null;
                 const icon = type === 'github_repo' || type === 'repo' ? '📦' : type === 'deployment' ? '🚀' : '🔗';
                 const label = url.replace(/https:\/\/github\.com\//, '');
