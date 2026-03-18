@@ -751,7 +751,19 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
     setActionLoading(true);
     try {
       switch (key) {
-        case 'stop': await onStatusChange(task.id, { status: 'todo', assigned_agent: null, started_at: null, paused: true }); break;
+        case 'stop': {
+          const stopResp = await fetch(`/api/tasks/${task.id}/stop`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ changed_by: 'dashboard' }),
+          });
+          if (!stopResp.ok) {
+            const errBody = await stopResp.json().catch(() => ({}));
+            throw new Error(errBody.error || 'Stop failed');
+          }
+          if (onStatusChange) await onStatusChange(task.id, {});
+          break;
+        }
         case 'resume': await onStatusChange(task.id, { paused: false }); break;
         case 'retry': await onStatusChange(task.id, { status: 'todo', assigned_agent: null, idle_retries: 0, qa_retries: 0 }); break;
         case 'unblock': await onStatusChange(task.id, { status: 'todo', blocked_reason: null, assigned_agent: null }); break;
