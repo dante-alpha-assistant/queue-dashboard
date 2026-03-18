@@ -118,7 +118,8 @@ Required files to generate:
 3. At least 2 domain-specific pages (e.g. src/app/contacts/page.tsx, src/app/deals/page.tsx)
 4. At least 1 API route (e.g. src/app/api/[resource]/route.ts)
 5. src/components/Sidebar.tsx or src/components/Header.tsx — navigation component
-${needsDb ? "6. src/lib/supabase.ts — Supabase client setup\n7. migrations/001_init.sql — Initial DB schema" : ""}
+${needsDb ? `6. src/lib/supabase.ts — Supabase client (use env vars: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY)
+7. migrations/001_init.sql — Initial Supabase/PostgreSQL schema (standard SQL, NOT SQLite syntax)` : ""}
 
 Rules:
 - Use TypeScript (.tsx/.ts), not JavaScript

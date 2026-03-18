@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { AppDetailView } from "./AppsPage.jsx";
 import SpeedLoader from "../components/SpeedLoader.jsx";
+import { showToast } from "../components/Toast.jsx";
 
 export default function AppDetailPage() {
   const { id } = useParams();
@@ -67,8 +68,10 @@ export default function AppDetailPage() {
     await refresh();
   };
 
-  const handleRemove = async () => {
-    await fetch(`/api/apps/${id}/remove`, { method: "DELETE" });
+  // NOTE: AppDetailView.handleRemoveConfirmed already calls the DELETE API
+  // before invoking onRemove — we only need to show the toast + redirect here.
+  const handleRemove = (removedApp) => {
+    showToast(`"${removedApp?.name || "App"}" removed successfully`);
     navigate("/apps");
   };
 
