@@ -20,6 +20,10 @@ import AppBuildProgress from "./pages/AppBuildProgress";
 import AppDetailPage from "./pages/AppDetailPage";
 import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
 import AppFilter from "./components/AppFilter";
+import LoginPage from "./pages/LoginPage";
+import SignUpPage from "./pages/SignUpPage";
+import ProtectedRoute from "./components/ProtectedRoute";
+import LogoutButton from "./components/LogoutButton";
 import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Package, Plus, Rocket, Search, Settings, XCircle, Zap } from 'lucide-react';
 import { ToastContainer } from "./components/Toast.jsx";
 
@@ -52,11 +56,18 @@ function AppRouter() {
   return (
     <>
       <Routes>
-        <Route path="/apps/new" element={<AppOnboardingWizard />} />
-        <Route path="/apps/:id/building" element={<AppBuildProgress />} />
-        <Route path="/apps/:id" element={<AppDetailPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="*" element={<AppMain />} />
+        {/* Public routes */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignUpPage />} />
+
+        {/* Protected routes */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/apps/new" element={<AppOnboardingWizard />} />
+          <Route path="/apps/:id/building" element={<AppBuildProgress />} />
+          <Route path="/apps/:id" element={<AppDetailPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="*" element={<AppMain />} />
+        </Route>
       </Routes>
       <ToastContainer />
     </>
@@ -203,6 +214,7 @@ function AppMain() {
               {t.label}
             </button>
           ))}
+          <LogoutButton />
         </div>
         <div style={{ paddingTop: 42 }}>
           {view === "pingboard" ? <Pingboard /> : view === "apps" ? <AppsPage /> : view === "settings" ? <SettingsPage /> : <HealthDashboard />}
@@ -303,7 +315,7 @@ function AppMain() {
             <span style={{ fontWeight: 600, fontSize: 15, letterSpacing: "-0.02em" }}>
               tasks<span style={{ color: "var(--md-primary)", fontWeight: 700 }}>.</span>dante<span style={{ color: "var(--md-primary)", fontWeight: 700 }}>.</span>id
             </span>
-            <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+            <div style={{ marginLeft: "auto", display: "flex", gap: 4, alignItems: "center" }}>
               <button onClick={() => setView("pingboard")} className="nav-tab" style={{ padding: "4px 8px" }}>
                 <Bot size={16} strokeWidth={1.8} />
               </button>
@@ -316,6 +328,7 @@ function AppMain() {
               <button onClick={() => setView("settings")} className="nav-tab" style={{ padding: "4px 8px" }}>
                 <Settings size={16} strokeWidth={1.8} />
               </button>
+              <LogoutButton />
             </div>
           </div>
         </div>
@@ -465,7 +478,10 @@ function AppMain() {
             ))}
             <span style={{ fontSize: 10, color: 'var(--md-on-surface-variant)', opacity: 0.5, fontFamily: "'JetBrains Mono', monospace", marginLeft: 8, background: 'var(--md-surface-container)', padding: '2px 6px', borderRadius: 4 }}>{__COMMIT_HASH__}</span>
           </div>
-          <StatsBar stats={stats} isTablet={isTablet} />
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <StatsBar stats={stats} isTablet={isTablet} />
+            <LogoutButton />
+          </div>
         </div>
 
         <div style={{

@@ -11,10 +11,18 @@ import { skillsRouter } from "./routes/skills.js";
 import { attachmentsRouter, ensureAttachmentsBucket } from "./routes/attachments.js";
 import { appsRouter } from "./routes/apps.js";
 import { githubRouter } from "./routes/github.js";
+import { requireAuth } from "./middleware/auth.js";
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "20mb" }));
+
+// Auth middleware — protect all /api/* routes except /api/health
+app.use("/api", (req, res, next) => {
+  if (req.path.startsWith("/health")) return next();
+  return requireAuth(req, res, next);
+});
+
 app.use("/api", router);
 app.use("/api/chat", chatRouter);
 app.use("/api/neo-chat", neoChatRouter);
