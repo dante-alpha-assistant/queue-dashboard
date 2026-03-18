@@ -1,5 +1,182 @@
 import { Router } from "express";
+import { execSync } from "child_process";
 import supabase from "../supabase.js";
+
+const KUBECTL = process.env.KUBECTL_PATH || "/tools/kubectl";
+
+async function resolveDeploymentUrl(taskId, taskData, supabase) {
+  // Only process deploy tasks
+  if (taskData.type !== "deploy") return;
+  if (taskData.deployment_url) return; // already set
+
+  console.log(`[DEPLOY_URL] Starting post-processing for task ${taskId}`);
+
+  let appId = taskData.app_id;
+  let subtaskIds = [];
+
+  // Step 2: Get subtask IDs from task_relationships
+  const { data: relData, error: relErr } = await supabase
+    .from("task_relationships")
+    .select("source_task_id")
+    .eq("target_task_id", taskId)
+    .eq("relationship_type", "deployed_by");
+  if (relErr) {
+    console.error("[DEPLOY_URL] Error fetching task_relationships:", relErr.message);
+  } else {
+    subtaskIds = (relData || []).map((r) => r.source_task_id);
+    console.log(`[DEPLOY_URL] Found ${subtaskIds.length} subtask(s):`, subtaskIds);
+  }
+
+  // Step 3: Inherit app_id from subtasks if not set
+  if (!appId && subtaskIds.length > 0) {
+    const { data: subtasks, error: stErr } = await supabase
+      .from("agent_tasks")
+      .select("id, app_id")
+      .in("id", subtaskIds);
+    if (stErr) {
+      console.error("[DEPLOY_URL] Error fetching subtasks:", stErr.message);
+    } else {
+      const found = (subtasks || []).find((t) => t.app_id);
+      if (found) {
+        appId = found.app_id;
+        console.log(`[DEPLOY_URL] Inherited app_id=${appId} from subtask ${found.id}`);
+      }
+    }
+  }
+
+  // Step 4: Get app record
+  let app = null;
+  if (appId) {
+    const { data: appData, error: appErr } = await supabase
+      .from("apps")
+      .select("id, deploy_target, deploy_config, vercel_project_id, custom_domain, deployment_url")
+      .eq("id", appId)
+      .single();
+    if (appErr) {
+      console.error("[DEPLOY_URL] Error fetching app:", appErr.message);
+    } else {
+      app = appData;
+      console.log(`[DEPLOY_URL] App record: deploy_target=${app?.deploy_target}`);
+    }
+  }
+
+  // Step 1: Resolve deployment URL based on deploy_target
+  let deploymentUrl = null;
+  if (app) {
+    try {
+      if (app.deploy_target === "vercel") {
+        const vercelProjectId = app.vercel_project_id;
+        if (vercelProjectId) {
+          const vercelToken = process.env.VERCEL_TOKEN;
+          const url = `https://api.vercel.com/v6/deployments?projectId=${vercelProjectId}&teamId=lautaro450&limit=1`;
+          console.log(`[DEPLOY_URL] Fetching Vercel deployments for project ${vercelProjectId}`);
+          const resp = await fetch(url, {
+            headers: { Authorization: `Bearer ${vercelToken}` },
+          });
+          if (resp.ok) {
+            const json = await resp.json();
+            const depUrl = json?.deployments?.[0]?.url;
+            if (depUrl) {
+              deploymentUrl = depUrl.startsWith("https://") ? depUrl : `https://${depUrl}`;
+              console.log(`[DEPLOY_URL] Resolved Vercel URL: ${deploymentUrl}`);
+            }
+          } else {
+            console.error(`[DEPLOY_URL] Vercel API error: ${resp.status} ${resp.statusText}`);
+          }
+        } else {
+          console.log("[DEPLOY_URL] No vercel_project_id on app, skipping Vercel lookup");
+        }
+      } else if (app.deploy_target === "kubernetes") {
+        const deployConfig = app.deploy_config || {};
+        const namespace = deployConfig.namespace;
+        const service = deployConfig.service;
+        if (namespace && service) {
+          try {
+            const cmd1 = `${KUBECTL} get ingress -n ${namespace} -o jsonpath='{.items[?(@.metadata.labels.app=="${service}")].spec.rules[0].host}'`;
+            console.log(`[DEPLOY_URL] Running kubectl: ${cmd1}`);
+            let host = execSync(cmd1, { timeout: 15000 }).toString().trim().replace(/^'|'$/g, "");
+            if (!host) {
+              const cmd2 = `${KUBECTL} get ingress -n ${namespace} -o jsonpath='{.items[0].spec.rules[0].host}'`;
+              console.log(`[DEPLOY_URL] Fallback kubectl: ${cmd2}`);
+              host = execSync(cmd2, { timeout: 15000 }).toString().trim().replace(/^'|'$/g, "");
+            }
+            if (host) {
+              deploymentUrl = `https://${host}`;
+              console.log(`[DEPLOY_URL] Resolved K8s URL: ${deploymentUrl}`);
+            } else if (app.custom_domain) {
+              deploymentUrl = app.custom_domain.startsWith("https://")
+                ? app.custom_domain
+                : `https://${app.custom_domain}`;
+              console.log(`[DEPLOY_URL] Fallback to custom_domain: ${deploymentUrl}`);
+            }
+          } catch (kubectlErr) {
+            console.error("[DEPLOY_URL] kubectl error:", kubectlErr.message);
+            if (app.custom_domain) {
+              deploymentUrl = app.custom_domain.startsWith("https://")
+                ? app.custom_domain
+                : `https://${app.custom_domain}`;
+              console.log(`[DEPLOY_URL] Fallback to custom_domain: ${deploymentUrl}`);
+            }
+          }
+        } else {
+          console.log("[DEPLOY_URL] No namespace/service in deploy_config, skipping K8s lookup");
+          if (app.custom_domain) {
+            deploymentUrl = app.custom_domain.startsWith("https://")
+              ? app.custom_domain
+              : `https://${app.custom_domain}`;
+          }
+        }
+      }
+    } catch (resolveErr) {
+      console.error("[DEPLOY_URL] Error resolving deployment URL:", resolveErr.message);
+    }
+  }
+
+  // Step 5: Update deploy task with deployment_url and app_id
+  const taskUpdates = {};
+  if (deploymentUrl) taskUpdates.deployment_url = deploymentUrl;
+  if (appId && !taskData.app_id) taskUpdates.app_id = appId;
+
+  if (Object.keys(taskUpdates).length > 0) {
+    const { error: updateErr } = await supabase
+      .from("agent_tasks")
+      .update(taskUpdates)
+      .eq("id", taskId);
+    if (updateErr) {
+      console.error("[DEPLOY_URL] Error updating deploy task:", updateErr.message);
+    } else {
+      console.log(`[DEPLOY_URL] Updated deploy task ${taskId}:`, taskUpdates);
+    }
+  }
+
+  // Step 6: Update subtasks with deployment_url
+  if (deploymentUrl && subtaskIds.length > 0) {
+    const { error: stUpdateErr } = await supabase
+      .from("agent_tasks")
+      .update({ deployment_url: deploymentUrl })
+      .in("id", subtaskIds);
+    if (stUpdateErr) {
+      console.error("[DEPLOY_URL] Error updating subtasks:", stUpdateErr.message);
+    } else {
+      console.log(`[DEPLOY_URL] Updated ${subtaskIds.length} subtask(s) with deployment_url`);
+    }
+  }
+
+  // Step 7: Update app record if deployment_url not already set
+  if (deploymentUrl && app && !app.deployment_url) {
+    const { error: appUpdateErr } = await supabase
+      .from("apps")
+      .update({ deployment_url: deploymentUrl })
+      .eq("id", app.id);
+    if (appUpdateErr) {
+      console.error("[DEPLOY_URL] Error updating app:", appUpdateErr.message);
+    } else {
+      console.log(`[DEPLOY_URL] Updated app ${app.id} with deployment_url`);
+    }
+  }
+
+  console.log(`[DEPLOY_URL] Post-processing complete for task ${taskId}`);
+}
 
 export const router = Router();
 
@@ -280,6 +457,15 @@ router.patch("/tasks/:id", async (req, res) => {
       .single();
     if (error) throw error;
     res.json(data);
+
+    // Async post-processing: resolve deployment_url for deploy tasks
+    if (updates.status === "deployed") {
+      setImmediate(() =>
+        resolveDeploymentUrl(req.params.id, data, supabase).catch((e) =>
+          console.error("[DEPLOY_URL] Post-processing error:", e.message)
+        )
+      );
+    }
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
