@@ -253,6 +253,13 @@ router.post("/dispatch", async (req, res) => {
 // Projects
 router.get("/projects", async (req, res) => {
   try {
+    // Check if user is authenticated
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      // No authentication - return empty array for security
+      return res.json([]);
+    }
+
     const { data, error } = await supabase
       .from("agent_projects")
       .select("*, agent_repositories(*)")
@@ -281,7 +288,15 @@ router.get("/repositories", async (req, res) => {
 // Stats
 router.get("/stats", async (req, res) => {
   try {
-    let query = req.supabase.from("agent_tasks").select("status");
+    // Check if user is authenticated  
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      // No authentication - return empty stats for security
+      const emptyStats = { todo: 0, in_progress: 0, qa_testing: 0, completed: 0, failed: 0, deployed: 0, blocked: 0, deploying: 0, deploy_failed: 0 };
+      return res.json(emptyStats);
+    }
+
+    let query = supabase.from("agent_tasks").select("status");
     if (req.query.project_id) query = query.eq("project_id", req.query.project_id);
     const { data, error } = await query;
     if (error) throw error;
@@ -296,6 +311,13 @@ router.get("/stats", async (req, res) => {
 // All tasks (optimized with server-side filtering)
 router.get("/tasks", async (req, res) => {
   try {
+    // Check if user is authenticated
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      // No authentication - return empty array for security
+      return res.json([]);
+    }
+
     // Light mode: exclude heavy columns (description, result, qa_result, metadata) for list view
     const isLight = req.query.columns === "light";
     const selectCols = isLight
