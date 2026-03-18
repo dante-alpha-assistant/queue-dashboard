@@ -411,22 +411,79 @@ router.get("/tasks/:id", async (req, res) => {
   }
 });
 
+// Stop task — sets paused=true, signals dispatcher to close agent session
+router.post("/tasks/:id/stop", async (req, res) => {
+  try {
+    const { data: current, error: fetchErr } = await supabase
+      .from("agent_tasks")
+      .select("id, status, assigned_agent, paused")
+      .eq("id", req.params.id)
+      .single();
+    if (fetchErr || !current) return res.status(404).json({ error: "Task not found" });
+
+    const prevAgent = current.assigned_agent;
+    const now = new Date().toISOString();
+
+    const { data: updated, error: updateErr } = await supabase
+      .from("agent_tasks")
+      .update({ status: "todo", assigned_agent: null, started_at: null, paused: true, updated_at: now })
+      .eq("id", req.params.id)
+      .select()
+      .single();
+    if (updateErr) throw updateErr;
+
+    // Log activity
+    await supabase.from("task_activity_log").insert({
+      task_id: req.params.id,
+      field: "stop",
+      old_value: current.status,
+      new_value: "paused (manual stop)",
+      changed_by: req.body?.changed_by || "dashboard",
+      changed_at: now,
+    }).catch(() => {});
+
+    // Notify dispatcher to close agent session (fire-and-forget)
+    if (prevAgent) {
+      fetch(`${DISPATCHER_URL}/api/stop-task`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: req.params.id, agentName: prevAgent }),
+        signal: AbortSignal.timeout(3000),
+      }).catch(() => {});
+    }
+
+    res.json({ ok: true, task: updated });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 router.patch("/tasks/:id", async (req, res) => {
   try {
     const updates = { ...req.body, updated_at: new Date().toISOString() };
 
-    // === STATUS REGRESSION GUARD ===
+    // === STATUS REGRESSION GUARD + PAUSED GUARD ===
     // Block completed/deployed → todo/in_progress transitions via API
-    // These can only happen through the reopen_task RPC (dashboard UI)
-    if (updates.status === "todo" || updates.status === "in_progress") {
+    // Also block agents from overriding a manual stop (paused=true)
+    const FORWARD_STATUSES = ["in_progress", "qa_testing", "completed", "deployed", "done"];
+    const needsCurrentCheck = updates.status === "todo" || updates.status === "in_progress" ||
+      (updates.status && FORWARD_STATUSES.includes(updates.status));
+    if (needsCurrentCheck) {
       const { data: current } = await supabase
         .from("agent_tasks")
-        .select("status")
+        .select("status, paused")
         .eq("id", req.params.id)
         .single();
       if (current && (current.status === "completed" || current.status === "deployed")) {
         return res.status(403).json({
           error: `Status regression blocked: ${current.status} → ${updates.status}. Use the Reopen button in the dashboard to reopen completed/deployed tasks.`,
+        });
+      }
+      // Paused guard: block agents from progressing a manually-stopped task
+      if (current && current.paused === true && FORWARD_STATUSES.includes(updates.status) && updates.paused !== false) {
+        console.warn(`[PAUSED-GUARD] Blocking status update ${updates.status} on paused task ${req.params.id}`);
+        return res.status(409).json({
+          error: "Task is paused — resume it before updating status",
         });
       }
     }
