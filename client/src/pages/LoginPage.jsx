@@ -94,6 +94,8 @@ export default function LoginPage() {
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         input:focus { outline: none; border-color: var(--md-primary, #6750A4) !important; box-shadow: 0 0 0 2px rgba(103,80,164,0.2); }
+        button[type="submit"]:not(:disabled):hover { opacity: 0.88; }
+        button[type="submit"]:disabled { opacity: 0.6; cursor: not-allowed; }
       `}</style>
     </div>
   );
@@ -119,25 +121,27 @@ const styles = {
   },
   logoRow: {
     display: "flex",
+    flexDirection: "column",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 28,
+    gap: 10,
+    marginBottom: 32,
   },
   logoBox: {
-    width: 32,
-    height: 32,
-    background: "var(--md-primary, #6750A4)",
-    color: "var(--md-on-primary, #fff)",
-    borderRadius: 9,
+    width: 48,
+    height: 48,
+    background: "linear-gradient(135deg, #6750A4 0%, #9A7FD4 100%)",
+    color: "#fff",
+    borderRadius: 14,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontWeight: 700,
-    fontSize: 18,
+    fontWeight: 800,
+    fontSize: 22,
+    boxShadow: "0 4px 16px rgba(103,80,164,0.4)",
   },
   logoText: {
-    fontWeight: 600,
-    fontSize: 16,
+    fontWeight: 700,
+    fontSize: 18,
     letterSpacing: "-0.02em",
     color: "var(--md-on-surface, #E6E1E5)",
   },
@@ -151,11 +155,13 @@ const styles = {
     fontWeight: 700,
     color: "var(--md-on-surface, #E6E1E5)",
     letterSpacing: "-0.02em",
+    textAlign: "center",
   },
   subtitle: {
     margin: "0 0 28px",
     fontSize: 14,
     color: "var(--md-on-surface-variant, #CAC4D0)",
+    textAlign: "center",
   },
   form: {
     display: "flex",
