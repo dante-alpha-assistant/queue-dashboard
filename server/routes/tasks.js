@@ -724,7 +724,7 @@ router.post("/deploy/batch", async (req, res) => {
     // Fetch the tasks to deploy
     const { data: tasks, error: fetchErr } = await supabase
       .from("agent_tasks")
-      .select("id, title, status, pull_request_url, repository_url, deploy_target, type")
+      .select("id, title, status, pull_request_url, repository_url, deploy_target, type, app_id")
       .in("id", taskIds);
 
     if (fetchErr) return res.status(500).json({ error: fetchErr.message });
@@ -767,6 +767,9 @@ router.post("/deploy/batch", async (req, res) => {
       });
     }
 
+    // Inherit app_id from the first deployable task that has one
+    const appId = deployable.find(t => t.app_id)?.app_id || null;
+
     // Create the parent deploy task
     const { data: deployTask, error: createErr } = await supabase
       .from("agent_tasks")
@@ -775,6 +778,7 @@ router.post("/deploy/batch", async (req, res) => {
         type: "deploy",
         priority: "urgent",
         status: "todo",
+        app_id: appId,
         deploy_target: deployable[0].deploy_target || "kubernetes",
         description: `Merge and deploy ${deployable.length} PRs:\n\n${deployable.map(t => `- ${t.title} (${getPrUrl(t)})`).join("\n")}`,
         metadata: {
@@ -824,7 +828,7 @@ router.post("/deploy/:id", async (req, res) => {
   try {
     const { data: task, error: fetchErr } = await supabase
       .from("agent_tasks")
-      .select("id, title, status, pull_request_url, repository_url, deploy_target, type")
+      .select("id, title, status, pull_request_url, repository_url, deploy_target, type, app_id")
       .eq("id", req.params.id)
       .single();
 
@@ -860,6 +864,7 @@ router.post("/deploy/:id", async (req, res) => {
         type: "deploy",
         priority: "urgent",
         status: "todo",
+        app_id: task.app_id || null,
         deploy_target: deployTarget,
         description: `Deploy task ${task.id}:\n- ${task.title}\n- PR: ${prUrl || "none"}\n- Target: ${deployTarget}`,
         metadata: {
