@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { authedFetch } from "../lib/api";
 
 // Lightweight columns for list view — exclude heavy JSON blobs
 const LIST_COLUMNS = "id,title,status,type,priority,assigned_agent,created_at,updated_at,error,deploy_target,pull_request_url,deployment_url,started_at,completed_at,paused,blocked_reason,stage,repository_url,project_id,repository_id,app_id,project:agent_projects(id,name,slug),repository:agent_repositories(id,name,url,provider),app:apps(id,name,slug,icon)";
@@ -31,10 +32,10 @@ export default function useQueue({ since, until } = {}) {
       const qs = params.toString() ? `?${params}` : "";
 
       const [sRes, tRes, pRes, aRes] = await Promise.all([
-        fetch(`/api/stats${selectedProject ? `?project_id=${selectedProject}` : ""}`),
-        fetch(`/api/tasks${qs}`),
-        fetch("/api/projects"),
-        fetch("/api/apps"),
+        authedFetch(`/api/stats${selectedProject ? `?project_id=${selectedProject}` : ""}`),
+        authedFetch(`/api/tasks${qs}`),
+        authedFetch("/api/projects"),
+        authedFetch("/api/apps"),
       ]);
       setStats(await sRes.json());
       const newTasks = await tRes.json();
@@ -58,7 +59,7 @@ export default function useQueue({ since, until } = {}) {
   }, [fetchAll]);
 
   const dispatch = useCallback(async (task) => {
-    const res = await fetch("/api/tasks", {
+    const res = await authedFetch("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(task),
@@ -71,7 +72,7 @@ export default function useQueue({ since, until } = {}) {
   const updateTask = useCallback(async (id, updates) => {
     setTransitioning(prev => ({ ...prev, [id]: true }));
     try {
-      const res = await fetch(`/api/tasks/${id}`, {
+      const res = await authedFetch(`/api/tasks/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updates),
@@ -91,7 +92,7 @@ export default function useQueue({ since, until } = {}) {
   }, [fetchAll]);
 
   const deleteTask = useCallback(async (id) => {
-    const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
+    const res = await authedFetch(`/api/tasks/${id}`, { method: "DELETE" });
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
       throw new Error(errBody?.message || errBody?.error || `Delete failed (${res.status})`);
