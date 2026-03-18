@@ -21,7 +21,7 @@ app.use(express.json({ limit: "20mb" }));
 
 // Auth middleware — protect all /api/* routes except public endpoints
 app.use("/api", (req, res, next) => {
-  if (req.path.startsWith("/health") || req.path.startsWith("/tasks") || req.path.startsWith("/apps") || req.path.startsWith("/github") || req.path.startsWith("/attachments") || req.path.startsWith("/agents")) return next();
+  if (req.path.startsWith("/health") || req.path.startsWith("/tasks") || req.path.startsWith("/deploy") || req.path.startsWith("/apps") || req.path.startsWith("/github") || req.path.startsWith("/attachments") || req.path.startsWith("/agents")) return next();
   return requireAuth(req, res, next);
 });
 
