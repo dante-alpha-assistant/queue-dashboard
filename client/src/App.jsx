@@ -21,6 +21,7 @@ import AppDetailPage from "./pages/AppDetailPage";
 import TimeFilter, { filterTasksByTime } from "./components/TimeFilter";
 import AppFilter from "./components/AppFilter";
 import { Ban, Bot, CheckCircle2, ClipboardList, Clock, FlaskConical, HeartPulse, Package, Plus, Rocket, Search, Settings, XCircle, Zap } from 'lucide-react';
+import { ToastContainer } from "./components/Toast.jsx";
 
 const MOBILE_TABS = [
   { key: "todo", label: "Todo", icon: "📋" },
@@ -49,13 +50,16 @@ const BOTTOM_TABS = [
 
 function AppRouter() {
   return (
-    <Routes>
-      <Route path="/apps/new" element={<AppOnboardingWizard />} />
-      <Route path="/apps/:id/building" element={<AppBuildProgress />} />
-      <Route path="/apps/:id" element={<AppDetailPage />} />
-      <Route path="/settings" element={<SettingsPage />} />
-      <Route path="*" element={<AppMain />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/apps/new" element={<AppOnboardingWizard />} />
+        <Route path="/apps/:id/building" element={<AppBuildProgress />} />
+        <Route path="/apps/:id" element={<AppDetailPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="*" element={<AppMain />} />
+      </Routes>
+      <ToastContainer />
+    </>
   );
 }
 

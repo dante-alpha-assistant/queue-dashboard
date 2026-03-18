@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { showToast } from "../components/Toast.jsx";
 import { Package, Plus, Pencil, Archive, RotateCcw, X, Loader2, Search, XCircle, ChevronLeft, Save, BarChart3, ExternalLink, Clock, CheckCircle2, XOctagon, Rocket, Activity, Copy, Globe, Zap, Trash2 } from "lucide-react";
 
 const DEPLOY_TARGETS = ["kubernetes", "vercel", "none"];
@@ -1144,6 +1145,12 @@ export default function AppsPage() {
         onSave={handleSave}
         onArchive={handleArchive}
         onRestore={handleRestore}
+        onRemove={(removedApp) => {
+          showToast(`"${removedApp?.name || "App"}" removed successfully`);
+          setSelectedApp(null);
+          fetchApps();
+          navigate("/apps");
+        }}
       />
     );
   }
