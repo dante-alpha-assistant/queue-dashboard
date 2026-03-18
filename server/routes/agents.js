@@ -485,6 +485,14 @@ agentsRouter.get("/:name/stats", async (req, res) => {
 // Results: { [name]: { reachable, statusCode, latencyMs, error, modelHealth, lastHeartbeatAge } }
 const _healthCache = { data: null, expiresAt: 0 };
 
+// In-memory ring buffer: last 20 health check results per agent
+const _errorLog = {};
+function appendToErrorLog(agentName, entry) {
+  if (!_errorLog[agentName]) _errorLog[agentName] = [];
+  _errorLog[agentName].unshift({ ...entry, timestamp: new Date().toISOString() });
+  if (_errorLog[agentName].length > 20) _errorLog[agentName].pop();
+}
+
 agentsRouter.get("/health-checks", async (req, res) => {
   try {
     const now = Date.now();
@@ -546,7 +554,7 @@ agentsRouter.get("/health-checks", async (req, res) => {
       else if (modelError) overallError = `model: ${modelError}`;
       else if (agent.status === "offline") overallError = "offline";
 
-      return {
+      const result = {
         name: agent.name,
         status: agent.status,
         reachable,
@@ -558,6 +566,8 @@ agentsRouter.get("/health-checks", async (req, res) => {
         lastHeartbeatAge,
         hasIssue: !!overallError || (reachable === false && agent.status !== "disabled"),
       };
+      appendToErrorLog(agent.name, result);
+      return result;
     }
 
     const probeable = (agents || []).filter(a => a.status !== "disabled");
@@ -575,6 +585,87 @@ agentsRouter.get("/health-checks", async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// POST /:name/health-check — run a fresh health probe for a single agent
+agentsRouter.post("/:name/health-check", async (req, res) => {
+  try {
+    const agentName = req.params.name;
+    const { data: agent, error } = await supabase
+      .from("agent_cards")
+      .select("id, name, status, endpoint_url, metadata, last_heartbeat")
+      .eq("name", agentName)
+      .single();
+    if (error || !agent) return res.status(404).json({ error: "Agent not found" });
+
+    const now = Date.now();
+    const TIMEOUT_MS = 5000;
+    const url = agent.endpoint_url;
+    let statusCode = null;
+    let reachable = false;
+    let errMsg = null;
+
+    if (url && !url.includes("localhost") && !url.includes("127.0.0.1")) {
+      try {
+        const controller = new AbortController();
+        const tid = setTimeout(() => controller.abort(), TIMEOUT_MS);
+        const resp = await fetch(url, { signal: controller.signal, redirect: "manual" });
+        clearTimeout(tid);
+        statusCode = resp.status;
+        reachable = statusCode < 500 || statusCode === 401 || statusCode === 403;
+        if (statusCode >= 500) errMsg = `HTTP ${statusCode}`;
+        else if (statusCode === 403) errMsg = "403 Forbidden";
+        else if (statusCode === 401) errMsg = null;
+      } catch (e) {
+        errMsg = e.name === "AbortError" ? "timeout" : "unreachable";
+        reachable = false;
+      }
+    } else {
+      reachable = null;
+    }
+
+    let lastHeartbeatAge = null;
+    if (agent.last_heartbeat) {
+      lastHeartbeatAge = Math.floor((now - new Date(agent.last_heartbeat).getTime()) / 1000);
+    }
+
+    const modelHealth = agent.metadata?.model_health || null;
+    const modelHealthAt = agent.metadata?.model_health_at || null;
+    const modelError = modelHealth && modelHealth !== "ok" ? modelHealth : null;
+
+    let overallError = null;
+    if (errMsg) overallError = errMsg;
+    else if (modelError) overallError = `model: ${modelError}`;
+    else if (agent.status === "offline") overallError = "offline";
+
+    const result = {
+      name: agent.name,
+      status: agent.status,
+      reachable,
+      statusCode,
+      latencyMs: reachable && statusCode ? Date.now() - now : null,
+      error: overallError,
+      modelHealth,
+      modelHealthAt,
+      lastHeartbeatAge,
+      hasIssue: !!overallError || (reachable === false && agent.status !== "disabled"),
+    };
+
+    appendToErrorLog(agent.name, result);
+    // Invalidate cache so next GET /health-checks returns fresh data
+    _healthCache.expiresAt = 0;
+
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /:name/error-log — return last 20 health check results for an agent
+agentsRouter.get("/:name/error-log", async (req, res) => {
+  const agentName = req.params.name;
+  const log = _errorLog[agentName] || [];
+  res.json({ agent: agentName, log });
 });
 
 // Full card + recent tasks
