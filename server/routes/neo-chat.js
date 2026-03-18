@@ -148,6 +148,7 @@ const CHAT_TOOLS = [
           description: { type: "string", description: "Detailed task description with context, requirements, and acceptance criteria (markdown supported)" },
           type: { type: "string", enum: ["coding", "ops", "general", "review", "research", "qa"], description: "Task type" },
           priority: { type: "string", enum: ["low", "normal", "high", "urgent"], description: "Task priority, default normal" },
+          app_id: { type: "string", description: "Optional app UUID to associate the task with a specific app" },
           image_urls: { type: "array", items: { type: "string" }, description: "Array of image URLs (from /upload endpoint) to attach to the task" },
         },
         required: ["title"],
@@ -172,7 +173,7 @@ const CHAT_TOOLS = [
 ];
 
 // Execute a tool call locally and return the result
-async function executeToolCall(name, args, conversationImages = [], uploadedImageUrls = []) {
+async function executeToolCall(name, args, conversationImages = [], uploadedImageUrls = [], contextAppId = null) {
   if (name === "create_task") {
     try {
       const { data, error } = await supabase
@@ -184,6 +185,7 @@ async function executeToolCall(name, args, conversationImages = [], uploadedImag
           priority: args.priority || "normal",
           dispatched_by: "neo-chat",
           status: "todo",
+          app_id: args.app_id || contextAppId || null,
         })
         .select()
         .single();
@@ -327,7 +329,7 @@ neoChatRouter.get("/conversations/:id/messages", async (req, res) => {
 neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
   try {
     const conversationId = req.params.id;
-    const { content, images, taskMentions } = req.body;
+    const { content, images, taskMentions, app_id } = req.body;
     if (!content && (!images || !images.length)) {
       return res.status(400).json({ error: "content required" });
     }
@@ -398,8 +400,9 @@ neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
       .order("created_at", { ascending: true });
 
 // Build messages for gateway, with task context and image reconstruction
-    const systemContent = taskContext
-      ? SYSTEM_PROMPT + taskContext
+    const appContext = app_id ? `\n\n**Active App Context:** The user currently has an app selected (app_id: ${app_id}). When creating a task, include this app_id so the task is associated with the correct app.` : "";
+    const systemContent = (taskContext || appContext)
+      ? SYSTEM_PROMPT + taskContext + appContext
       : SYSTEM_PROMPT;
     const fullMessages = [
       { role: "system", content: systemContent },
@@ -604,7 +607,7 @@ neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
         // Separate uploaded URLs (http) from base64 data URLs
         const uploadedUrls = conversationImages.filter(u => u.startsWith('http'));
         const base64Images = conversationImages.filter(u => u.startsWith('data:'));
-        const result = await executeToolCall(tc.name, args, base64Images, uploadedUrls);
+        const result = await executeToolCall(tc.name, args, base64Images, uploadedUrls, app_id);
         toolResultMsgs.push({
           role: "tool",
           tool_call_id: tc.id || `call_0`,
