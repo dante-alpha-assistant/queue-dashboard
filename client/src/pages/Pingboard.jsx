@@ -34,6 +34,10 @@ if (typeof document !== "undefined" && !document.getElementById(styleId)) {
       0% { background-color: rgba(99, 102, 241, 0.2); }
       100% { background-color: transparent; }
     }
+    @keyframes pb-slide-in-right {
+      from { opacity: 0; transform: translateX(40px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
     .pingboard-tooltip {
       visibility: hidden;
       opacity: 0;
@@ -62,6 +66,284 @@ if (typeof document !== "undefined" && !document.getElementById(styleId)) {
 }
 import OrgChart from "../components/OrgChart";
 import { AlertTriangle, BarChart3, Bot, Building2, CheckCircle2, ClipboardList, FlaskConical, Puzzle, Rocket, Search, Timer, Wifi, WifiOff, Wrench, XCircle, ZapOff } from 'lucide-react';
+
+/* ─── Connection Quality Dot ─── */
+function ConnectionQualityDot({ latencyMs, reachable, size = 8 }) {
+  let color = "#79747E"; // gray = unknown
+  let title = "Unknown";
+  if (reachable === false) {
+    color = "#BA1A1A";
+    title = "Unreachable";
+  } else if (latencyMs != null) {
+    if (latencyMs < 200) { color = "#2E7D32"; title = `${latencyMs}ms`; }
+    else if (latencyMs < 800) { color = "#E65100"; title = `${latencyMs}ms (degraded)`; }
+    else { color = "#BA1A1A"; title = `${latencyMs}ms (slow)`; }
+  } else if (reachable === null) {
+    color = "#79747E";
+    title = "No endpoint";
+  }
+  return (
+    <span title={title} style={{
+      display: "inline-block",
+      width: size, height: size, borderRadius: "50%",
+      background: color, flexShrink: 0, cursor: "default",
+    }} />
+  );
+}
+
+/* ─── Error Category Helper ─── */
+function categorizeError(statusCode, error) {
+  if (!error && !statusCode) return null;
+  if (error === "timeout" || statusCode === 408 || statusCode === 504) return "Timeout";
+  if (error === "unreachable") return "Unreachable";
+  if (error === "offline") return "Agent Offline";
+  if (statusCode === 401) return "Auth Expired";
+  if (statusCode === 403) return "Forbidden";
+  if (statusCode === 404) return "Not Found";
+  if (statusCode >= 500) return "Server Error";
+  if (error) return "Unknown Error";
+  return null;
+}
+
+/* ─── Agent Diagnostics Panel ─── */
+function AgentDiagnosticsPanel({ agent, healthCheck, onClose, onHealthCheckUpdate }) {
+  const [running, setRunning] = useState(false);
+  const [log, setLog] = useState([]);
+  const [copied, setCopied] = useState(false);
+  const hc = healthCheck || {};
+
+  useEffect(() => {
+    async function fetchLog() {
+      try {
+        const res = await fetch(`/api/agents/${encodeURIComponent(agent.name)}/error-log`);
+        if (res.ok) {
+          const data = await res.json();
+          setLog(data.log || []);
+        }
+      } catch (e) {
+        console.error("Failed to fetch error log:", e);
+      }
+    }
+    fetchLog();
+  }, [agent.name]);
+
+  async function runHealthCheck() {
+    setRunning(true);
+    try {
+      const res = await fetch(`/api/agents/${encodeURIComponent(agent.name)}/health-check`, { method: "POST" });
+      if (res.ok) {
+        const result = await res.json();
+        onHealthCheckUpdate && onHealthCheckUpdate(agent.name, result);
+        setLog(prev => [{ ...result, timestamp: new Date().toISOString() }, ...prev].slice(0, 20));
+      }
+    } catch (e) {
+      console.error("Health check failed:", e);
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  function copyLog() {
+    const text = JSON.stringify(log, null, 2);
+    navigator.clipboard?.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
+
+  const errorCategory = categorizeError(hc.statusCode, hc.error);
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{
+          position: "fixed", inset: 0,
+          background: "rgba(0,0,0,0.4)",
+          zIndex: 299,
+        }}
+      />
+      {/* Panel */}
+      <div style={{
+        position: "fixed", top: 0, right: 0, bottom: 0,
+        width: 480,
+        background: "var(--md-surface-container)",
+        borderLeft: "1px solid var(--md-surface-variant)",
+        zIndex: 300, overflowY: "auto",
+        padding: 24,
+        display: "flex", flexDirection: "column", gap: 20,
+        animation: "pb-slide-in-right 250ms ease-out",
+        boxShadow: "-8px 0 32px rgba(0,0,0,0.2)",
+        fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+      }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <AgentAvatar agent={agent} size={40} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 16, color: "var(--md-on-background)" }}>{agent.name}</div>
+            <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)" }}>Diagnostics Panel</div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ background: "none", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center" }}
+          >
+            {PingboardIcons.close(20, "var(--md-on-surface-variant)")}
+          </button>
+        </div>
+
+        {/* Status grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          {[
+            {
+              label: "Reachable",
+              value: hc.reachable === true ? "✓ Yes" : hc.reachable === false ? "✗ No" : "— Unknown",
+              color: hc.reachable === true ? "#2E7D32" : hc.reachable === false ? "#BA1A1A" : "#79747E",
+            },
+            {
+              label: "HTTP Code",
+              value: hc.statusCode || "—",
+              color: hc.statusCode
+                ? hc.statusCode < 400 ? "#2E7D32" : hc.statusCode < 500 ? "#E65100" : "#BA1A1A"
+                : "var(--md-on-surface-variant)",
+            },
+          ].map(({ label, value, color }) => (
+            <div key={label} style={{ padding: 14, borderRadius: 12, background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)" }}>
+              <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--md-on-surface-variant)", marginBottom: 6 }}>{label}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color }}>{value}</div>
+            </div>
+          ))}
+          <div style={{ padding: 14, borderRadius: 12, background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)" }}>
+            <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--md-on-surface-variant)", marginBottom: 6 }}>Latency</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <ConnectionQualityDot latencyMs={hc.latencyMs} reachable={hc.reachable} size={10} />
+              <span style={{ fontSize: 15, fontWeight: 700, color: "var(--md-on-background)" }}>
+                {hc.latencyMs != null ? `${hc.latencyMs}ms` : "—"}
+              </span>
+            </div>
+          </div>
+          <div style={{ padding: 14, borderRadius: 12, background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)" }}>
+            <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--md-on-surface-variant)", marginBottom: 6 }}>Heartbeat Age</div>
+            <div style={{
+              fontSize: 15, fontWeight: 700,
+              color: hc.lastHeartbeatAge != null
+                ? hc.lastHeartbeatAge < 300 ? "#2E7D32" : hc.lastHeartbeatAge < 900 ? "#E65100" : "#BA1A1A"
+                : "var(--md-on-surface-variant)",
+            }}>
+              {hc.lastHeartbeatAge != null
+                ? formatElapsed(new Date(Date.now() - hc.lastHeartbeatAge * 1000).toISOString())
+                : "—"}
+            </div>
+          </div>
+        </div>
+
+        {/* Error category */}
+        {errorCategory && (
+          <div style={{
+            padding: "10px 16px", borderRadius: 10,
+            background: "rgba(186,26,26,0.08)", border: "1px solid rgba(186,26,26,0.3)",
+            color: "#BA1A1A", fontSize: 13, fontWeight: 700,
+            display: "flex", alignItems: "center", gap: 8,
+          }}>
+            <AlertTriangle size={14} /> Error Category: {errorCategory}
+          </div>
+        )}
+
+        {/* Endpoint URL */}
+        {agent.endpoint_url && (
+          <div style={{
+            padding: "8px 12px", borderRadius: 8,
+            background: "var(--md-surface)", border: "1px solid var(--md-surface-variant)",
+            fontSize: 11, fontFamily: "'JetBrains Mono', monospace",
+            color: "var(--md-on-surface-variant)", wordBreak: "break-all",
+          }}>
+            🔗 {agent.endpoint_url}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={runHealthCheck}
+            disabled={running}
+            style={{
+              flex: 1, padding: "10px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600,
+              border: "1px solid var(--md-primary)", background: "var(--md-primary-container)",
+              color: "var(--md-on-primary-container)", cursor: running ? "not-allowed" : "pointer",
+              fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+              opacity: running ? 0.7 : 1, transition: "opacity 150ms",
+            }}
+          >
+            {running ? "⏳ Running..." : "▶ Run Health Check"}
+          </button>
+          <button
+            onClick={copyLog}
+            style={{
+              padding: "10px 14px", borderRadius: 10, fontSize: 13, fontWeight: 600,
+              border: "1px solid var(--md-surface-variant)", background: "var(--md-surface)",
+              color: "var(--md-on-surface-variant)", cursor: "pointer",
+              fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+              transition: "all 150ms",
+            }}
+          >
+            {copied ? "✓ Copied" : "📋 Copy Log"}
+          </button>
+        </div>
+
+        {/* Error log table */}
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--md-on-background)", marginBottom: 10 }}>
+            Health Check History
+            {log.length > 0 && (
+              <span style={{ fontSize: 11, fontWeight: 500, color: "var(--md-on-surface-variant)", marginLeft: 8 }}>
+                ({log.length} entries)
+              </span>
+            )}
+          </div>
+          {log.length === 0 ? (
+            <div style={{
+              fontSize: 12, color: "var(--md-on-surface-variant)", fontStyle: "italic",
+              padding: 16, textAlign: "center",
+              background: "var(--md-surface)", borderRadius: 8, border: "1px dashed var(--md-surface-variant)",
+            }}>
+              No health checks recorded yet. Run a health check to populate.
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {log.map((entry, i) => (
+                <div key={i} style={{
+                  padding: "10px 12px", borderRadius: 8, background: "var(--md-surface)",
+                  border: `1px solid ${entry.hasIssue ? "rgba(186,26,26,0.3)" : "rgba(46,125,50,0.25)"}`,
+                  fontSize: 12,
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                    <span style={{ fontWeight: 600, color: entry.hasIssue ? "#BA1A1A" : "#2E7D32" }}>
+                      {entry.reachable === true ? "✓ Reachable" : entry.reachable === false ? "✗ Unreachable" : "? Unknown"}
+                    </span>
+                    <span style={{ fontSize: 10, color: "var(--md-on-surface-variant)", fontFamily: "'JetBrains Mono', monospace" }}>
+                      {entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString() : ""}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 11, color: "var(--md-on-surface-variant)" }}>
+                    {entry.statusCode && <span>HTTP {entry.statusCode}</span>}
+                    {entry.latencyMs != null && (
+                      <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <ConnectionQualityDot latencyMs={entry.latencyMs} reachable={entry.reachable} size={7} />
+                        {entry.latencyMs}ms
+                      </span>
+                    )}
+                    {entry.error && <span style={{ color: "#BA1A1A" }}>{entry.error}</span>}
+                    {entry.lastHeartbeatAge != null && <span>hb {Math.floor(entry.lastHeartbeatAge / 60)}m ago</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
 
 /* ─── Health Error Badge ─── */
 function ErrorBadge({ error, statusCode, reachable, size = "normal" }) {
@@ -344,7 +626,7 @@ function HumanCard({ agent, replicas, liveTasks = [] }) {
 }
 
 /* ─── Manager Card ─── */
-function ManagerCard({ agent, replicas, liveTasks = [], healthCheck = null }) {
+function ManagerCard({ agent, replicas, liveTasks = [], healthCheck = null, onDiagnosticsClick }) {
   const load = liveTasks.length || agent.current_load || 0;
   const maxCap = agent.max_capacity || 0;
   const caps = Array.isArray(agent.capabilities) ? agent.capabilities : [];
@@ -363,6 +645,19 @@ function ManagerCard({ agent, replicas, liveTasks = [], healthCheck = null }) {
       }}>
         <TierBadge tier="manager" size="small" />
       </div>
+      {/* Diagnostics button */}
+      {onDiagnosticsClick && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDiagnosticsClick(agent); }}
+          title="Open diagnostics"
+          style={{
+            position: "absolute", top: 10, right: 10,
+            background: "var(--md-surface-variant)", border: "none", borderRadius: 6,
+            padding: "3px 6px", cursor: "pointer", fontSize: 12, lineHeight: 1,
+            color: "var(--md-on-surface-variant)", zIndex: 1,
+          }}
+        >🔍</button>
+      )}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginTop: 8 }}>
         <div style={{ position: "relative" }}>
           <AgentAvatar agent={agent} size={56} />
@@ -371,8 +666,11 @@ function ManagerCard({ agent, replicas, liveTasks = [], healthCheck = null }) {
           </div>
         </div>
         <div>
-          <div style={{ fontWeight: 700, fontSize: 16, color: "var(--md-on-background)" }}>
+          <div style={{ fontWeight: 700, fontSize: 16, color: "var(--md-on-background)", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
             {agent.name}
+            {healthCheck && (
+              <ConnectionQualityDot latencyMs={healthCheck.latencyMs} reachable={healthCheck.reachable} />
+            )}
           </div>
           <div style={{ fontSize: 11, color: "#7c4dff", fontWeight: 600, marginTop: 2 }}>
             {agent.role || "Engineering Manager"}
@@ -403,7 +701,7 @@ function ManagerCard({ agent, replicas, liveTasks = [], healthCheck = null }) {
 }
 
 /* ─── Worker Card ─── */
-function WorkerCard({ agent, liveTasks = [], healthCheck = null }) {
+function WorkerCard({ agent, liveTasks = [], healthCheck = null, onDiagnosticsClick }) {
   const load = liveTasks.length || agent.current_load || 0;
   const maxCap = agent.max_capacity || 0;
   const caps = Array.isArray(agent.capabilities) ? agent.capabilities : [];
@@ -425,6 +723,19 @@ function WorkerCard({ agent, liveTasks = [], healthCheck = null }) {
       onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.1)"; }}
       onMouseLeave={(e) => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "none"; }}
     >
+      {/* Diagnostics button */}
+      {onDiagnosticsClick && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDiagnosticsClick(agent); }}
+          title="Open diagnostics"
+          style={{
+            position: "absolute", top: 8, right: 8,
+            background: "var(--md-surface-variant)", border: "none", borderRadius: 5,
+            padding: "2px 5px", cursor: "pointer", fontSize: 10, lineHeight: 1,
+            color: "var(--md-on-surface-variant)", zIndex: 1,
+          }}
+        >🔍</button>
+      )}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
         <div style={{ position: "relative" }}>
           <AgentAvatar agent={agent} size={40} />
@@ -433,8 +744,11 @@ function WorkerCard({ agent, liveTasks = [], healthCheck = null }) {
           </div>
         </div>
         <div>
-          <div style={{ fontWeight: 600, fontSize: 13, color: "var(--md-on-background)" }}>
+          <div style={{ fontWeight: 600, fontSize: 13, color: "var(--md-on-background)", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
             {agent.name}
+            {healthCheck && (
+              <ConnectionQualityDot latencyMs={healthCheck.latencyMs} reachable={healthCheck.reachable} />
+            )}
           </div>
           <div style={{ fontSize: 10, color: "var(--md-on-surface-variant)", fontWeight: 500, marginTop: 1 }}>
             {agent.role || "Worker"}
@@ -476,7 +790,7 @@ function VerticalConnector({ height = 32, color = "var(--md-surface-variant)", d
 }
 
 /* ─── Org Chart Tree View ─── */
-function OrgChartTree({ agents, allReplicas, loading: replicasLoading, liveStatus = {}, healthChecks = {} }) {
+function OrgChartTree({ agents, allReplicas, loading: replicasLoading, liveStatus = {}, healthChecks = {}, onDiagnosticsClick }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
@@ -518,8 +832,8 @@ function OrgChartTree({ agents, allReplicas, loading: replicasLoading, liveStatu
     const hc = healthChecks[agent.name] || healthChecks[agentId] || null;
     switch (type) {
       case "human": return <HumanCard agent={agent} replicas={allReplicas[agentId]} liveTasks={tasks} />;
-      case "manager": return <ManagerCard agent={agent} replicas={allReplicas[agentId]} liveTasks={tasks} healthCheck={hc} />;
-      default: return <WorkerCard agent={agent} liveTasks={tasks} healthCheck={hc} />;
+      case "manager": return <ManagerCard agent={agent} replicas={allReplicas[agentId]} liveTasks={tasks} healthCheck={hc} onDiagnosticsClick={onDiagnosticsClick} />;
+      default: return <WorkerCard agent={agent} liveTasks={tasks} healthCheck={hc} onDiagnosticsClick={onDiagnosticsClick} />;
     }
   }
 
@@ -995,7 +1309,7 @@ function ReplicaCard({ pod, activeTasks, animState, hasActiveTasks }) {
 }
 
 /* ─── Agent Tile (Grid View) ─── */
-function AgentTile({ agent, isSelected, onClick, liveTasks = [], healthCheck = null }) {
+function AgentTile({ agent, isSelected, onClick, liveTasks = [], healthCheck = null, onDiagnosticsClick }) {
   const caps = Array.isArray(agent.capabilities) ? agent.capabilities : [];
   const load = liveTasks.length || agent.current_load || 0;
   const maxCap = agent.max_capacity || 0;
@@ -1007,7 +1321,7 @@ function AgentTile({ agent, isSelected, onClick, liveTasks = [], healthCheck = n
     <div
       onClick={onClick}
       style={{
-        background: "var(--md-surface-container)",
+        background: hasError ? "rgba(186,26,26,0.03)" : "var(--md-surface-container)",
         borderRadius: 16, padding: 20, cursor: "pointer",
         border: isSelected
           ? "2px solid var(--md-primary)"
@@ -1017,7 +1331,6 @@ function AgentTile({ agent, isSelected, onClick, liveTasks = [], healthCheck = n
         transition: "all 200ms ease", textAlign: "center",
         position: "relative", minHeight: 160,
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8,
-        background: hasError ? "rgba(186,26,26,0.03)" : "var(--md-surface-container)",
       }}
       onMouseEnter={(e) => {
         if (!isSelected) e.currentTarget.style.border = "1px solid var(--md-primary)";
@@ -1030,7 +1343,14 @@ function AgentTile({ agent, isSelected, onClick, liveTasks = [], healthCheck = n
         e.currentTarget.style.boxShadow = "none";
       }}
     >
-      <div style={{ position: "absolute", top: 12, right: 12 }}>
+      <div style={{ position: "absolute", top: 12, right: 12, display: "flex", alignItems: "center", gap: 4 }}>
+        {onDiagnosticsClick && (hasError) && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onDiagnosticsClick(agent); }}
+            title="Agent Diagnostics"
+            style={{ background: "rgba(186,26,26,0.12)", border: "none", borderRadius: 6, cursor: "pointer", padding: "1px 4px", fontSize: 10, color: "#BA1A1A" }}
+          >🔍</button>
+        )}
         <StatusDotSvg status={agent.status} size={10} isWorking={isWorking} />
       </div>
 
@@ -1102,6 +1422,7 @@ export default function Pingboard() {
   const [animatingPods, setAnimatingPods] = useState(new Map());
   const exitingPodsRef = useRef([]);
   const [skillsOpen, setSkillsOpen] = useState(false);
+  const [diagnosticsAgent, setDiagnosticsAgent] = useState(null);
 
   const fetchAgents = useCallback(async () => {
     try {
@@ -1194,7 +1515,7 @@ export default function Pingboard() {
     fetchHealthChecks();
     const interval = setInterval(fetchAgents, 10000);
     const liveInterval = setInterval(fetchLiveStatus, 30000);
-    const healthInterval = setInterval(fetchHealthChecks, 60000); // probe every 60s
+    const healthInterval = setInterval(fetchHealthChecks, 30000); // probe every 30s
     return () => { clearInterval(interval); clearInterval(liveInterval); clearInterval(healthInterval); };
   }, [fetchAgents, fetchLiveStatus, fetchHealthChecks]);
 
@@ -1267,6 +1588,21 @@ export default function Pingboard() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            onClick={() => { fetchHealthChecks(); }}
+            style={{
+              padding: "6px 14px", borderRadius: 10, fontSize: 12, fontWeight: 600,
+              border: "1px solid var(--md-surface-variant)",
+              background: "var(--md-surface)", color: "var(--md-on-surface-variant)",
+              cursor: "pointer", fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+              transition: "all 150ms", display: "flex", alignItems: "center", gap: 5,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "var(--md-primary-container)"; e.currentTarget.style.color = "var(--md-on-primary-container)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "var(--md-surface)"; e.currentTarget.style.color = "var(--md-on-surface-variant)"; }}
+            title="Refresh health checks now"
+          >
+            <Wifi size={13} /> Refresh Health
+          </button>
           <button
             onClick={() => setSkillsOpen(true)}
             style={{
@@ -1377,7 +1713,7 @@ export default function Pingboard() {
 
         {/* View content */}
         {viewMode === "orgchart" ? (
-          <OrgChartTree agents={filtered} allReplicas={allReplicas} loading={allReplicasLoading} liveStatus={liveStatus} healthChecks={healthChecks} />
+          <OrgChartTree agents={filtered} allReplicas={allReplicas} loading={allReplicasLoading} liveStatus={liveStatus} healthChecks={healthChecks} onDiagnosticsClick={setDiagnosticsAgent} />
         ) : viewMode === "pipeline" ? (
           <PipelineView />
         ) : (
@@ -1403,6 +1739,7 @@ export default function Pingboard() {
                       onClick={() => handleSelectAgent(agent)}
                       liveTasks={liveStatus[agent.id || agent.name] || liveStatus[agent.name] || []}
                       healthCheck={healthChecks[agent.name] || healthChecks[agent.id] || null}
+                      onDiagnosticsClick={setDiagnosticsAgent}
                     />
                   ))}
                 </div>
@@ -1585,6 +1922,24 @@ export default function Pingboard() {
         )}
       </div>
       <SkillsModal open={skillsOpen} onClose={() => setSkillsOpen(false)} />
+
+      {/* Agent Diagnostics Panel */}
+      {diagnosticsAgent && (
+        <>
+          <div
+            onClick={() => setDiagnosticsAgent(null)}
+            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 299 }}
+          />
+          <AgentDiagnosticsPanel
+            agent={diagnosticsAgent}
+            healthCheck={healthChecks[diagnosticsAgent.name] || healthChecks[diagnosticsAgent.id] || null}
+            onClose={() => setDiagnosticsAgent(null)}
+            onHealthCheckUpdate={(name, result) => {
+              setHealthChecks(prev => ({ ...prev, [name]: result }));
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }
