@@ -21,7 +21,7 @@ function fileToBase64(file) {
 /* ── File type helpers ─────────────────────────────── */
 function getFileType(attachment) {
   const type = attachment.type || "";
-  const filename = attachment.filename || "";
+  const filename = attachment.filename || attachment.name || attachment.name || "";
   const ext = filename.split(".").pop()?.toLowerCase();
   if (type.startsWith("image/")) return "image";
   if (type === "application/pdf" || ext === "pdf") return "pdf";
@@ -98,7 +98,7 @@ function AttachmentThumb({ attachment, index, onDelete, readonly }) {
       >
         <img
           src={attachment.url}
-          alt={attachment.filename}
+          alt={attachment.filename || attachment.name}
           style={{ width: "100%", height: "100%", objectFit: "cover" }}
           loading="lazy"
         />
@@ -130,7 +130,7 @@ function AttachmentThumb({ attachment, index, onDelete, readonly }) {
           </button>
         )}
       </div>
-      {lightbox && <Lightbox src={attachment.url} alt={attachment.filename} onClose={() => setLightbox(false)} />}
+      {lightbox && <Lightbox src={attachment.url} alt={attachment.filename || attachment.name} onClose={() => setLightbox(false)} />}
     </>
   );
 }
@@ -149,16 +149,24 @@ function TextPreview({ attachment, fileType, onDelete }) {
     }
     setLoading(true);
     try {
-      const resp = await fetch(attachment.url);
-      const text = await resp.text();
-      setContent(text);
-      setExpanded(true);
+      // If attachment has inline content, use it directly
+      if (attachment.content) {
+        setContent(attachment.content);
+        setExpanded(true);
+      } else if (attachment.url) {
+        const resp = await fetch(attachment.url);
+        const text = await resp.text();
+        setContent(text);
+        setExpanded(true);
+      } else {
+        setError("No content or URL available");
+      }
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, [attachment.url, content, expanded]);
+  }, [attachment.url, attachment.content, content, expanded]);
 
   return (
     <div style={{ border: "1px solid var(--md-surface-variant, #E7E0EC)", borderRadius: 8, overflow: "hidden" }}>
@@ -172,14 +180,30 @@ function TextPreview({ attachment, fileType, onDelete }) {
       >
         <span style={{ fontSize: 16 }}>{getFileIcon(fileType)}</span>
         <span style={{ fontSize: 13, fontWeight: 500, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {attachment.filename}
+          {attachment.filename || attachment.name}
         </span>
         {loading && <span style={{ fontSize: 11, color: "var(--md-primary, #6750A4)" }}>Loading...</span>}
         {!loading && <span style={{ fontSize: 11, color: "var(--md-outline, #79747E)" }}>{expanded ? "▲ Collapse" : "▼ Expand"}</span>}
         <a
-          href={attachment.url}
-          download={attachment.filename}
-          onClick={(e) => e.stopPropagation()}
+          href={attachment.url || "#"}
+          download={attachment.filename || attachment.name}
+          onClick={(e) => {
+            e.stopPropagation();
+            // For inline content attachments, create blob download
+            if (!attachment.url || attachment.url.startsWith("workspace/")) {
+              e.preventDefault();
+              const text = attachment.content || content || "";
+              if (text) {
+                const blob = new Blob([text], { type: attachment.type || "text/markdown" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = attachment.filename || attachment.name || "download";
+                a.click();
+                URL.revokeObjectURL(url);
+              }
+            }
+          }}
           style={{ fontSize: 11, color: "var(--md-primary, #6750A4)", textDecoration: "none", padding: "2px 6px", borderRadius: 4, border: "1px solid var(--md-primary, #6750A4)" }}
         >
           ⬇ Download
@@ -231,7 +255,7 @@ function PDFPreview({ attachment, onDelete }) {
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "var(--md-surface-container-low, #F7F2FA)" }}>
         <span style={{ fontSize: 16 }}>📋</span>
         <span style={{ fontSize: 13, fontWeight: 500, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {attachment.filename}
+          {attachment.filename || attachment.name}
         </span>
         <button
           onClick={() => setShowEmbed(!showEmbed)}
@@ -241,7 +265,7 @@ function PDFPreview({ attachment, onDelete }) {
         </button>
         <a
           href={attachment.url}
-          download={attachment.filename}
+          download={attachment.filename || attachment.name}
           style={{ fontSize: 11, color: "var(--md-primary, #6750A4)", textDecoration: "none", padding: "2px 6px", borderRadius: 4, border: "1px solid var(--md-primary, #6750A4)" }}
         >
           ⬇ Download
