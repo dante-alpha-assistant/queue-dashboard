@@ -386,9 +386,7 @@ export function AppDetailView({ app, onBack, onSave, onArchive, onRestore, onRem
         name: form.name?.trim(),
         slug: form.slug?.trim(),
         description: form.description?.trim() || null,
-        repos: typeof form.repos === "string"
-          ? form.repos.split("\n").map(r => r.trim()).filter(Boolean)
-          : form.repos || [],
+        repos: Array.isArray(form.repos) ? form.repos : [],
         deploy_target: form.deploy_target || "none",
         supabase_project_ref: form.supabase_project_ref?.trim() || null,
       };
@@ -482,7 +480,7 @@ export function AppDetailView({ app, onBack, onSave, onArchive, onRestore, onRem
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             {!isArchived && (
-              <button onClick={() => { setEditing(true); setForm({ ...app, repos: (app.repos || []).join("\n") }); }}
+              <button onClick={() => { setEditing(true); setForm({ ...app, repos: app.repos || [] }); }}
                 style={{
                   padding: "8px 16px", borderRadius: 100, border: "1px solid var(--md-surface-variant)",
                   background: "transparent", color: "var(--md-on-surface)", cursor: "pointer",
@@ -690,9 +688,73 @@ export function AppDetailView({ app, onBack, onSave, onArchive, onRestore, onRem
                   rows={2} style={{ ...inputStyle, resize: "vertical", minHeight: 60 }} />
               </div>
               <div>
-                <label style={labelStyle}>Repos (one per line)</label>
-                <textarea value={form.repos || ""} onChange={e => setForm(f => ({ ...f, repos: e.target.value }))}
-                  rows={3} style={{ ...inputStyle, resize: "vertical", fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }} />
+                <label style={labelStyle}>Repositories</label>
+                {(Array.isArray(form.repos) ? form.repos : []).length > 0 ? (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+                    {(Array.isArray(form.repos) ? form.repos : []).map((r, i) => {
+                      const name = typeof r === "string" ? r : r.full_name || r.name || r;
+                      return (
+                        <span key={i} style={{
+                          display: "inline-flex", alignItems: "center", gap: 8,
+                          padding: "6px 12px", borderRadius: 100,
+                          background: "var(--md-primary, #6750A4)", color: "#fff",
+                          fontSize: 12, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace",
+                        }}>
+                          {name}
+                          <button onClick={() => setForm(f => ({
+                            ...f,
+                            repos: (Array.isArray(f.repos) ? f.repos : []).filter((_, idx) => idx !== i),
+                          }))} style={{
+                            background: "none", border: "none", color: "rgba(255,255,255,0.7)",
+                            cursor: "pointer", padding: 0, display: "flex", fontSize: 14, lineHeight: 1,
+                          }}>×</button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{
+                    padding: "12px 16px", borderRadius: 12,
+                    border: "1px dashed var(--md-surface-variant, #E7E0EC)",
+                    color: "var(--md-on-surface-variant, #49454F)",
+                    fontSize: 13, textAlign: "center",
+                  }}>
+                    No repositories linked
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  <input
+                    id="add-repo-input"
+                    placeholder="owner/repo-name"
+                    style={{ ...inputStyle, flex: 1, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && e.target.value.trim()) {
+                        e.preventDefault();
+                        const val = e.target.value.trim();
+                        setForm(f => ({
+                          ...f,
+                          repos: [...(Array.isArray(f.repos) ? f.repos : []), { full_name: val, name: val.split("/").pop() }],
+                        }));
+                        e.target.value = "";
+                      }
+                    }}
+                  />
+                  <button onClick={() => {
+                    const inp = document.getElementById("add-repo-input");
+                    if (inp?.value.trim()) {
+                      const val = inp.value.trim();
+                      setForm(f => ({
+                        ...f,
+                        repos: [...(Array.isArray(f.repos) ? f.repos : []), { full_name: val, name: val.split("/").pop() }],
+                      }));
+                      inp.value = "";
+                    }
+                  }} style={{
+                    padding: "8px 16px", borderRadius: 10, border: "1px solid var(--md-surface-variant)",
+                    background: "transparent", color: "var(--md-on-surface)", cursor: "pointer",
+                    fontSize: 12, fontWeight: 600, fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                  }}>+ Add</button>
+                </div>
               </div>
               <div>
                 <label style={labelStyle}>Deploy Target</label>
