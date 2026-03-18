@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { authedFetch } from "../lib/api";
 import ImageModal from "./ImageModal";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -393,7 +394,7 @@ export default function NewTaskChat({ isMobile, apps = [], selectedApp = "" }) {
 
   const loadConversations = useCallback(async () => {
     try {
-      const resp = await fetch("/api/neo-chat/conversations");
+      const resp = await authedFetch("/api/neo-chat/conversations");
       if (!resp.ok) {
         console.error("Failed to load conversations:", resp.status);
         setError("Failed to load conversations. The chat service may be unavailable.");
@@ -414,7 +415,7 @@ export default function NewTaskChat({ isMobile, apps = [], selectedApp = "" }) {
     loadAbortRef.current = controller;
     setLoadingMessages(true);
     try {
-      const resp = await fetch(`/api/neo-chat/conversations/${convoId}/messages`, {
+      const resp = await authedFetch(`/api/neo-chat/conversations/${convoId}/messages`, {
         signal: controller.signal,
       });
       if (controller.signal.aborted) return;
@@ -495,7 +496,7 @@ export default function NewTaskChat({ isMobile, apps = [], selectedApp = "" }) {
         const dataUrl = await compressImage(file);
         // Upload immediately to get a permanent URL
         try {
-          const uploadResp = await fetch('/api/neo-chat/upload', {
+          const uploadResp = await authedFetch('/api/neo-chat/upload', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ image: dataUrl, filename: file.name }),
@@ -553,7 +554,7 @@ export default function NewTaskChat({ isMobile, apps = [], selectedApp = "" }) {
   const deleteConversation = useCallback(async (id, e) => {
     e?.stopPropagation();
     try {
-      await fetch(`/api/neo-chat/conversations/${id}`, { method: "DELETE" });
+      await authedFetch(`/api/neo-chat/conversations/${id}`, { method: "DELETE" });
       setConversations(prev => prev.filter(c => c.id !== id));
       if (activeConvoId === id) {
         setActiveConvoId(null);
@@ -569,7 +570,7 @@ export default function NewTaskChat({ isMobile, apps = [], selectedApp = "" }) {
     let convoId = activeConvoId;
     if (!convoId) {
       try {
-        const resp = await fetch("/api/neo-chat/conversations", {
+        const resp = await authedFetch("/api/neo-chat/conversations", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({}),
@@ -635,7 +636,7 @@ export default function NewTaskChat({ isMobile, apps = [], selectedApp = "" }) {
       const controller = new AbortController();
       abortRef.current = controller;
 
-      const resp = await fetch(`/api/neo-chat/conversations/${convoId}/messages`, {
+      const resp = await authedFetch(`/api/neo-chat/conversations/${convoId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
