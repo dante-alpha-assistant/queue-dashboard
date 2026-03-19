@@ -17,7 +17,17 @@ export function serveStatic(app) {
   );
 
   // Other static files (favicon, manifest, etc.) — short cache
-  app.use(express.static(clientDist, { maxAge: "1h" }));
+  // IMPORTANT: index.html must NOT be cached or browsers will load stale chunk references
+  app.use(express.static(clientDist, {
+    maxAge: "1h",
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith("index.html") || filePath.endsWith(".html")) {
+        res.set("Cache-Control", "no-cache, no-store, must-revalidate");
+        res.set("Pragma", "no-cache");
+        res.set("Expires", "0");
+      }
+    },
+  }));
 
   // SPA fallback — serve index.html for all non-API routes.
   // CRITICAL: index.html MUST be served with no-cache headers so that browsers
