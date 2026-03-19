@@ -5,6 +5,18 @@ import { createVercelProject } from "../vercel.js";
 
 export const appsRouter = Router();
 
+// Guess credential type from env var name
+function guessCredentialType(name) {
+  const n = name.toUpperCase();
+  if (n.includes("API_KEY") || n.includes("APIKEY")) return "api_key";
+  if (n.includes("TOKEN")) return "token";
+  if (n.includes("PASSWORD") || n.includes("PASSWD")) return "password";
+  if (n.includes("SECRET")) return "secret";
+  if (n.includes("KEY")) return "key";
+  if (n.includes("URL") || n.includes("URI") || n.includes("HOST") || n.includes("ENDPOINT")) return "url";
+  return "secret";
+}
+
 // Transform app row: expand required_credentials jsonb into separate fields
 function expandCredentials(app) {
   if (!app) return app;
@@ -456,6 +468,24 @@ appsRouter.post("/", async (req, res) => {
 
         const { data: taskResult } = await supabase.from("agent_tasks").insert(taskData).select("id").single();
         console.log(`[app-factory] Created setup task ${taskResult?.id} for app ${data.id} (${name}, ${primaryDeployTarget}, ${envKeys.length} env vars)`);
+
+        // Auto-register env var names as app_credentials so they appear in the App Credentials panel
+        if (envKeys.length > 0) {
+          try {
+            const credRows = envKeys.map(key => ({
+              app_id: data.id,
+              credential_name: key,
+              credential_type: guessCredentialType(key),
+              k8s_secret_name: `${slug}-env`,
+              k8s_secret_key: key.toLowerCase().replace(/_/g, "-"),
+              description: "Auto-detected from .env during app onboarding",
+            }));
+            await supabase.from("app_credentials").insert(credRows);
+            console.log(`[app-factory] Registered ${envKeys.length} credentials for app ${data.id}`);
+          } catch (credErr) {
+            console.error("[app-factory] Failed to register credentials:", credErr.message);
+          }
+        }
       } catch (taskErr) {
         console.error("[app-factory] Failed to create setup task:", taskErr.message);
       }
