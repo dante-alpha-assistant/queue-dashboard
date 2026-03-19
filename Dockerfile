@@ -13,6 +13,7 @@ RUN npm ci --production
 COPY client/package.json client/package-lock.json ./client/
 RUN cd client && npm ci
 COPY client/ ./client/
+ARG CACHE_BUST=1
 RUN cd client && npm run build
 
 # Copy server
