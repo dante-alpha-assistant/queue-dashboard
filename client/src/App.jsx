@@ -215,6 +215,18 @@ function AppMain() {
               {t.label}
             </button>
           ))}
+          <button
+            onClick={() => console.log("Hello World")}
+            style={{
+              display: "flex", alignItems: "center", gap: 5,
+              padding: "5px 10px", background: "none",
+              border: "1px solid var(--md-surface-variant, #49454F)",
+              borderRadius: 8, color: "var(--md-on-surface-variant, #CAC4D0)",
+              cursor: "pointer", fontSize: 13, fontWeight: 500, transition: "all 150ms",
+            }}
+          >
+            Hello World
+          </button>
           <LogoutButton />
         </div>
         <div style={{ paddingTop: 42 }}>
@@ -481,6 +493,18 @@ function AppMain() {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <StatsBar stats={stats} isTablet={isTablet} />
+            <button
+              onClick={() => console.log("Hello World")}
+              style={{
+                display: "flex", alignItems: "center", gap: 5,
+                padding: "5px 10px", background: "none",
+                border: "1px solid var(--md-surface-variant, #49454F)",
+                borderRadius: 8, color: "var(--md-on-surface-variant, #CAC4D0)",
+                cursor: "pointer", fontSize: 13, fontWeight: 500, transition: "all 150ms",
+              }}
+            >
+              Hello World
+            </button>
             <LogoutButton />
           </div>
         </div>
