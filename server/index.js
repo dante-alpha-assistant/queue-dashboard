@@ -20,10 +20,10 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: "20mb" }));
 
-// Auth middleware — protect all /api/* routes except public endpoints  
+// Auth middleware — protect all /api/* routes except truly public endpoints  
 app.use("/api", (req, res, next) => {
-  // Public endpoints that don't require authentication
-  if (req.path.startsWith("/health") || req.path.startsWith("/tasks") || req.path.startsWith("/stats") || req.path.startsWith("/projects") || req.path.startsWith("/apps") || req.path.startsWith("/github") || req.path.startsWith("/attachments") || req.path.startsWith("/agents")) {
+  // Truly public endpoints that don't require authentication
+  if (req.path.startsWith("/health") || req.path.startsWith("/github") || req.path.startsWith("/attachments") || req.path.startsWith("/agents")) {
     return next();
   }
   
@@ -32,7 +32,8 @@ app.use("/api", (req, res, next) => {
     return requireAuth(req, res, next);
   }
   
-  // All other endpoints require auth + user-scoped supabase client
+  // CRITICAL: /tasks, /stats, /projects, /apps now require auth + user-scoped supabase client
+  // This ensures proper user isolation and Row Level Security enforcement
   return requireAuth(req, res, (err) => {
     if (err) return next(err);
     return attachUserSupabase(req, res, next);
