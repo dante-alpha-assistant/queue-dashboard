@@ -39,6 +39,19 @@ export function AuthProvider({ children }) {
   };
 
   const signOut = async () => {
+    // Clear user-scoped localStorage on sign out
+    const userId = session?.user?.id;
+    if (userId) {
+      try {
+        localStorage.removeItem(`app-onboarding-github-oauth:${userId}`);
+        localStorage.removeItem(`app-onboarding-draft:${userId}`);
+      } catch {}
+    }
+    // Also clear legacy global keys (pre-user-scoping)
+    try {
+      localStorage.removeItem("app-onboarding-github-oauth");
+      localStorage.removeItem("app-onboarding-draft");
+    } catch {}
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   };

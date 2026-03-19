@@ -2,6 +2,7 @@ import { authedFetch } from "../../lib/api.js";
 import { useReducer, useState, useCallback, useEffect, useRef, lazy, Suspense } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, X, Loader2, Sparkles } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext.jsx";
 import OnboardingStepIndicator from "./OnboardingStepIndicator";
 import { computeProposedArchitecture } from "./repoArchitecture";
 import { TEMPLATES } from "./steps/TemplateGallery";
@@ -29,12 +30,14 @@ function generateShortId() {
 
 const DEFAULT_REQ_CREDS = ["GH_TOKEN"];
 const DEFAULT_QA_CREDS = ["GH_TOKEN", "SUPABASE_SERVICE_ROLE_KEY"];
-const GITHUB_OAUTH_STORAGE_KEY = "app-onboarding-github-oauth";
-const ONBOARDING_DRAFT_STORAGE_KEY = "app-onboarding-draft";
+// Storage keys are scoped by user ID to prevent cross-user data leaks
+function githubOAuthKey(userId) { return `app-onboarding-github-oauth:${userId}`; }
+function onboardingDraftKey(userId) { return `app-onboarding-draft:${userId}`; }
 
-function getPersistedGitHubAuth() {
+function getPersistedGitHubAuth(userId) {
+  if (!userId) return { githubToken: null, githubUser: null, repoSource: "scratch" };
   try {
-    const raw = localStorage.getItem(GITHUB_OAUTH_STORAGE_KEY);
+    const raw = localStorage.getItem(githubOAuthKey(userId));
     if (!raw) return { githubToken: null, githubUser: null, repoSource: "scratch" };
     const parsed = JSON.parse(raw);
     if (!parsed?.githubToken) return { githubToken: null, githubUser: null, repoSource: "scratch" };
@@ -48,9 +51,10 @@ function getPersistedGitHubAuth() {
   }
 }
 
-function getPersistedOnboardingDraft() {
+function getPersistedOnboardingDraft(userId) {
+  if (!userId) return {};
   try {
-    const raw = localStorage.getItem(ONBOARDING_DRAFT_STORAGE_KEY);
+    const raw = localStorage.getItem(onboardingDraftKey(userId));
     if (!raw) return {};
     const parsed = JSON.parse(raw);
     return parsed && typeof parsed === "object" ? parsed : {};
@@ -213,10 +217,12 @@ function canProceed(state) {
 /* ── Component ─────────────────────────────────────────── */
 export default function AppOnboardingWizard() {
   const navigate = useNavigate();
+  const { session } = useAuth();
+  const userId = session?.user?.id;
   const [searchParams, setSearchParams] = useSearchParams();
   const initialUrlStep = parseInt(searchParams.get("step"), 10);
-  const persistedDraft = getPersistedOnboardingDraft();
-  const persistedGitHubAuth = getPersistedGitHubAuth();
+  const persistedDraft = getPersistedOnboardingDraft(userId);
+  const persistedGitHubAuth = getPersistedGitHubAuth(userId);
   const initialWizardState = {
     ...initialState,
     ...persistedDraft,
@@ -274,23 +280,26 @@ export default function AppOnboardingWizard() {
   }, [state.deployTarget, state.repoSource]);
 
   // Persist GitHub OAuth session so users do not need to reconnect every time.
+  // Scoped by user ID to prevent cross-user leaks.
   useEffect(() => {
+    if (!userId) return;
     try {
       if (state.githubToken) {
-        localStorage.setItem(GITHUB_OAUTH_STORAGE_KEY, JSON.stringify({
+        localStorage.setItem(githubOAuthKey(userId), JSON.stringify({
           githubToken: state.githubToken,
           githubUser: state.githubUser,
         }));
       } else {
-        localStorage.removeItem(GITHUB_OAUTH_STORAGE_KEY);
+        localStorage.removeItem(githubOAuthKey(userId));
       }
     } catch {}
-  }, [state.githubToken, state.githubUser]);
+  }, [state.githubToken, state.githubUser, userId]);
 
   // Persist onboarding draft across the GitHub OAuth redirect.
   useEffect(() => {
     try {
-      localStorage.setItem(ONBOARDING_DRAFT_STORAGE_KEY, JSON.stringify({
+      if (!userId) return;
+      localStorage.setItem(onboardingDraftKey(userId), JSON.stringify({
         step: state.step,
         name: state.name,
         slug: state.slug,
@@ -328,7 +337,7 @@ export default function AppOnboardingWizard() {
 
   const handleClose = useCallback(() => {
     if (hasChanges && !confirm("Discard changes? Your progress will be lost.")) return;
-    try { localStorage.removeItem(ONBOARDING_DRAFT_STORAGE_KEY); } catch {}
+    try { userId && localStorage.removeItem(onboardingDraftKey(userId)); } catch {}
     navigate("/");
   }, [hasChanges, navigate]);
 
@@ -407,7 +416,7 @@ export default function AppOnboardingWizard() {
           throw new Error(err.error || `Failed (${resp.status})`);
         }
         const created = await resp.json();
-        try { localStorage.removeItem(ONBOARDING_DRAFT_STORAGE_KEY); } catch {}
+        try { userId && localStorage.removeItem(onboardingDraftKey(userId)); } catch {}
         setCreatedApp(created);
         setSuccess(true);
         setTimeout(() => { navigate(`/apps/${created.id}`); }, 1500);
@@ -498,7 +507,7 @@ export default function AppOnboardingWizard() {
       }
 
       const created = await resp.json();
-      try { localStorage.removeItem(ONBOARDING_DRAFT_STORAGE_KEY); } catch {}
+      try { userId && localStorage.removeItem(onboardingDraftKey(userId)); } catch {}
       setCreatedApp(created);
       setSuccess(true);
 
