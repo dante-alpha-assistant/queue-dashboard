@@ -23,7 +23,8 @@ app.use(express.json({ limit: "20mb" }));
 // Auth middleware — protect all /api/* routes except truly public endpoints  
 app.use("/api", (req, res, next) => {
   // Truly public endpoints that don't require authentication
-  if (req.path.startsWith("/health") || req.path.startsWith("/github") || req.path.startsWith("/attachments") || req.path.startsWith("/agents")) {
+  // /events is SSE (EventSource) which can't send auth headers
+  if (req.path.startsWith("/health") || req.path.startsWith("/github") || req.path.startsWith("/attachments") || req.path.startsWith("/agents") || req.path.startsWith("/events")) {
     return next();
   }
   
