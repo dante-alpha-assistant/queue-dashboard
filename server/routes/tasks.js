@@ -207,7 +207,7 @@ router.get("/tasks/counts-by-period", async (req, res) => {
     const ALWAYS_INCLUDE_STATUSES = ["todo", "in_progress", "qa_testing", "blocked"];
 
     const buildQuery = (since) => {
-      let q = req.supabase.from("agent_tasks").select("id", { count: "exact", head: true }).neq("status", "deprecated");
+      let q = supabase.from("agent_tasks").select("id", { count: "exact", head: true }).neq("status", "deprecated");
       if (projectId !== "all") q = q.eq("project_id", projectId);
       if (since) {
         q = q.or(`created_at.gte.${since},status.in.(${ALWAYS_INCLUDE_STATUSES.join(",")})`);
@@ -877,7 +877,7 @@ router.post("/deploy/batch", async (req, res) => {
       created_by: "system",
     }));
 
-    const { error: relErr } = await req.supabase.from("task_relationships").insert(relationships);
+    const { error: relErr } = await supabase.from("task_relationships").insert(relationships);
     if (relErr) console.error("[BATCH_DEPLOY] Relationship insert error:", relErr.message);
 
     // Set all deployable tasks to "deploying"
@@ -927,7 +927,7 @@ router.post("/deploy/:id", async (req, res) => {
 
     // For deploy_target "none" — just mark deployed directly
     if (deployTarget === "none") {
-      await req.supabase.from("agent_tasks")
+      await supabase.from("agent_tasks")
         .update({ status: "deployed", updated_at: new Date().toISOString() })
         .eq("id", req.params.id);
       return res.json({ ok: true, message: "No deployment needed — marked deployed" });
@@ -958,7 +958,7 @@ router.post("/deploy/:id", async (req, res) => {
     if (createErr) return res.status(500).json({ ok: false, error: createErr.message });
 
     // Link via deployed_by relationship
-    await req.supabase.from("task_relationships").insert({
+    await supabase.from("task_relationships").insert({
       source_task_id: task.id,
       target_task_id: deployTask.id,
       relationship_type: "deployed_by",
@@ -966,7 +966,7 @@ router.post("/deploy/:id", async (req, res) => {
     });
 
     // Set task to deploying
-    await req.supabase.from("agent_tasks")
+    await supabase.from("agent_tasks")
       .update({ status: "deploying", updated_at: new Date().toISOString() })
       .eq("id", req.params.id);
 
@@ -1272,7 +1272,7 @@ router.get("/tasks/:id/activity", async (req, res) => {
         const entryTime = new Date(entry.changed_at).getTime();
         const hasMatchingError = errorEntries.some(e => Math.abs(new Date(e.changed_at).getTime() - entryTime) < 2000);
         if (!hasMatchingError) {
-          const { data: task } = await req.supabase.from("agent_tasks").select("error").eq("id", req.params.id).single();
+          const { data: task } = await supabase.from("agent_tasks").select("error").eq("id", req.params.id).single();
           if (task?.error) entry.reason = task.error;
         }
       }
