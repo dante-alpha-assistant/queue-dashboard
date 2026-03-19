@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 const inputStyle = {
   width: "100%", padding: "12px 16px", borderRadius: 12,
@@ -37,6 +37,27 @@ function getAutoReqCreds(deployTarget) {
 
 const AUTO_QA_CREDS = ["GH_TOKEN", "SUPABASE_SERVICE_ROLE_KEY"];
 
+/** Parse a raw .env string into an array of {key, value} objects */
+function parseEnvText(text) {
+  if (!text) return [];
+  const lines = text.split("\n");
+  const vars = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eqIdx = trimmed.indexOf("=");
+    if (eqIdx < 1) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    let value = trimmed.slice(eqIdx + 1).trim();
+    // Strip surrounding quotes
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    if (key) vars.push({ key, value });
+  }
+  return vars;
+}
+
 function CredentialList({ state, dispatch, field, inputField }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -63,7 +84,6 @@ function CredentialList({ state, dispatch, field, inputField }) {
           </label>
         );
       })}
-      {/* Custom credentials already added */}
       {state[field].filter(c => !CREDENTIAL_OPTIONS.some(o => o.key === c)).map(c => (
         <label key={c} style={{
           display: "flex", alignItems: "center", gap: 12, padding: "10px 14px",
@@ -76,7 +96,6 @@ function CredentialList({ state, dispatch, field, inputField }) {
           <span style={{ fontSize: 11, color: "var(--md-on-surface-variant)", fontStyle: "italic" }}>(custom)</span>
         </label>
       ))}
-      {/* Add custom */}
       <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
         <input
           value={state[inputField]}
@@ -101,8 +120,82 @@ function CredentialList({ state, dispatch, field, inputField }) {
   );
 }
 
+/** Raw .env paste view for existing repo apps */
+function EnvPasteCredentials({ state, dispatch }) {
+  const parsed = parseEnvText(state.rawEnvCredentials || "");
+
+  return (
+    <div className="step-fields-stagger" style={{ gap: 24 }}>
+      <div className="step-field" style={{
+        "--field-index": 0,
+        padding: "14px 16px", borderRadius: 12,
+        background: "rgba(103,80,164,0.06)",
+        border: "1px solid rgba(103,80,164,0.2)",
+        color: "var(--md-on-surface)", fontSize: 13, lineHeight: 1.6,
+        fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+      }}>
+        🔐 <strong>Paste your app's environment variables below.</strong> The AI agent will securely handle sealing, storing in the GitOps repo, and making them available to your app's tasks.
+        <div style={{ marginTop: 8, fontSize: 12, color: "var(--md-on-surface-variant)" }}>
+          Paste your <code style={{ background: "var(--md-surface-variant)", padding: "1px 5px", borderRadius: 4, fontSize: 11 }}>.env</code> file contents — comments and blank lines are ignored. Values are encrypted before storage.
+        </div>
+      </div>
+
+      <div className="step-field" style={{ "--field-index": 1 }}>
+        <label style={labelStyle}>Environment Variables</label>
+        <textarea
+          value={state.rawEnvCredentials || ""}
+          onChange={e => dispatch({ type: "SET_FIELD", field: "rawEnvCredentials", value: e.target.value })}
+          placeholder={`# Paste your .env file here\nDATABASE_URL="postgres://..."\nAPI_KEY="sk-..."\nSECRET_TOKEN="..."`}
+          rows={12}
+          style={{
+            ...inputStyle,
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 12,
+            lineHeight: 1.7,
+            resize: "vertical",
+            minHeight: 200,
+          }}
+        />
+      </div>
+
+      {parsed.length > 0 && (
+        <div className="step-field" style={{ "--field-index": 2 }}>
+          <label style={labelStyle}>Detected Variables ({parsed.length})</label>
+          <div style={{
+            display: "flex", flexWrap: "wrap", gap: 6,
+          }}>
+            {parsed.map(({ key }) => (
+              <span key={key} style={{
+                padding: "4px 10px", borderRadius: 8,
+                background: "rgba(34,197,94,0.08)",
+                border: "1px solid rgba(34,197,94,0.25)",
+                fontSize: 12, fontWeight: 600,
+                fontFamily: "'JetBrains Mono', monospace",
+                color: "#166534",
+              }}>
+                {key}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="step-field" style={{ "--field-index": 3 }}>
+        <label style={labelStyle}>Supabase Project Ref (optional)</label>
+        <input
+          value={state.supabaseRef}
+          onChange={e => dispatch({ type: "SET_FIELD", field: "supabaseRef", value: e.target.value })}
+          placeholder="abcdefghijklmnop"
+          style={{ ...inputStyle, fontFamily: "'JetBrains Mono', monospace", fontSize: 13 }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function StepCredentials({ state, dispatch }) {
   const isScratch = state.repoSource === "scratch";
+  const isExistingRepo = state.repoSource === "github" || state.repoSource === "existing";
 
   /* Auto-select credentials for scratch apps based on deploy target */
   useEffect(() => {
@@ -112,10 +205,14 @@ export default function StepCredentials({ state, dispatch }) {
     dispatch({ type: "SET_FIELD", field: "qaCredentials", value: AUTO_QA_CREDS });
   }, [isScratch, state.deployTarget]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // For existing repos: show the raw .env paste view
+  if (isExistingRepo) {
+    return <EnvPasteCredentials state={state} dispatch={dispatch} />;
+  }
+
+  // For scratch apps: show the checkbox credential picker
   return (
     <div className="step-fields-stagger" style={{ gap: 24 }}>
-
-      {/* Green info banner — scratch mode only */}
       {isScratch && (
         <div className="step-field" style={{
           "--field-index": 0,
@@ -155,3 +252,5 @@ export default function StepCredentials({ state, dispatch }) {
     </div>
   );
 }
+
+export { parseEnvText };

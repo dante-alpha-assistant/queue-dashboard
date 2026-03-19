@@ -1,4 +1,5 @@
 import { ExternalLink } from "lucide-react";
+import { parseEnvText } from "./StepCredentials";
 
 const labelStyle = {
   fontSize: 11, fontWeight: 600, color: "var(--md-on-surface-variant, #49454F)",
@@ -142,12 +143,24 @@ export default function StepReview({ state }) {
               </span>
             )}
           </div>
-          <div style={{ fontSize: 13, color: "var(--md-on-surface-variant)", marginBottom: 6 }}>
-            <strong>Required:</strong> {state.reqCredentials.join(", ") || "—"}
-          </div>
-          <div style={{ fontSize: 13, color: "var(--md-on-surface-variant)" }}>
-            <strong>QA:</strong> {state.qaCredentials.join(", ") || "—"}
-          </div>
+          {state.rawEnvCredentials?.trim() ? (
+            <div style={{ fontSize: 13, color: "var(--md-on-surface-variant)" }}>
+              <strong>Environment Variables:</strong>{" "}
+              {parseEnvText(state.rawEnvCredentials).map(v => v.key).join(", ") || "—"}
+              <div style={{ marginTop: 4, fontSize: 11, color: "var(--md-on-surface-variant)", fontStyle: "italic" }}>
+                🔐 {parseEnvText(state.rawEnvCredentials).length} variables will be securely sealed by AI agent
+              </div>
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 13, color: "var(--md-on-surface-variant)", marginBottom: 6 }}>
+                <strong>Required:</strong> {state.reqCredentials.join(", ") || "—"}
+              </div>
+              <div style={{ fontSize: 13, color: "var(--md-on-surface-variant)" }}>
+                <strong>QA:</strong> {state.qaCredentials.join(", ") || "—"}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Supabase */}

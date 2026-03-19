@@ -109,6 +109,7 @@ const initialState = {
   customCredential: "",
   customQaCredential: "",
   supabaseRef: "",
+  rawEnvCredentials: "",  // raw .env text pasted by user (for existing repo apps)
   needsDatabase: false,
   selectedTemplate: null,
   submitting: false,
@@ -502,6 +503,8 @@ export default function AppOnboardingWizard() {
         template_repo: state.selectedTemplate
           ? (TEMPLATES.find(t => t.id === state.selectedTemplate)?.githubTemplate || null)
           : null,
+        // Raw .env credentials for existing repo apps — sent securely to backend
+        ...(state.rawEnvCredentials?.trim() ? { raw_env_credentials: state.rawEnvCredentials.trim() } : {}),
       };
 
       const resp = await authedFetch("/api/apps", {

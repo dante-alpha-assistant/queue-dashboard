@@ -408,6 +408,54 @@ appsRouter.post("/", async (req, res) => {
       }
     }
 
+    // If raw .env credentials were provided, create a setup task
+    // to seal and deploy them to the app's environment
+    const rawEnvCreds = req.body.raw_env_credentials;
+    if (rawEnvCreds && typeof rawEnvCreds === "string" && rawEnvCreds.trim()) {
+      try {
+        // Parse env vars to extract key names for the description
+        const envLines = rawEnvCreds.split("\n").filter(l => l.trim() && !l.trim().startsWith("#"));
+        const envKeys = envLines.map(l => l.split("=")[0]?.trim()).filter(Boolean);
+
+        const credTaskData = {
+          title: `Setup credentials for ${name}`,
+          description: `## Credential Setup for ${name} (${slug})\n\n` +
+            `**App ID:** ${data.id}\n` +
+            `**Repo:** ${reposArray.join(", ")}\n` +
+            `**Deploy target:** ${primaryDeployTarget}\n\n` +
+            `### Environment Variables (${envKeys.length})\n` +
+            envKeys.map(k => `- \`${k}\``).join("\n") + "\n\n" +
+            `### Instructions\n` +
+            `1. Parse the raw credentials from \`metadata.raw_env_credentials\`\n` +
+            `2. Create a Kubernetes secret or sealed secret for the app\n` +
+            `3. Update the GitOps repo (dante-alpha-assistant/dante-gitops) with the sealed secret\n` +
+            `4. Ensure the app's deployment references the secret\n` +
+            `5. DO NOT log or expose credential values in task results\n`,
+          type: "setup",
+          status: "assigned",
+          assigned_agent: "setup-agent",
+          priority: "high",
+          app_id: data.id,
+          dispatched_by: req.user?.email || "dashboard",
+          created_by: req.user?.id || null,
+          metadata: {
+            action: "setup-app-credentials",
+            app_id: data.id,
+            app_slug: slug,
+            app_name: name,
+            deploy_target: primaryDeployTarget,
+            repos: reposArray,
+            raw_env_credentials: rawEnvCreds,
+            env_keys: envKeys,
+          },
+        };
+        await supabase.from("agent_tasks").insert(credTaskData);
+        console.log(`[apps] Created credential setup task for app ${data.id} (${envKeys.length} vars)`);
+      } catch (credErr) {
+        console.error("[apps] Failed to create credential task:", credErr.message);
+      }
+    }
+
     res.status(201).json(expandCredentials(data));
   } catch (e) {
     res.status(500).json({ error: e.message });
