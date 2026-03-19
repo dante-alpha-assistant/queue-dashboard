@@ -65,9 +65,20 @@ Critical Rules:
 - ALWAYS overwrite agents/<name>/sealed-secret.yaml — never create custom-named files
 `;
 
+// All agents that have ANTHROPIC_API_KEY in their sealed secrets
+const ANTHROPIC_AGENTS = [
+  "neo", "neo-worker", "ifra-worker", "neo-chat-worker",
+  "research-worker", "setup-agent", "mu", "flow"
+];
+
 // POST /api/settings/rotate-claude-token
 router.post("/rotate-claude-token", async (req, res) => {
   try {
+    // Auth required
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
     const { token } = req.body;
 
     if (!token || typeof token !== "string") {
@@ -79,17 +90,49 @@ router.post("/rotate-claude-token", async (req, res) => {
       return res.status(400).json({ error: "Invalid token — must start with sk-ant-" });
     }
 
-    const description = ROTATION_RUNBOOK_TEMPLATE.replace(/\{NEW_TOKEN\}/g, trimmed);
+    // Task description: runbook instructions WITHOUT the raw token
+    // The raw token is passed securely via metadata (not visible in task list)
+    const description = `## Claude OAuth Token Rotation
+
+**Target agents:** ${ANTHROPIC_AGENTS.join(", ")}
+
+### Instructions for setup-agent:
+1. Clone gitops repo: \`dante-alpha-assistant/dante-gitops\`
+2. Fetch kubeseal cert: \`kubeseal --controller-name=sealed-secrets --controller-namespace=kube-system --fetch-cert > /tmp/ss-cert.pem\`
+3. For EACH agent in the target list:
+   a. Get current secret: \`kubectl get secret <agent>-env -n agents -o json\`
+   b. Replace ANTHROPIC_API_KEY with the new token from metadata.token
+   c. Re-seal ALL keys (not just the changed one): \`kubectl create secret generic <agent>-env ... | kubeseal ...\`
+   d. Write to \`agents/<agent>/sealed-secret.yaml\` in the gitops repo
+4. Git commit + push all changed sealed-secret.yaml files
+5. Verify ArgoCD syncs and pods restart (Stakater Reloader handles this)
+6. Verify auth-profiles.json on at least 2 agents shows the new token prefix
+
+### Critical Rules:
+- NEVER hardcode token values in deployment env vars
+- Pre-rotation check: verify no keys are EMPTY before sealing
+- ALWAYS preserve DISCORD_BOT_TOKEN in neo-env
+- Overwrite \`agents/<name>/sealed-secret.yaml\` — never create custom-named files
+- The raw token is in \`metadata.token\` — DO NOT log it or put it in the result field`;
 
     const { data, error } = await supabase
       .from("agent_tasks")
       .insert({
         title: "Claude OAuth Token Rotation",
         type: "setup",
-        status: "todo",
-        assigned_agent: null,
-        priority: "high",
+        status: "assigned",
+        assigned_agent: "setup-agent",
+        dispatched_by: req.user.email || "dashboard",
+        created_by: req.user.id,
+        priority: "urgent",
         description,
+        metadata: {
+          token: trimmed,
+          target_agents: ANTHROPIC_AGENTS,
+          secret_key: "ANTHROPIC_API_KEY",
+          gitops_repo: "dante-alpha-assistant/dante-gitops",
+          action: "rotate-anthropic-token",
+        },
       })
       .select("id")
       .single();
@@ -99,8 +142,12 @@ router.post("/rotate-claude-token", async (req, res) => {
       return res.status(500).json({ error: "Failed to create task: " + error.message });
     }
 
-    console.log(`[settings] Token rotation task created: ${data.id}`);
-    res.json({ taskId: data.id, message: "Token rotation task dispatched" });
+    console.log(`[settings] Token rotation task created: ${data.id} → setup-agent`);
+    res.json({
+      taskId: data.id,
+      message: `Token rotation task dispatched to setup-agent for ${ANTHROPIC_AGENTS.length} agents`,
+      targetAgents: ANTHROPIC_AGENTS,
+    });
   } catch (e) {
     console.error("[settings] rotate-claude-token error:", e.message);
     res.status(500).json({ error: e.message });

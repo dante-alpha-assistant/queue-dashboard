@@ -135,7 +135,7 @@ function TokenRotationSection() {
         }}>
           This will dispatch a <code style={{ background: "var(--md-surface-variant)", padding: "1px 5px", borderRadius: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>setup</code> task
           to <strong>setup-agent</strong>, which will rotate the Anthropic OAuth token across
-          agents <strong>neo</strong>, <strong>neo-worker</strong>, and <strong>ifra-worker</strong> via GitOps sealed secrets.
+          all agents that use it: <strong>neo</strong>, <strong>neo-worker</strong>, <strong>ifra-worker</strong>, <strong>neo-chat-worker</strong>, <strong>research-worker</strong>, <strong>setup-agent</strong>, <strong>mu</strong>, and <strong>flow</strong> via GitOps sealed secrets.
         </div>
 
         {/* Input */}
