@@ -1,3 +1,4 @@
+import { authedFetch } from "../lib/api.js";
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowUp, CheckCircle2, Clock, Link, Paperclip, Search } from 'lucide-react';
 const CircleDot = ({ size = 14, color = "currentColor", ...p }) => <svg width={size} height={size} viewBox="0 0 24 24" fill={color} stroke="none" {...p}><circle cx="12" cy="12" r="8" /></svg>;
@@ -84,7 +85,7 @@ function AddRelationshipForm({ taskId, onAdd, onCancel }) {
     if (!q || q.length < 2) { setResults([]); return; }
     setLoading(true);
     try {
-      const resp = await fetch(`/api/tasks?search=${encodeURIComponent(q)}`);
+      const resp = await authedFetch(`/api/tasks?search=${encodeURIComponent(q)}`);
       const tasks = await resp.json();
       const filtered = (Array.isArray(tasks) ? tasks : [])
         .filter(t => t.id !== taskId)
@@ -248,7 +249,7 @@ export default function TaskRelationships({ taskId, onNavigateToTask }) {
 
   const fetchRelationships = useCallback(async () => {
     try {
-      const resp = await fetch(`/api/tasks/${taskId}/relationships`);
+      const resp = await authedFetch(`/api/tasks/${taskId}/relationships`);
       const data = await resp.json();
       if (data.ok) setRelationships(data.relationships || []);
     } catch { /* ignore */ }
@@ -258,7 +259,7 @@ export default function TaskRelationships({ taskId, onNavigateToTask }) {
   useEffect(() => { fetchRelationships(); }, [fetchRelationships]);
 
   const handleAdd = async (targetId, type) => {
-    const resp = await fetch(`/api/tasks/${taskId}/relationships`, {
+    const resp = await authedFetch(`/api/tasks/${taskId}/relationships`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ target_task_id: targetId, relationship_type: type }),
@@ -271,7 +272,7 @@ export default function TaskRelationships({ taskId, onNavigateToTask }) {
   const handleRemove = async (relId) => {
     setRemoving(relId);
     try {
-      await fetch(`/api/relationships/${relId}`, { method: 'DELETE' });
+      await authedFetch(`/api/relationships/${relId}`, { method: 'DELETE' });
       setRelationships(prev => prev.filter(r => r.id !== relId));
     } catch { /* ignore */ }
     finally { setRemoving(null); }

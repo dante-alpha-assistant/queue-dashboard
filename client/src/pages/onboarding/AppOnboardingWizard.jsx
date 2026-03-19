@@ -1,3 +1,4 @@
+import { authedFetch } from "../../lib/api.js";
 import { useReducer, useState, useCallback, useEffect, useRef, lazy, Suspense } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, X, Loader2, Sparkles } from "lucide-react";
@@ -396,7 +397,7 @@ export default function AppOnboardingWizard() {
           supabase_project_ref: null,
           needs_database: false,
         };
-        const resp = await fetch("/api/apps", {
+        const resp = await authedFetch("/api/apps", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -485,7 +486,7 @@ export default function AppOnboardingWizard() {
           : null,
       };
 
-      const resp = await fetch("/api/apps", {
+      const resp = await authedFetch("/api/apps", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

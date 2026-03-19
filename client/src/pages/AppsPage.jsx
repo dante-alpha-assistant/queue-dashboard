@@ -364,8 +364,8 @@ export function AppDetailView({ app, onBack, onSave, onArchive, onRestore, onRem
     (async () => {
       try {
         const [tasksResp, statsResp] = await Promise.all([
-          fetch(`/api/apps/${app.id}/tasks`),
-          fetch(`/api/apps/${app.id}/stats`),
+          authedFetch(`/api/apps/${app.id}/tasks`),
+          authedFetch(`/api/apps/${app.id}/stats`),
         ]);
         if (cancelled) return;
         const tasksData = await tasksResp.json();
@@ -393,7 +393,7 @@ export function AppDetailView({ app, onBack, onSave, onArchive, onRestore, onRem
         deploy_target: form.deploy_target || "none",
         supabase_project_ref: form.supabase_project_ref?.trim() || null,
       };
-      const resp = await fetch(`/api/apps/${app.id}`, {
+      const resp = await authedFetch(`/api/apps/${app.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -411,7 +411,7 @@ export function AppDetailView({ app, onBack, onSave, onArchive, onRestore, onRem
 
   const handleRemoveConfirmed = async () => {
     try {
-      await fetch(`/api/apps/${app.id}/remove`, { method: "DELETE" });
+      await authedFetch(`/api/apps/${app.id}/remove`, { method: "DELETE" });
       setShowRemoveConfirm(false);
       if (onRemove) onRemove(app);
     } catch (e) {
@@ -1088,7 +1088,7 @@ export default function AppsPage() {
     if (!confirm(`Archive "${app.name}"? Tasks won't be affected.`)) return;
     setArchiving(app.id);
     try {
-      await fetch(`/api/apps/${app.id}`, { method: "DELETE" });
+      await authedFetch(`/api/apps/${app.id}`, { method: "DELETE" });
       if (selectedApp?.id === app.id) setSelectedApp(null);
       fetchApps();
     } catch (e) {
@@ -1101,7 +1101,7 @@ export default function AppsPage() {
   const handleRestore = async (app) => {
     setArchiving(app.id);
     try {
-      await fetch(`/api/apps/${app.id}`, {
+      await authedFetch(`/api/apps/${app.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "active" }),

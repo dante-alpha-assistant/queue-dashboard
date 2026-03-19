@@ -1,3 +1,4 @@
+import { authedFetch } from "../lib/api.js";
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { AlertTriangle, BarChart3, CheckCircle2, ClipboardList, Clock, FileText, Image, Lightbulb, Link, Maximize2, Minimize2, Package, Pencil, RefreshCw, Timer, Wrench, XCircle, Pause, Rocket } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
@@ -707,7 +708,7 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
     setShowStatusPicker(false);
     setForceStatusConfirm(null);
     try {
-      const resp = await fetch(`/api/tasks/${task.id}/force-status`, {
+      const resp = await authedFetch(`/api/tasks/${task.id}/force-status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus, changed_by: 'dashboard' }),
@@ -752,7 +753,7 @@ function ActionsDropdown({ task, onStatusChange, onClose, handleDeploy, deployin
     try {
       switch (key) {
         case 'stop': {
-          const stopResp = await fetch(`/api/tasks/${task.id}/stop`, {
+          const stopResp = await authedFetch(`/api/tasks/${task.id}/stop`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ changed_by: 'dashboard' }),
@@ -1016,7 +1017,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
     setDeploySuccess(false);
     stopDeployPolling();
     try {
-      const resp = await fetch(`/api/deploy/${task.id}`, { method: "POST" });
+      const resp = await authedFetch(`/api/deploy/${task.id}`, { method: "POST" });
       const data = await resp.json();
       if (!resp.ok || !data.ok) {
         throw new Error(data.error || `Deploy failed (HTTP ${resp.status})`);
@@ -1030,7 +1031,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
       // Start polling as fallback in case Realtime doesn't fire
       deployPollRef.current = setInterval(async () => {
         try {
-          const pollResp = await fetch(`/api/tasks/${task.id}`);
+          const pollResp = await authedFetch(`/api/tasks/${task.id}`);
           if (pollResp.ok) {
             const pollData = await pollResp.json();
             const st = pollData?.status || pollData?.task?.status;
@@ -1066,7 +1067,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
     if (!task?.pull_request_url?.length) return;
     if (!['completed', 'qa_testing', 'deploy_failed'].includes(task.status)) return;
     let cancelled = false;
-    fetch(`/api/tasks/${task.id}/mergeability`)
+    authedFetch(`/api/tasks/${task.id}/mergeability`)
       .then(r => r.json())
       .then(data => {
         if (cancelled) return;
@@ -1084,7 +1085,7 @@ export default function TaskDetailModal({ task, onClose, onStatusChange, isMobil
     setRebaseError(null);
     setRebaseSuccess(false);
     try {
-      const resp = await fetch(`/api/tasks/${task.id}/rebase`, { method: "POST" });
+      const resp = await authedFetch(`/api/tasks/${task.id}/rebase`, { method: "POST" });
       const data = await resp.json();
       if (!resp.ok || !data.ok) {
         throw new Error(data.error || `Rebase failed (HTTP ${resp.status})`);

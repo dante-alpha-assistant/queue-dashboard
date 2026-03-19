@@ -1,3 +1,4 @@
+import { authedFetch } from "../lib/api.js";
 import { useState, useEffect } from "react";
 
 const AGENTS = ["neo", "mu", "beta", "flow"];
@@ -18,7 +19,7 @@ export default function DispatchModal({ onClose, dispatch, projects = [], isMobi
 
   useEffect(() => {
     if (projectId) {
-      fetch(`/api/repositories?project_id=${projectId}`)
+      authedFetch(`/api/repositories?project_id=${projectId}`)
         .then(r => r.json())
         .then(setRepos)
         .catch(() => setRepos([]));

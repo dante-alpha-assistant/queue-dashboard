@@ -1,3 +1,4 @@
+import { authedFetch } from "./lib/api.js";
 import { useState, useCallback, useEffect } from "react";
 import SpeedLoader from "./components/SpeedLoader";
 import { useNavigate, useLocation, Routes, Route } from "react-router-dom";
@@ -126,7 +127,7 @@ function AppMain() {
   useEffect(() => {
     if (!selectedTask || selectedTask._notFound || selectedTask._full) return;
     let cancelled = false;
-    fetch(`/api/tasks/${selectedTask.id}`)
+    authedFetch(`/api/tasks/${selectedTask.id}`)
       .then(r => r.ok ? r.json() : null)
       .then(full => {
         if (!cancelled && full) setSelectedTask(prev => prev?.id === full.id ? { ...full, _full: true } : prev);

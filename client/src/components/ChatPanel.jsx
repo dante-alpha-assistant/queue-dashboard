@@ -1,3 +1,4 @@
+import { authedFetch } from "../lib/api.js";
 import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -77,7 +78,7 @@ export default function ChatPanel({ isMobile, open: controlledOpen, onClose }) {
     setSending(true);
     setInput("");
     try {
-      await fetch("/api/chat", {
+      await authedFetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),

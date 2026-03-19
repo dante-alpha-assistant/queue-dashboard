@@ -1,3 +1,4 @@
+import { authedFetch } from "../lib/api.js";
 import { useEffect, useState } from 'react';
 import { Activity, Ban, AlertTriangle, CheckCircle2, Clock, FileText, FlaskConical, Folder, Link, MessageSquare, Package, Pencil, PlusCircle, RefreshCw, Search, Tag, User, Wrench, XCircle, Zap } from 'lucide-react';
 
@@ -322,7 +323,7 @@ export default function ActivityLog({ taskId }) {
 
     const fetchActivity = async () => {
       try {
-        const res = await fetch(`/api/tasks/${taskId}/activity?limit=${PAGE_SIZE}&offset=0`);
+        const res = await authedFetch(`/api/tasks/${taskId}/activity?limit=${PAGE_SIZE}&offset=0`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (!cancelled) {
@@ -346,7 +347,7 @@ export default function ActivityLog({ taskId }) {
   const loadMore = async () => {
     setLoadingMore(true);
     try {
-      const res = await fetch(`/api/tasks/${taskId}/activity?limit=${PAGE_SIZE}&offset=${entries.length}`);
+      const res = await authedFetch(`/api/tasks/${taskId}/activity?limit=${PAGE_SIZE}&offset=${entries.length}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setEntries(prev => [...prev, ...(data.entries || data)]);

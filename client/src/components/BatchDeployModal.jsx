@@ -1,3 +1,4 @@
+import { authedFetch } from "../lib/api.js";
 import { useState, useMemo, useCallback } from "react";
 
 export default function BatchDeployModal({ tasks, onDeploy, onClose }) {
@@ -39,7 +40,7 @@ export default function BatchDeployModal({ tasks, onDeploy, onClose }) {
     setLoading(true);
     setDryRunResult(null);
     try {
-      const res = await fetch("/api/deploy/batch/dry-run", {
+      const res = await authedFetch("/api/deploy/batch/dry-run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ taskIds: [...selected] }),
@@ -57,7 +58,7 @@ export default function BatchDeployModal({ tasks, onDeploy, onClose }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/deploy/batch", {
+      const res = await authedFetch("/api/deploy/batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ taskIds: [...selected] }),

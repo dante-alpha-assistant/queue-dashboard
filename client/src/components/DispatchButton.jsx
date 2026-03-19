@@ -1,3 +1,4 @@
+import { authedFetch } from "../lib/api.js";
 import { useState } from "react";
 import { Zap } from 'lucide-react';
 
@@ -11,7 +12,7 @@ export default function DispatchButton() {
     setState("loading");
     setMessage("");
     try {
-      const res = await fetch("/api/dispatch", { method: "POST" });
+      const res = await authedFetch("/api/dispatch", { method: "POST" });
       const data = await res.json();
       if (data.ok) {
         const count = data.assigned || 0;

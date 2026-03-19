@@ -1,3 +1,4 @@
+import { authedFetch } from "../lib/api.js";
 import { useState, useEffect } from "react";
 import { Bot, Puzzle } from 'lucide-react';
 
@@ -279,7 +280,7 @@ export default function SkillsModal({ open, onClose }) {
   useEffect(() => {
     if (!open) return;
     setLoading(true);
-    fetch("/api/skills")
+    authedFetch("/api/skills")
       .then(r => r.json())
       .then(data => {
         setSkills(data.skills || []);

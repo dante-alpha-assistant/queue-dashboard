@@ -1,3 +1,4 @@
+import { authedFetch } from "../lib/api.js";
 import { useState, useEffect, useRef, useCallback } from "react";
 
 const STATUS_COLORS = {
@@ -54,7 +55,7 @@ export default function TaskMentionDropdown({ query, onSelect, onClose, inputRef
     fetchTimer.current = setTimeout(async () => {
       try {
         const searchParam = query ? `&search=${encodeURIComponent(query)}` : "";
-        const resp = await fetch(`/api/tasks?limit=8${searchParam}`);
+        const resp = await authedFetch(`/api/tasks?limit=8${searchParam}`);
         if (resp.ok) {
           const data = await resp.json();
           setResults(Array.isArray(data) ? data.slice(0, 8) : []);

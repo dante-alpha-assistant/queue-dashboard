@@ -1,3 +1,4 @@
+import { authedFetch } from "../lib/api.js";
 import { useState } from "react";
 import { Settings, Zap, Hand, Info, Database, KeyRound, RotateCcw, CheckCircle, AlertCircle } from "lucide-react";
 
@@ -79,7 +80,7 @@ function TokenRotationSection() {
     setMessage("");
     setTaskId(null);
     try {
-      const resp = await fetch("/api/settings/rotate-claude-token", {
+      const resp = await authedFetch("/api/settings/rotate-claude-token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token: token.trim() }),

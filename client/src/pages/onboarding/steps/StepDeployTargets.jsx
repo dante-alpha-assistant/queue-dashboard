@@ -1,3 +1,4 @@
+import { authedFetch } from "../../../lib/api.js";
 import { useState, useEffect } from "react";
 import { Loader2, ChevronLeft } from "lucide-react";
 
@@ -317,7 +318,7 @@ export default function StepDeployTargets({ state, dispatch }) {
     dispatch({ type: "SET_FIELD", field: "aiAnalysisLoading", value: true });
     setError(null);
 
-    fetch("/api/apps/suggest-deploy", {
+    authedFetch("/api/apps/suggest-deploy", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

@@ -1,3 +1,4 @@
+import { authedFetch } from "../lib/api.js";
 import { useState, useEffect, useCallback, useRef } from "react";
 import AgentPicker from "./AgentPicker";
 import { ProgressBadge } from "./ProgressFeed";
@@ -438,7 +439,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
         await onStatusChange?.(task.id, { deploy_target: targetOverride });
         setShowDeployTargetPicker(false);
       }
-      const resp = await fetch(`/api/deploy/${task.id}`, { method: "POST" });
+      const resp = await authedFetch(`/api/deploy/${task.id}`, { method: "POST" });
       const data = await resp.json();
       if (!resp.ok || !data.ok) {
         throw new Error(data.error || `Deploy failed (HTTP ${resp.status})`);
@@ -452,7 +453,7 @@ function ActionBar({ task, onStatusChange, isMobile }) {
       // Start polling as fallback in case Realtime doesn't fire
       deployPollRef.current = setInterval(async () => {
         try {
-          const pollResp = await fetch(`/api/tasks/${task.id}`);
+          const pollResp = await authedFetch(`/api/tasks/${task.id}`);
           if (pollResp.ok) {
             const pollData = await pollResp.json();
             const st = pollData?.status || pollData?.task?.status;

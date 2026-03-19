@@ -1,3 +1,4 @@
+import { authedFetch } from "../lib/api.js";
 import { useState, useCallback, useRef, useEffect } from "react";
 import { Paperclip, Upload, X, ZoomIn } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -334,7 +335,7 @@ function UploadZone({ taskId, onUploaded, disabled }) {
       }
       try {
         const base64 = await fileToBase64(file);
-        const resp = await fetch(`/api/tasks/${taskId}/attachments`, {
+        const resp = await authedFetch(`/api/tasks/${taskId}/attachments`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ data: base64, filename: file.name, type: file.type }),
@@ -447,7 +448,7 @@ export default function TaskAttachments({ taskId, attachments: initialAttachment
 
   const handleDelete = useCallback(async (index) => {
     try {
-      const resp = await fetch(`/api/tasks/${taskId}/attachments/${index}`, { method: "DELETE" });
+      const resp = await authedFetch(`/api/tasks/${taskId}/attachments/${index}`, { method: "DELETE" });
       if (resp.ok) {
         setAttachments((prev) => {
           const next = prev.filter((_, i) => i !== index);

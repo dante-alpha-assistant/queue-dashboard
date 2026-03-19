@@ -1,3 +1,4 @@
+import { authedFetch } from "../lib/api.js";
 import { useState, useEffect, useRef, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -46,7 +47,7 @@ export default function TaskComments({ taskId }) {
 
   const fetchComments = async () => {
     try {
-      const resp = await fetch(`/api/tasks/${taskId}/comments`);
+      const resp = await authedFetch(`/api/tasks/${taskId}/comments`);
       if (!resp.ok) {
         const errBody = await resp.json().catch(() => ({}));
         throw new Error(errBody.error || `Server error (${resp.status})`);
@@ -134,7 +135,7 @@ export default function TaskComments({ taskId }) {
     const mentions = mentionMatches.map(m => m[1]);
 
     try {
-      const resp = await fetch(`/api/tasks/${taskId}/comments`, {
+      const resp = await authedFetch(`/api/tasks/${taskId}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

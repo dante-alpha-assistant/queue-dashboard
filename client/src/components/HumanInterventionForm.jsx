@@ -1,3 +1,4 @@
+import { authedFetch } from "../lib/api.js";
 import { useState } from 'react';
 import { AlertTriangle, CheckCircle2, Lightbulb, Unlock } from 'lucide-react';
 
@@ -130,7 +131,7 @@ export default function HumanInterventionForm({ task, onStatusChange, onClose })
     setSubmitting(true);
     setError(null);
     try {
-      const resp = await fetch(`/api/tasks/${task.id}/intervene`, {
+      const resp = await authedFetch(`/api/tasks/${task.id}/intervene`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

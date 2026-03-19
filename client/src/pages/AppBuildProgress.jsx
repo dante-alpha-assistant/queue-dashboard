@@ -1,3 +1,4 @@
+import { authedFetch } from "../lib/api.js";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 
@@ -411,7 +412,7 @@ export default function AppBuildProgress() {
 
   const fetchApp = useCallback(async () => {
     try {
-      const res = await fetch(`/api/apps/${id}`);
+      const res = await authedFetch(`/api/apps/${id}`);
       if (!res.ok) {
         if (res.status === 404) throw new Error("App not found");
         return;
@@ -427,7 +428,7 @@ export default function AppBuildProgress() {
 
   const fetchTasks = useCallback(async () => {
     try {
-      const res = await fetch(`/api/apps/${id}/tasks`);
+      const res = await authedFetch(`/api/apps/${id}/tasks`);
       if (!res.ok) return;
       const data = await res.json();
       const taskList = Array.isArray(data) ? data : (data.tasks || []);
@@ -517,7 +518,7 @@ export default function AppBuildProgress() {
   const handleRetry = async () => {
     setRetrying(true);
     try {
-      const res = await fetch(`/api/apps/${id}/retry`, { method: "POST" });
+      const res = await authedFetch(`/api/apps/${id}/retry`, { method: "POST" });
       if (res.ok) {
         setApp((prev) => ({ ...prev, build_steps: [], status: "scaffolding" }));
         setTasks([]);
