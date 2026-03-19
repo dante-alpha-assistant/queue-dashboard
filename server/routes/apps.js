@@ -439,13 +439,15 @@ appsRouter.post("/", async (req, res) => {
           `2. Deployment manifests created/updated for ${primaryDeployTarget}`,
           `3. App accessible at deployment URL`,
           `4. All environment variables available to the running app`,
-          `5. Task status updated to \`deployed\` with deployment URL in result`,
+          `5. Set \`deployment_url\` on this task via PATCH /api/tasks/:id with the live URL`,
+          `6. Update the app record: PATCH /api/apps/${data.id} with { "deployment_url": "<url>" }`,
+          `7. Task status updated to \`deployed\``,
         );
 
         const taskData = {
           title: `Setup & Deploy ${name} (${repoLabel})`,
           description: descParts.join("\n"),
-          type: "setup",
+          type: "ops",
           status: "todo",
           priority: "high",
           app_id: data.id,
