@@ -19,7 +19,12 @@ function expandCredentials(app) {
 // GET /api/apps — list all apps (optionally filter by status)
 appsRouter.get("/", async (req, res) => {
   try {
-    let query = supabase.from("apps").select("*").order("name");
+    // Validate authentication
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    let query = supabase.from("apps").select("*").eq("created_by", req.user.id).order("name");
     const status = req.query.status;
     if (status === "all") {
       // No filter — return everything including archived
@@ -252,6 +257,15 @@ appsRouter.get("/:id", async (req, res) => {
 // POST /api/apps — create app
 appsRouter.post("/", async (req, res) => {
   try {
+    // Validate authentication
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    // CRITICAL: Reject created_by from body — always injected from JWT
+    if (req.body.created_by !== undefined) {
+      return res.status(400).json({ error: "created_by cannot be set in the request body — it is injected from your auth token" });
+    }
+
     const { name, slug, description, repos, repo_source, repo_architecture, supabase_project_ref, deploy_target, deploy_config, env_keys, icon, qa_env_keys, required_credentials, required_qa_credentials, needs_database } = req.body;
     if (!name) return res.status(400).json({ error: "name required" });
     if (!slug) return res.status(400).json({ error: "slug required" });
@@ -309,6 +323,7 @@ appsRouter.post("/", async (req, res) => {
         required_credentials: { coding: codingCreds, qa: qaCreds },
         repo_source: repo_source || "scratch",
         repo_architecture: repo_architecture || null,
+        created_by: req.user.id,  // ← ALWAYS from JWT, never from body
       })
       .select()
       .single();
@@ -382,7 +397,9 @@ appsRouter.post("/", async (req, res) => {
 // PATCH /api/apps/:id — update app
 appsRouter.patch("/:id", async (req, res) => {
   try {
-    const updates = { ...req.body, updated_at: new Date().toISOString() };
+    // Strip created_by — immutable after creation
+    const { created_by: _stripCreatedBy, ...safeBody } = req.body;
+    const updates = { ...safeBody, updated_at: new Date().toISOString() };
     // Don't allow changing id
     delete updates.id;
     delete updates.created_at;
