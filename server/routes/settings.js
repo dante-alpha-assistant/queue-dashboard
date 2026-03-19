@@ -68,7 +68,7 @@ Critical Rules:
 // All agents that have ANTHROPIC_API_KEY in their sealed secrets
 const ANTHROPIC_AGENTS = [
   "neo", "neo-worker", "ifra-worker", "neo-chat-worker",
-  "research-worker", "setup-agent", "mu", "flow"
+  "research-worker", "setup-agent"
 ];
 
 // POST /api/settings/rotate-claude-token
