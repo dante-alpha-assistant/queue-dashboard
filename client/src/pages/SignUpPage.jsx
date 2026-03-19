@@ -59,10 +59,10 @@ export default function SignUpPage() {
           </div>
           <div style={styles.successBox}>
             <div style={{ fontSize: 36, marginBottom: 12 }}>📧</div>
-            <h2 style={{ margin: "0 0 8px", color: "var(--md-on-surface, #E6E1E5)", fontSize: 20 }}>
+            <h2 style={{ margin: "0 0 8px", color: "var(--md-on-surface, #1C1B1F)", fontSize: 20 }}>
               Check your email
             </h2>
-            <p style={{ margin: 0, color: "var(--md-on-surface-variant, #CAC4D0)", fontSize: 14 }}>
+            <p style={{ margin: 0, color: "var(--md-on-surface-variant, #52525B)", fontSize: 14 }}>
               We sent a confirmation link to <strong>{email}</strong>. Click it to activate your account.
             </p>
           </div>
@@ -167,17 +167,17 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    background: "var(--md-background, #1C1B1F)",
+    background: "var(--md-background, #FAFAFA)",
     fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
     padding: "20px",
   },
   card: {
-    background: "var(--md-surface, #2B2930)",
+    background: "var(--md-surface, #FFFFFF)",
     borderRadius: 20,
     padding: "40px 36px",
     width: "100%",
     maxWidth: 400,
-    boxShadow: "0 4px 32px rgba(0,0,0,0.4)",
+    boxShadow: "0 4px 32px rgba(0,0,0,0.08)",
   },
   logoRow: {
     display: "flex",
@@ -203,7 +203,7 @@ const styles = {
     fontWeight: 700,
     fontSize: 18,
     letterSpacing: "-0.02em",
-    color: "var(--md-on-surface, #E6E1E5)",
+    color: "var(--md-on-surface, #1C1B1F)",
   },
   accent: {
     color: "var(--md-primary, #6750A4)",
@@ -213,14 +213,14 @@ const styles = {
     margin: "0 0 4px",
     fontSize: 24,
     fontWeight: 700,
-    color: "var(--md-on-surface, #E6E1E5)",
+    color: "var(--md-on-surface, #1C1B1F)",
     letterSpacing: "-0.02em",
     textAlign: "center",
   },
   subtitle: {
     margin: "0 0 28px",
     fontSize: 14,
-    color: "var(--md-on-surface-variant, #CAC4D0)",
+    color: "var(--md-on-surface-variant, #52525B)",
     textAlign: "center",
   },
   form: {
@@ -236,16 +236,16 @@ const styles = {
   label: {
     fontSize: 13,
     fontWeight: 600,
-    color: "var(--md-on-surface-variant, #CAC4D0)",
+    color: "var(--md-on-surface-variant, #52525B)",
     letterSpacing: "0.01em",
   },
   input: {
-    background: "var(--md-surface-container, #211F26)",
-    border: "1.5px solid var(--md-surface-variant, #49454F)",
+    background: "var(--md-surface-container, #F4F4F5)",
+    border: "1.5px solid var(--md-surface-variant, #E4E4E7)",
     borderRadius: 10,
     padding: "10px 14px",
     fontSize: 14,
-    color: "var(--md-on-surface, #E6E1E5)",
+    color: "var(--md-on-surface, #1C1B1F)",
     transition: "border-color 150ms",
     width: "100%",
     boxSizing: "border-box",
@@ -298,7 +298,7 @@ const styles = {
     marginTop: 24,
     textAlign: "center",
     fontSize: 13,
-    color: "var(--md-on-surface-variant, #CAC4D0)",
+    color: "var(--md-on-surface-variant, #52525B)",
   },
   link: {
     color: "var(--md-primary, #9A7FD4)",
