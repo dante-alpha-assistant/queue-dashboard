@@ -388,6 +388,26 @@ appsRouter.post("/", async (req, res) => {
       }
     }
 
+    // For existing/github repos with a deploy target, create a deploy task
+    if (repo_source !== "scratch" && primaryDeployTarget !== "none" && reposArray.length > 0) {
+      try {
+        const deployTaskData = {
+          title: `Deploy ${name} (${reposArray[0]})`,
+          description: `Deploy existing repo to ${primaryDeployTarget}.\n\nApp: ${name} (${slug})\nRepo: ${reposArray.join(", ")}\nDeploy target: ${primaryDeployTarget}\nDeploy config: ${JSON.stringify(primaryDeployConfig)}`,
+          type: "coding",
+          status: "todo",
+          priority: "high",
+          app_id: data.id,
+          dispatched_by: req.user?.email || "dashboard",
+          created_by: req.user?.id || null,
+        };
+        await supabase.from("agent_tasks").insert(deployTaskData);
+        console.log(`[apps] Created deploy task for app ${data.id} (${name})`);
+      } catch (taskErr) {
+        console.error("[apps] Failed to create deploy task:", taskErr.message);
+      }
+    }
+
     res.status(201).json(expandCredentials(data));
   } catch (e) {
     res.status(500).json({ error: e.message });
