@@ -363,11 +363,10 @@ export default function AppOnboardingWizard() {
   }, [state.step, animating]);
 
   const handleNext = useCallback(() => {
-    const isScratch = state.repoSource === "scratch";
+    // Only skip credentials for true scratch (not "existing" which also has repoSource=scratch)
+    const skipCredentials = state.repoSource === "scratch" && state.startingMode !== "existing";
     if (state.step < STEP_COUNT - 1 && canProceed(state)) {
-      // For scratch apps: skip credentials step (auto-selected)
-      // For existing/github apps: show credentials step (user pastes .env)
-      if (isScratch && state.step === 2) {
+      if (skipCredentials && state.step === 2) {
         goToStep(4);
       } else {
         goToStep(state.step + 1);
@@ -376,16 +375,15 @@ export default function AppOnboardingWizard() {
   }, [state, goToStep]);
 
   const handleBack = useCallback(() => {
-    const isScratch = state.repoSource === "scratch";
+    const skipCredentials = state.repoSource === "scratch" && state.startingMode !== "existing";
     if (state.step > 0) {
-      // Skip credentials step (index 3) only for scratch mode
-      if (isScratch && state.step === 4) {
+      if (skipCredentials && state.step === 4) {
         goToStep(2);
       } else {
         goToStep(state.step - 1);
       }
     }
-  }, [state.step, state.repoSource, goToStep]);
+  }, [state.step, state.repoSource, state.startingMode, goToStep]);
 
   const handleSubmit = async () => {
     dispatch({ type: "SET_FIELD", field: "submitting", value: true });
@@ -684,7 +682,7 @@ export default function AppOnboardingWizard() {
       </div>
 
       {/* Step indicator */}
-      <OnboardingStepIndicator currentStep={state.step} repoSource={state.repoSource} />
+      <OnboardingStepIndicator currentStep={state.step} repoSource={state.repoSource} startingMode={state.startingMode} />
 
       {/* Step content */}
       <div style={{
@@ -757,7 +755,7 @@ export default function AppOnboardingWizard() {
         <span style={{
           fontSize: 13, fontWeight: 600, color: "#94A3B8",
         }}>
-          {state.repoSource === "scratch"
+          {state.repoSource === "scratch" && state.startingMode !== "existing"
             ? `Step ${state.step === 4 ? 4 : state.step + 1} of 4`
             : `Step ${state.step + 1} of ${STEP_COUNT}`}
         </span>

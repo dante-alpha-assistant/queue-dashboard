@@ -8,13 +8,14 @@ const ALL_STEPS = [
   { key: "review", label: "Review & Create" },
 ];
 
-export default function OnboardingStepIndicator({ currentStep, repoSource }) {
-  const isScratch = repoSource === "scratch";
-  const steps = isScratch ? ALL_STEPS.filter(s => s.key !== "credentials") : ALL_STEPS;
+export default function OnboardingStepIndicator({ currentStep, repoSource, startingMode }) {
+  // Only hide credentials for true scratch apps (not "existing" mode which also has repoSource=scratch)
+  const hideCredentials = repoSource === "scratch" && startingMode !== "existing";
+  const steps = hideCredentials ? ALL_STEPS.filter(s => s.key !== "credentials") : ALL_STEPS;
 
   // Map wizard step index to display index for scratch mode
   function toDisplayIndex(wizardStep) {
-    if (!isScratch) return wizardStep;
+    if (!hideCredentials) return wizardStep;
     if (wizardStep <= 2) return wizardStep;
     if (wizardStep === 4) return 3;
     return wizardStep;
