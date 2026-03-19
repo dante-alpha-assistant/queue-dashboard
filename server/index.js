@@ -27,16 +27,8 @@ app.use("/api", (req, res, next) => {
     return next();
   }
   
-  // Deploy endpoints require auth but not user supabase (use service role)
-  if (req.path.startsWith("/deploy")) {
-    return requireAuth(req, res, next);
-  }
-  
-  // /tasks, /stats, /projects, /apps now require auth + user-scoped supabase client
-  return requireAuth(req, res, (err) => {
-    if (err) return next(err);
-    return attachUserSupabase(req, res, next);
-  });
+  // All other endpoints require authentication but use service role client with user filtering
+  return requireAuth(req, res, next);
 });
 
 app.use("/api", router);

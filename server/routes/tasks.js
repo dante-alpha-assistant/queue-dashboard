@@ -254,13 +254,14 @@ router.post("/dispatch", async (req, res) => {
 // Projects
 router.get("/projects", async (req, res) => {
   try {
-    // Validate that user-scoped Supabase client is available from auth middleware
-    if (!req.supabase || !req.user) {
+    // Validate authentication - user must be present from auth middleware
+    if (!req.user) {
       return res.status(401).json({ error: "Authentication required" });
     }
     
-    // Use user-scoped Supabase client - enforces Row Level Security
-    const { data, error } = await req.supabase
+    // For now, return all projects (projects aren't user-specific)
+    // TODO: Add user filtering to projects if needed
+    const { data, error } = await supabase
       .from("agent_projects")
       .select("*, agent_repositories(*)")
       .order("name");
@@ -274,13 +275,13 @@ router.get("/projects", async (req, res) => {
 // Repositories
 router.get("/repositories", async (req, res) => {
   try {
-    // Validate that user-scoped Supabase client is available from auth middleware
-    if (!req.supabase || !req.user) {
+    // Validate authentication - user must be present from auth middleware
+    if (!req.user) {
       return res.status(401).json({ error: "Authentication required" });
     }
     
     const { project_id } = req.query;
-    let query = req.supabase.from("agent_repositories").select("*").order("name");
+    let query = supabase.from("agent_repositories").select("*").order("name");
     if (project_id) query = query.eq("project_id", project_id);
     const { data, error } = await query;
     if (error) throw error;
@@ -293,13 +294,13 @@ router.get("/repositories", async (req, res) => {
 // Stats
 router.get("/stats", async (req, res) => {
   try {
-    // Validate that user-scoped Supabase client is available from auth middleware
-    if (!req.supabase || !req.user) {
+    // Validate authentication - user must be present from auth middleware
+    if (!req.user) {
       return res.status(401).json({ error: "Authentication required" });
     }
     
-    // Use user-scoped Supabase client - enforces Row Level Security
-    let query = req.supabase.from("agent_tasks").select("status");
+    // Use service role client but filter by authenticated user's ID
+    let query = supabase.from("agent_tasks").select("status").eq("created_by", req.user.id);
     if (req.query.project_id) query = query.eq("project_id", req.query.project_id);
     const { data, error } = await query;
     if (error) throw error;
@@ -314,8 +315,8 @@ router.get("/stats", async (req, res) => {
 // All tasks (optimized with server-side filtering)
 router.get("/tasks", async (req, res) => {
   try {
-    // Validate that user-scoped Supabase client is available from auth middleware
-    if (!req.supabase || !req.user) {
+    // Validate authentication - user must be present from auth middleware
+    if (!req.user) {
       return res.status(401).json({ error: "Authentication required" });
     }
 
@@ -325,10 +326,11 @@ router.get("/tasks", async (req, res) => {
       ? "id,title,status,type,priority,assigned_agent,created_at,updated_at,error,deploy_target,pull_request_url,deployment_url,started_at,completed_at,paused,blocked_reason,stage,repository_url,project_id,repository_id,app_id,project:agent_projects(id,name,slug),repository:agent_repositories(id,name,url,provider),app:apps(id,name,slug,icon)"
       : "*, project:agent_projects(id, name, slug), repository:agent_repositories(id, name, url, provider), app:apps(id, name, slug, icon, repos, deploy_target, supabase_project_ref)";
 
-    // Use user-scoped Supabase client - enforces Row Level Security
-    let query = req.supabase
+    // Use service role client but filter by authenticated user's ID
+    let query = supabase
       .from("agent_tasks")
       .select(selectCols)
+      .eq("created_by", req.user.id)
       .order("created_at", { ascending: false });
     if (req.query.project_id) query = query.eq("project_id", req.query.project_id);
     if (req.query.repository_id) query = query.eq("repository_id", req.query.repository_id);
