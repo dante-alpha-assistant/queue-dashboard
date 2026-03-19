@@ -396,10 +396,17 @@ export default function AppOnboardingWizard() {
       if (state.startingMode === "existing") {
         const existingRepos = state.existingRepoUrl.trim()
           ? [state.existingRepoUrl.trim()]
-          : [];
-        const existingDeployConfig = state.existingDeployUrl.trim()
-          ? { url: state.existingDeployUrl.trim() }
-          : {};
+          : state.repos.map(r => r.full_name || r);
+        const deployConfig = {};
+        if (state.deployTarget === "kubernetes") {
+          deployConfig.namespace = state.k8sNamespace || "apps";
+          deployConfig.service = state.k8sService || state.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+        } else if (state.deployTarget === "vercel") {
+          deployConfig.project = state.vercelProject || state.slug;
+        }
+        if (state.existingDeployUrl?.trim()) {
+          deployConfig.url = state.existingDeployUrl.trim();
+        }
         const body = {
           name: state.name.trim(),
           slug: state.slug.trim(),
@@ -407,13 +414,12 @@ export default function AppOnboardingWizard() {
           icon: state.icon || null,
           repos: existingRepos,
           repo_source: "existing",
-          deploy_target: "none",
-          deploy_config: existingDeployConfig,
-          env_keys: [],
-          qa_env_keys: [],
-          supabase_project_ref: null,
-          needs_database: false,
-          // Include raw credentials if user pasted them
+          deploy_target: state.deployTarget || "none",
+          deploy_config: deployConfig,
+          env_keys: state.reqCredentials || [],
+          qa_env_keys: state.qaCredentials || [],
+          supabase_project_ref: state.supabaseRef?.trim() || null,
+          needs_database: state.needsDatabase || false,
           ...(state.rawEnvCredentials?.trim() ? { raw_env_credentials: state.rawEnvCredentials.trim() } : {}),
         };
         const resp = await authedFetch("/api/apps", {
