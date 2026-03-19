@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { showToast } from "../components/Toast.jsx";
 import AppCredentialsPanel from "../components/AppCredentialsPanel.jsx";
+import { authedFetch } from "../lib/api.js";
 import { Package, Plus, Pencil, Archive, RotateCcw, X, Loader2, Search, XCircle, ChevronLeft, Save, BarChart3, ExternalLink, Clock, CheckCircle2, XOctagon, Rocket, Activity, Copy, Globe, Zap, Trash2 } from "lucide-react";
 
 const DEPLOY_TARGETS = ["kubernetes", "vercel", "none"];
@@ -1059,8 +1060,8 @@ export default function AppsPage() {
   const fetchApps = useCallback(async () => {
     try {
       const [allResp, statsResp] = await Promise.all([
-        fetch("/api/apps?status=all"),
-        fetch("/api/apps/stats/bulk"),
+        authedFetch("/api/apps?status=all"),
+        authedFetch("/api/apps/stats/bulk"),
       ]);
       const all = await allResp.json();
       const stats = await statsResp.json();

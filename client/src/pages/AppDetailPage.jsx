@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { AppDetailView } from "./AppsPage.jsx";
 import SpeedLoader from "../components/SpeedLoader.jsx";
 import { showToast } from "../components/Toast.jsx";
+import { authedFetch } from "../lib/api.js";
 
 export default function AppDetailPage() {
   const { id } = useParams();
@@ -14,7 +15,7 @@ export default function AppDetailPage() {
   useEffect(() => {
     setLoading(true);
     setNotFound(false);
-    fetch(`/api/apps/${id}`)
+    authedFetch(`/api/apps/${id}`)
       .then(r => {
         if (r.status === 404) {
           setNotFound(true);
@@ -36,13 +37,13 @@ export default function AppDetailPage() {
   }, [id]);
 
   const refresh = () =>
-    fetch(`/api/apps/${id}`)
+    authedFetch(`/api/apps/${id}`)
       .then(r => r.json())
       .then(setApp)
       .catch(() => {});
 
   const handleSave = async (data) => {
-    await fetch(`/api/apps/${id}`, {
+    await authedFetch(`/api/apps/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -51,7 +52,7 @@ export default function AppDetailPage() {
   };
 
   const handleArchive = async () => {
-    await fetch(`/api/apps/${id}`, {
+    await authedFetch(`/api/apps/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "archived" }),
@@ -60,7 +61,7 @@ export default function AppDetailPage() {
   };
 
   const handleRestore = async () => {
-    await fetch(`/api/apps/${id}`, {
+    await authedFetch(`/api/apps/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "active" }),

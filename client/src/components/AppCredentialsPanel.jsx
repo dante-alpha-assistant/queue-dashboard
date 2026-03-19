@@ -1,3 +1,4 @@
+import { authedFetch } from "../lib/api.js";
 import { useState, useEffect, useCallback } from "react";
 
 const CREDENTIAL_TYPES = ["secret", "token", "key", "password", "url", "api_key"];
@@ -46,7 +47,7 @@ export default function AppCredentialsPanel({ appId }) {
   const load = useCallback(() => {
     setLoading(true);
     setError(null);
-    fetch(`/api/apps/${appId}/credentials`)
+    authedFetch(`/api/apps/${appId}/credentials`)
       .then((r) => r.json())
       .then((data) => {
         setCredentials(Array.isArray(data) ? data : []);
@@ -68,7 +69,7 @@ export default function AppCredentialsPanel({ appId }) {
     setSaving(true);
     setError(null);
     try {
-      const resp = await fetch(`/api/apps/${appId}/credentials`, {
+      const resp = await authedFetch(`/api/apps/${appId}/credentials`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -89,7 +90,7 @@ export default function AppCredentialsPanel({ appId }) {
     if (!window.confirm("Remove this credential?")) return;
     setDeletingId(credId);
     try {
-      const resp = await fetch(`/api/apps/${appId}/credentials/${credId}`, {
+      const resp = await authedFetch(`/api/apps/${appId}/credentials/${credId}`, {
         method: "DELETE",
       });
       if (!resp.ok) throw new Error("Failed to delete credential");

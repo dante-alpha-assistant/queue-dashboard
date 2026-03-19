@@ -1,3 +1,4 @@
+import { authedFetch } from "../lib/api.js";
 import { useReducer, useEffect, useRef, useCallback, useState } from "react";
 import { X, ChevronLeft, ChevronRight, Search, ExternalLink, Check, Loader2, Package, GitBranch, Server, Key, ClipboardList } from "lucide-react";
 
@@ -290,7 +291,7 @@ export default function AppCreationWizard({ onClose, onCreated }) {
         supabase_project_ref: state.supabaseRef.trim() || null,
       };
 
-      const resp = await fetch("/api/apps", {
+      const resp = await authedFetch("/api/apps", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

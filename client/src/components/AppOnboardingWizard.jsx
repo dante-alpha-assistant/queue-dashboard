@@ -1,3 +1,4 @@
+import { authedFetch } from "../lib/api.js";
 import { useReducer, useEffect, useRef, useCallback, useState } from "react";
 import { X, ChevronLeft, ChevronRight, Check, Loader2, AlertCircle, Search, RefreshCw, Star, ExternalLink } from "lucide-react";
 
@@ -277,7 +278,7 @@ function OnboardingStep1({ state, dispatch }) {
     clearTimeout(slugCheckTimer.current);
     slugCheckTimer.current = setTimeout(async () => {
       try {
-        const r = await fetch(`/api/apps?slug=eq.${encodeURIComponent(value.trim())}`);
+        const r = await authedFetch(`/api/apps?slug=eq.${encodeURIComponent(value.trim())}`);
         const data = await r.json();
         if (Array.isArray(data) && data.length > 0) {
           if (isAuto) {
