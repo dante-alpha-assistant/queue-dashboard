@@ -388,56 +388,57 @@ appsRouter.post("/", async (req, res) => {
       }
     }
 
-    // For existing/github repos, create a deploy task
-    if (repo_source !== "scratch" && (primaryDeployTarget !== "none" || reposArray.length > 0 || req.body.raw_env_credentials)) {
+    // For non-scratch apps: create a single setup+deploy task with full context
+    if (repo_source !== "scratch") {
       try {
+        const rawEnvCreds = req.body.raw_env_credentials || "";
+        const envLines = rawEnvCreds.split("\n").filter(l => l.trim() && !l.trim().startsWith("#"));
+        const envKeys = envLines.map(l => l.split("=")[0]?.trim()).filter(Boolean);
         const repoLabel = reposArray[0] || slug;
-        const deployTaskData = {
+
+        // Build structured description
+        const descParts = [
+          `## App Setup & Deploy: ${name}`,
+          ``,
+          `### App Details`,
+          `- **Name:** ${name}`,
+          `- **Slug:** ${slug}`,
+          `- **App ID:** ${data.id}`,
+          `- **Repository:** ${reposArray.join(", ") || "Not specified"}`,
+          `- **Deploy Target:** ${primaryDeployTarget}`,
+          `- **Deploy Config:** ${JSON.stringify(primaryDeployConfig, null, 2)}`,
+          `- **Repo Source:** ${repo_source}`,
+        ];
+
+        if (envKeys.length > 0) {
+          descParts.push(
+            ``,
+            `### Environment Variables (${envKeys.length})`,
+            ...envKeys.map(k => `- \`${k}\``),
+            ``,
+            `> Raw credentials are in \`metadata.raw_env_credentials\`. DO NOT log values.`,
+          );
+        }
+
+        descParts.push(
+          ``,
+          `### Acceptance Criteria`,
+          `1. App credentials sealed and pushed to GitOps repo`,
+          `2. Deployment manifests created/updated for ${primaryDeployTarget}`,
+          `3. App accessible at deployment URL`,
+          `4. All environment variables available to the running app`,
+          `5. Task status updated to \`deployed\` with deployment URL in result`,
+        );
+
+        const taskData = {
           title: `Setup & Deploy ${name} (${repoLabel})`,
-          description: `Setup app environment and deploy.\n\nApp: ${name} (${slug})\nRepo: ${reposArray.join(", ") || "none specified"}\nDeploy target: ${primaryDeployTarget}\nDeploy config: ${JSON.stringify(primaryDeployConfig)}`,
-          type: "coding",
+          description: descParts.join("\n"),
+          type: "setup",
           status: "todo",
           priority: "high",
           app_id: data.id,
-          dispatched_by: req.user?.email || "dashboard",
-          created_by: req.user?.id || null,
-        };
-        await supabase.from("agent_tasks").insert(deployTaskData);
-        console.log(`[apps] Created deploy task for app ${data.id} (${name})`);
-      } catch (taskErr) {
-        console.error("[apps] Failed to create deploy task:", taskErr.message);
-      }
-    }
-
-    // If raw .env credentials were provided, create a setup task
-    // to seal and deploy them to the app's environment
-    const rawEnvCreds = req.body.raw_env_credentials;
-    if (rawEnvCreds && typeof rawEnvCreds === "string" && rawEnvCreds.trim()) {
-      try {
-        // Parse env vars to extract key names for the description
-        const envLines = rawEnvCreds.split("\n").filter(l => l.trim() && !l.trim().startsWith("#"));
-        const envKeys = envLines.map(l => l.split("=")[0]?.trim()).filter(Boolean);
-
-        const credTaskData = {
-          title: `Setup credentials for ${name}`,
-          description: `## Credential Setup for ${name} (${slug})\n\n` +
-            `**App ID:** ${data.id}\n` +
-            `**Repo:** ${reposArray.join(", ")}\n` +
-            `**Deploy target:** ${primaryDeployTarget}\n\n` +
-            `### Environment Variables (${envKeys.length})\n` +
-            envKeys.map(k => `- \`${k}\``).join("\n") + "\n\n" +
-            `### Instructions\n` +
-            `1. Parse the raw credentials from \`metadata.raw_env_credentials\`\n` +
-            `2. Create a Kubernetes secret or sealed secret for the app\n` +
-            `3. Update the GitOps repo (dante-alpha-assistant/dante-gitops) with the sealed secret\n` +
-            `4. Ensure the app's deployment references the secret\n` +
-            `5. DO NOT log or expose credential values in task results\n`,
-          type: "setup",
-          status: "assigned",
-          assigned_agent: "setup-agent",
-          priority: "high",
-          app_id: data.id,
-          dispatched_by: req.user?.email || "dashboard",
+          deploy_target: primaryDeployTarget,
+          dispatched_by: "app-factory",
           created_by: req.user?.id || null,
           metadata: {
             action: "setup-app-credentials",
@@ -445,15 +446,18 @@ appsRouter.post("/", async (req, res) => {
             app_slug: slug,
             app_name: name,
             deploy_target: primaryDeployTarget,
+            deploy_config: primaryDeployConfig,
             repos: reposArray,
-            raw_env_credentials: rawEnvCreds,
+            repo_source,
             env_keys: envKeys,
+            ...(rawEnvCreds.trim() ? { raw_env_credentials: rawEnvCreds } : {}),
           },
         };
-        await supabase.from("agent_tasks").insert(credTaskData);
-        console.log(`[apps] Created credential setup task for app ${data.id} (${envKeys.length} vars)`);
-      } catch (credErr) {
-        console.error("[apps] Failed to create credential task:", credErr.message);
+
+        const { data: taskResult } = await supabase.from("agent_tasks").insert(taskData).select("id").single();
+        console.log(`[app-factory] Created setup task ${taskResult?.id} for app ${data.id} (${name}, ${primaryDeployTarget}, ${envKeys.length} env vars)`);
+      } catch (taskErr) {
+        console.error("[app-factory] Failed to create setup task:", taskErr.message);
       }
     }
 
