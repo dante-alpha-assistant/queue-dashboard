@@ -221,16 +221,25 @@ export default function AppOnboardingWizard() {
   const userId = session?.user?.id;
   const [searchParams, setSearchParams] = useSearchParams();
   const initialUrlStep = parseInt(searchParams.get("step"), 10);
-  const persistedDraft = getPersistedOnboardingDraft(userId);
+  const hasUrlStep = !isNaN(initialUrlStep) && initialUrlStep >= 1 && initialUrlStep <= STEP_COUNT;
+
+  // Only restore draft if coming back from GitHub OAuth redirect (has ?step= param).
+  // Otherwise start fresh — prevents stale state from previous app creations.
+  const persistedDraft = hasUrlStep ? getPersistedOnboardingDraft(userId) : {};
   const persistedGitHubAuth = getPersistedGitHubAuth(userId);
   const initialWizardState = {
     ...initialState,
     ...persistedDraft,
     ...persistedGitHubAuth,
-    step: !isNaN(initialUrlStep) && initialUrlStep >= 1 && initialUrlStep <= STEP_COUNT
+    step: hasUrlStep
       ? initialUrlStep - 1
-      : (typeof persistedDraft.step === "number" ? persistedDraft.step : initialState.step),
+      : initialState.step,
   };
+
+  // Clear stale draft on fresh mount (no ?step= param)
+  if (!hasUrlStep && userId) {
+    try { localStorage.removeItem(onboardingDraftKey(userId)); } catch {}
+  }
   const [state, dispatch] = useReducer(reducer, initialWizardState);
   const [slideDir, setSlideDir] = useState("none"); // "left", "right", "none"
   const [animating, setAnimating] = useState(false);
