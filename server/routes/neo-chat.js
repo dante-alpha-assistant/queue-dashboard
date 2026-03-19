@@ -173,12 +173,10 @@ const CHAT_TOOLS = [
 ];
 
 // Execute a tool call locally and return the result
-async function executeToolCall(name, args, conversationImages = [], uploadedImageUrls = [], contextAppId = null) {
+async function executeToolCall(name, args, conversationImages = [], uploadedImageUrls = [], contextAppId = null, userId = null) {
   if (name === "create_task") {
     try {
-      const { data, error } = await supabase
-        .from("agent_tasks")
-        .insert({
+      const insertData = {
           title: args.title,
           description: args.description || null,
           type: args.type || "general",
@@ -186,7 +184,12 @@ async function executeToolCall(name, args, conversationImages = [], uploadedImag
           dispatched_by: "neo-chat",
           status: "todo",
           app_id: args.app_id || contextAppId || null,
-        })
+      };
+      // Inject created_by from the authenticated user's session
+      if (userId) insertData.created_by = userId;
+      const { data, error } = await supabase
+        .from("agent_tasks")
+        .insert(insertData)
         .select()
         .single();
       if (error) return JSON.stringify({ error: error.message });
@@ -607,7 +610,7 @@ neoChatRouter.post("/conversations/:id/messages", async (req, res) => {
         // Separate uploaded URLs (http) from base64 data URLs
         const uploadedUrls = conversationImages.filter(u => u.startsWith('http'));
         const base64Images = conversationImages.filter(u => u.startsWith('data:'));
-        const result = await executeToolCall(tc.name, args, base64Images, uploadedUrls, app_id);
+        const result = await executeToolCall(tc.name, args, base64Images, uploadedUrls, app_id, req.user?.id);
         toolResultMsgs.push({
           role: "tool",
           tool_call_id: tc.id || `call_0`,
