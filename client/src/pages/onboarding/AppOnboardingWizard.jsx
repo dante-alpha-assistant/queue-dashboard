@@ -364,11 +364,10 @@ export default function AppOnboardingWizard() {
 
   const handleNext = useCallback(() => {
     const isScratch = state.repoSource === "scratch";
-    const isExisting = state.startingMode === "existing";
     if (state.step < STEP_COUNT - 1 && canProceed(state)) {
-      // For existing apps: step 0 → step 1 → step 2 → step 4 (skip credentials)
-      // For scratch apps: step 2 → step 4 (skip credentials)
-      if ((isScratch || isExisting) && state.step === 2) {
+      // For scratch apps: skip credentials step (auto-selected)
+      // For existing/github apps: show credentials step (user pastes .env)
+      if (isScratch && state.step === 2) {
         goToStep(4);
       } else {
         goToStep(state.step + 1);
@@ -378,10 +377,9 @@ export default function AppOnboardingWizard() {
 
   const handleBack = useCallback(() => {
     const isScratch = state.repoSource === "scratch";
-    const isExisting = state.startingMode === "existing";
     if (state.step > 0) {
-      // Skip credentials step (index 3) for scratch/existing mode
-      if ((isScratch || isExisting) && state.step === 4) {
+      // Skip credentials step (index 3) only for scratch mode
+      if (isScratch && state.step === 4) {
         goToStep(2);
       } else {
         goToStep(state.step - 1);
