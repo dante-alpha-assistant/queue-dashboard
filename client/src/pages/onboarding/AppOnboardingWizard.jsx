@@ -413,6 +413,8 @@ export default function AppOnboardingWizard() {
           qa_env_keys: [],
           supabase_project_ref: null,
           needs_database: false,
+          // Include raw credentials if user pasted them
+          ...(state.rawEnvCredentials?.trim() ? { raw_env_credentials: state.rawEnvCredentials.trim() } : {}),
         };
         const resp = await authedFetch("/api/apps", {
           method: "POST",

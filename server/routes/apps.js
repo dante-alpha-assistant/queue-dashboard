@@ -388,12 +388,13 @@ appsRouter.post("/", async (req, res) => {
       }
     }
 
-    // For existing/github repos with a deploy target, create a deploy task
-    if (repo_source !== "scratch" && primaryDeployTarget !== "none" && reposArray.length > 0) {
+    // For existing/github repos, create a deploy task
+    if (repo_source !== "scratch" && (primaryDeployTarget !== "none" || reposArray.length > 0 || req.body.raw_env_credentials)) {
       try {
+        const repoLabel = reposArray[0] || slug;
         const deployTaskData = {
-          title: `Deploy ${name} (${reposArray[0]})`,
-          description: `Deploy existing repo to ${primaryDeployTarget}.\n\nApp: ${name} (${slug})\nRepo: ${reposArray.join(", ")}\nDeploy target: ${primaryDeployTarget}\nDeploy config: ${JSON.stringify(primaryDeployConfig)}`,
+          title: `Setup & Deploy ${name} (${repoLabel})`,
+          description: `Setup app environment and deploy.\n\nApp: ${name} (${slug})\nRepo: ${reposArray.join(", ") || "none specified"}\nDeploy target: ${primaryDeployTarget}\nDeploy config: ${JSON.stringify(primaryDeployConfig)}`,
           type: "coding",
           status: "todo",
           priority: "high",
