@@ -63,6 +63,7 @@ function AppRouter() {
 
         {/* Protected routes */}
         <Route element={<ProtectedRoute />}>
+          <Route path="/apps" element={<AppsPage />} />
           <Route path="/apps/new" element={<AppOnboardingWizard />} />
           <Route path="/apps/:id/building" element={<AppBuildProgress />} />
           <Route path="/apps/:id" element={<AppDetailPage />} />

@@ -348,7 +348,7 @@ export default function AppOnboardingWizard() {
   const handleClose = useCallback(() => {
     if (hasChanges && !confirm("Discard changes? Your progress will be lost.")) return;
     try { userId && localStorage.removeItem(onboardingDraftKey(userId)); } catch {}
-    navigate("/");
+    navigate("/apps");
   }, [hasChanges, navigate]);
 
   const goToStep = useCallback((targetStep) => {

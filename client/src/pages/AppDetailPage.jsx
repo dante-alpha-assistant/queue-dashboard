@@ -92,14 +92,14 @@ export default function AppDetailPage() {
           No app with ID <code style={{ fontSize: 12 }}>{id}</code> exists.
         </p>
         <button
-          onClick={() => navigate("/")}
+          onClick={() => navigate("/apps")}
           style={{
             padding: "8px 24px", borderRadius: 20, border: "none",
             background: "var(--md-primary, #D0BCFF)", color: "var(--md-on-primary, #381E72)",
             cursor: "pointer", fontWeight: 600, fontSize: 14,
           }}
         >
-          Back to Dashboard
+          Back to Apps
         </button>
       </div>
     );
@@ -108,7 +108,7 @@ export default function AppDetailPage() {
   return (
     <AppDetailView
       app={app}
-      onBack={() => navigate("/")}
+      onBack={() => navigate("/apps")}
       onSave={handleSave}
       onArchive={handleArchive}
       onRestore={handleRestore}
