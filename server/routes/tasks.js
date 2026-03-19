@@ -367,18 +367,59 @@ router.get("/tasks", async (req, res) => {
 });
 
 // Create task
+// ── Task creation schema validation ──────────────────────────────────
+// Enforces field types/values at the API boundary so LLMs can't hallucinate
+// invalid payloads. created_by is NEVER accepted from the request body —
+// it is always injected programmatically from the authenticated JWT.
+const VALID_PRIORITIES = ["low", "normal", "high", "urgent"];
+const VALID_TYPES     = ["coding", "ops", "general", "review", "research", "qa", "setup", "deploy"];
+const VALID_STATUSES  = ["todo", "in_progress", "qa_testing", "completed", "failed", "deployed", "blocked", "deploying", "deploy_failed"];
+const UUID_RE         = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function validateTaskPayload(body) {
+  const errors = [];
+  if (!body.title || typeof body.title !== "string" || body.title.trim().length === 0) {
+    errors.push("title is required and must be a non-empty string");
+  }
+  if (body.priority && !VALID_PRIORITIES.includes(body.priority)) {
+    errors.push(`Invalid priority "${body.priority}". Must be one of: ${VALID_PRIORITIES.join(", ")}`);
+  }
+  if (body.type && !VALID_TYPES.includes(body.type)) {
+    errors.push(`Invalid type "${body.type}". Must be one of: ${VALID_TYPES.join(", ")}`);
+  }
+  if (body.status && !VALID_STATUSES.includes(body.status)) {
+    errors.push(`Invalid status "${body.status}". Must be one of: ${VALID_STATUSES.join(", ")}`);
+  }
+  if (body.project_id && !UUID_RE.test(body.project_id)) {
+    errors.push("project_id must be a valid UUID");
+  }
+  if (body.repository_id && !UUID_RE.test(body.repository_id)) {
+    errors.push("repository_id must be a valid UUID");
+  }
+  if (body.app_id && !UUID_RE.test(body.app_id)) {
+    errors.push("app_id must be a valid UUID");
+  }
+  // CRITICAL: created_by must NEVER come from the request body
+  if (body.created_by !== undefined) {
+    errors.push("created_by cannot be set in the request body — it is injected from your auth token");
+  }
+  return errors;
+}
+
 router.post("/tasks", async (req, res) => {
   try {
+    // ── Authentication required ──
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    // ── Schema validation ──
+    const validationErrors = validateTaskPayload(req.body);
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ error: "Validation failed", details: validationErrors });
+    }
+
     const { title, description, prompt, type, priority, assigned_agent, status, project_id, repository_id, acceptance_criteria, stage, app_id, metadata } = req.body;
-    if (!title) return res.status(400).json({ error: "title required" });
-    const validPriorities = ["low", "normal", "high", "urgent"];
-    if (priority && !validPriorities.includes(priority)) {
-      return res.status(400).json({ error: `Invalid priority "${priority}". Must be one of: ${validPriorities.join(", ")}` });
-    }
-    const validTypes = ["coding", "ops", "general", "review", "research", "qa"];
-    if (type && !validTypes.includes(type)) {
-      return res.status(400).json({ error: `Invalid type "${type}". Must be one of: ${validTypes.join(", ")}` });
-    }
 
     // Auto-resolve app_id from metadata.repo if not explicitly provided
     let resolvedAppId = app_id || null;
@@ -393,6 +434,11 @@ router.post("/tasks", async (req, res) => {
       } catch (_) { /* no match, leave null */ }
     }
 
+    // ── CRITICAL: created_by is ALWAYS injected from the JWT token ──
+    // This is programmatic — the LLM never generates this value.
+    // req.user.id comes from supabase.auth.getUser(token) in the auth middleware.
+    const authenticatedUserId = req.user.id;
+
     const { data, error } = await supabase
       .from("agent_tasks")
       .insert({
@@ -403,7 +449,8 @@ router.post("/tasks", async (req, res) => {
         priority: priority || "normal",
         assigned_agent: assigned_agent || null,
         status: status || "todo",
-        dispatched_by: "dante",
+        dispatched_by: req.user.email || "unknown",
+        created_by: authenticatedUserId,  // ← ALWAYS from JWT, never from body
         project_id: project_id || null,
         repository_id: repository_id || null,
         acceptance_criteria: acceptance_criteria || null,
@@ -486,7 +533,9 @@ router.post("/tasks/:id/stop", async (req, res) => {
 
 router.patch("/tasks/:id", async (req, res) => {
   try {
-    const updates = { ...req.body, updated_at: new Date().toISOString() };
+    // Strip created_by from updates — it is immutable after creation
+    const { created_by: _stripCreatedBy, ...safeBody } = req.body;
+    const updates = { ...safeBody, updated_at: new Date().toISOString() };
 
     // === STATUS REGRESSION GUARD + PAUSED GUARD ===
     // Block completed/deployed → todo/in_progress transitions via API
@@ -797,6 +846,7 @@ router.post("/deploy/batch", async (req, res) => {
     const appId = deployable.find(t => t.app_id)?.app_id || null;
 
     // Create the parent deploy task
+    // CRITICAL: created_by injected from auth JWT, never from LLM
     const { data: deployTask, error: createErr } = await supabase
       .from("agent_tasks")
       .insert({
@@ -812,6 +862,7 @@ router.post("/deploy/batch", async (req, res) => {
           repos: byRepo,
           strategy: "sequential_rebase",
         },
+        created_by: req.user?.id || null,
       })
       .select()
       .single();
@@ -883,6 +934,7 @@ router.post("/deploy/:id", async (req, res) => {
     }
 
     // Create a deploy task for the agent
+    // CRITICAL: created_by injected from auth JWT, never from LLM
     const { data: deployTask, error: createErr } = await supabase
       .from("agent_tasks")
       .insert({
@@ -893,6 +945,7 @@ router.post("/deploy/:id", async (req, res) => {
         app_id: task.app_id || null,
         deploy_target: deployTarget,
         description: `Deploy task ${task.id}:\n- ${task.title}\n- PR: ${prUrl || "none"}\n- Target: ${deployTarget}`,
+        created_by: req.user?.id || null,
         metadata: {
           batch_tasks: [{ id: task.id, title: task.title, pr_url: prUrl }],
           repos: prUrl ? { [prUrl.match(/github\.com\/([^/]+\/[^/]+)/)?.[1] || "unknown"]: [{ id: task.id, title: task.title, pr_url: prUrl, pr_number: prUrl.match(/\/pull\/(\d+)/)?.[1] }] } : {},
