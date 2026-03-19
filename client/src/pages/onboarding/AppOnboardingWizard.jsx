@@ -610,8 +610,8 @@ export default function AppOnboardingWizard() {
               </div>
             )}
             {createdApp?.vercel_warning && (
-              <div style={{ marginTop: 8, fontSize: 12, color: "#D84315" }}>
-                ⚠️ Vercel project auto-creation failed: {createdApp.vercel_warning}
+              <div style={{ marginTop: 8, fontSize: 12, color: "#94A3B8", fontStyle: "italic" }}>
+                ℹ️ Vercel project will be configured by the setup agent. ({createdApp.vercel_warning})
               </div>
             )}
           </div>
