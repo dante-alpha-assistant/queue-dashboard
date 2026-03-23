@@ -1,6 +1,6 @@
 import { authedFetch } from "../lib/api.js";
-import { useState } from "react";
-import { Settings, Zap, Hand, Info, Database, KeyRound, RotateCcw, CheckCircle, AlertCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Settings, Zap, Hand, Info, Database, KeyRound, RotateCcw, CheckCircle, AlertCircle, Gauge, Lock, Users } from "lucide-react";
 
 const DEPLOYMENT_RULES = [
   {
@@ -246,6 +246,283 @@ function TokenRotationSection() {
   );
 }
 
+function ConcurrencyLimitsSection() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [globalLimit, setGlobalLimit] = useState(2);
+  const [agentLimits, setAgentLimits] = useState({});
+  const [agentUsage, setAgentUsage] = useState({});
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [toast, setToast] = useState(null); // { type: "success"|"error", message }
+
+  useEffect(() => {
+    authedFetch("/api/settings/concurrency")
+      .then(r => r.json())
+      .then(data => {
+        setGlobalLimit(data.global_user_concurrency_limit ?? 2);
+        setAgentLimits(data.agent_user_concurrency_limits ?? {});
+        setAgentUsage(data.agent_usage ?? {});
+        setIsAdmin(data.is_admin ?? false);
+        setLoading(false);
+      })
+      .catch(e => {
+        setToast({ type: "error", message: "Failed to load concurrency config: " + e.message });
+        setLoading(false);
+      });
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setToast(null);
+    try {
+      const resp = await authedFetch("/api/settings/concurrency", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          global_user_concurrency_limit: globalLimit,
+          agent_user_concurrency_limits: agentLimits,
+        }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Request failed");
+      setToast({ type: "success", message: data.message || "Concurrency limits saved!" });
+    } catch (e) {
+      setToast({ type: "error", message: e.message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const agentNames = Object.keys(agentLimits);
+
+  const formatUsage = (agent) => {
+    const usage = agentUsage[agent] || {};
+    const entries = Object.entries(usage);
+    if (entries.length === 0) return "—";
+    return entries.map(([user, count]) => {
+      const display = user.length > 20 ? user.slice(0, 8) + "…" : user;
+      return `${display}: ${count}`;
+    }).join(", ");
+  };
+
+  return (
+    <div style={{
+      background: "var(--md-surface)",
+      borderRadius: 16,
+      border: "1px solid var(--md-surface-variant)",
+      overflow: "hidden",
+      marginBottom: 20,
+    }}>
+      {/* Header */}
+      <div style={{
+        padding: "16px 20px",
+        borderBottom: "1px solid var(--md-surface-variant)",
+        display: "flex", alignItems: "center", gap: 10,
+      }}>
+        <Gauge size={16} style={{ color: "var(--md-primary)" }} />
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 15 }}>🔒 Agent Concurrency Limits</div>
+          <div style={{ fontSize: 12, color: "var(--md-on-surface-variant)", marginTop: 1 }}>
+            Configure how many tasks each user can run concurrently per agent
+          </div>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div style={{ padding: "20px" }}>
+        {loading ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--md-on-surface-variant)", fontSize: 13 }}>
+            <div style={{
+              width: 16, height: 16, borderRadius: "50%",
+              border: "2px solid var(--md-primary)", borderTopColor: "transparent",
+              animation: "spin 0.7s linear infinite",
+            }} />
+            Loading concurrency config…
+          </div>
+        ) : (
+          <>
+            {/* Global Limit */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{
+                display: "flex", alignItems: "center", gap: 6,
+                fontSize: 12, fontWeight: 600,
+                color: "var(--md-on-surface-variant)",
+                textTransform: "uppercase", letterSpacing: "0.5px",
+                marginBottom: 8,
+              }}>
+                <Users size={13} />
+                Global User Concurrency Limit
+                {!isAdmin && <Lock size={12} style={{ marginLeft: 4, opacity: 0.6 }} />}
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={globalLimit}
+                disabled={!isAdmin}
+                onChange={e => setGlobalLimit(Number(e.target.value))}
+                style={{
+                  width: 100,
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  border: "1px solid var(--md-surface-variant)",
+                  background: isAdmin ? "var(--md-background)" : "var(--md-surface-variant)",
+                  color: "var(--md-on-surface)",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  outline: "none",
+                  opacity: isAdmin ? 1 : 0.7,
+                  cursor: isAdmin ? "auto" : "not-allowed",
+                }}
+              />
+              <span style={{ marginLeft: 10, fontSize: 12, color: "var(--md-on-surface-variant)" }}>
+                tasks per user across all agents
+              </span>
+            </div>
+
+            {/* Per-agent table */}
+            {agentNames.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{
+                  fontSize: 12, fontWeight: 600,
+                  color: "var(--md-on-surface-variant)",
+                  textTransform: "uppercase", letterSpacing: "0.5px",
+                  marginBottom: 10,
+                }}>
+                  Per-Agent Limits
+                  {!isAdmin && <Lock size={12} style={{ marginLeft: 6, opacity: 0.6 }} />}
+                </div>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: "var(--md-surface-variant)" }}>
+                        {["Agent", "Limit per User", "Current Usage"].map(h => (
+                          <th key={h} style={{
+                            padding: "8px 14px",
+                            textAlign: "left",
+                            fontWeight: 600,
+                            fontSize: 11,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.5px",
+                            color: "var(--md-on-surface-variant)",
+                            whiteSpace: "nowrap",
+                          }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {agentNames.map((agent, i) => (
+                        <tr key={agent} style={{
+                          borderBottom: i < agentNames.length - 1
+                            ? "1px solid var(--md-surface-variant)"
+                            : "none",
+                        }}>
+                          <td style={{ padding: "10px 14px", fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 600 }}>
+                            {agent}
+                          </td>
+                          <td style={{ padding: "10px 14px" }}>
+                            <input
+                              type="number"
+                              min={1}
+                              max={20}
+                              value={agentLimits[agent] ?? 1}
+                              disabled={!isAdmin}
+                              onChange={e => setAgentLimits(prev => ({ ...prev, [agent]: Number(e.target.value) }))}
+                              style={{
+                                width: 70,
+                                padding: "5px 10px",
+                                borderRadius: 6,
+                                border: "1px solid var(--md-surface-variant)",
+                                background: isAdmin ? "var(--md-background)" : "var(--md-surface-variant)",
+                                color: "var(--md-on-surface)",
+                                fontSize: 13,
+                                fontWeight: 600,
+                                outline: "none",
+                                opacity: isAdmin ? 1 : 0.7,
+                                cursor: isAdmin ? "auto" : "not-allowed",
+                              }}
+                            />
+                          </td>
+                          <td style={{ padding: "10px 14px", fontSize: 12, color: "var(--md-on-surface-variant)", fontFamily: "'JetBrains Mono', monospace" }}>
+                            {formatUsage(agent)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Save button (admin only) */}
+            {isAdmin && (
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "10px 20px",
+                  borderRadius: 10,
+                  border: "none",
+                  background: saving ? "var(--md-surface-variant)" : "var(--md-primary)",
+                  color: saving ? "var(--md-on-surface-variant)" : "var(--md-on-primary)",
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: saving ? "not-allowed" : "pointer",
+                  transition: "background 0.15s",
+                  marginBottom: toast ? 14 : 0,
+                }}
+              >
+                <Gauge size={14} style={{ animation: saving ? "spin 1s linear infinite" : "none" }} />
+                {saving ? "Saving…" : "Save Concurrency Limits"}
+              </button>
+            )}
+
+            {/* Toast */}
+            {toast && (
+              <div style={{
+                marginTop: isAdmin ? 14 : 0,
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 8,
+                padding: "10px 14px",
+                borderRadius: 10,
+                background: toast.type === "success" ? "rgba(22,163,74,0.1)" : "rgba(220,38,38,0.1)",
+                border: `1px solid ${toast.type === "success" ? "rgba(22,163,74,0.25)" : "rgba(220,38,38,0.25)"}`,
+                color: toast.type === "success" ? "#16a34a" : "#dc2626",
+                fontSize: 13,
+              }}>
+                {toast.type === "success"
+                  ? <CheckCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                  : <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                }
+                <span style={{ fontWeight: 500 }}>{toast.message}</span>
+              </div>
+            )}
+
+            {!isAdmin && (
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 12,
+                color: "var(--md-on-surface-variant)",
+                marginTop: 4,
+                opacity: 0.7,
+              }}>
+                <Lock size={12} />
+                Read-only — only admins can modify concurrency limits
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   return (
     <div style={{
@@ -357,6 +634,8 @@ export default function SettingsPage() {
         </div>
 
         <TokenRotationSection />
+
+        <ConcurrencyLimitsSection />
 
         {/* Future notice */}
         <div style={{

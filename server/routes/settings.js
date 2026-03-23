@@ -153,3 +153,115 @@ router.post("/rotate-claude-token", async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// GET /api/settings/concurrency
+// Returns dispatcher_config limits + current per-agent per-user in-progress usage
+router.get("/concurrency", async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    // Fetch all dispatcher_config rows
+    const { data: configRows, error: configErr } = await supabase
+      .from("dispatcher_config")
+      .select("key, value");
+
+    if (configErr) {
+      console.error("[settings] concurrency config fetch error:", configErr.message);
+      return res.status(500).json({ error: configErr.message });
+    }
+
+    const configMap = {};
+    for (const row of configRows || []) {
+      configMap[row.key] = row.value;
+    }
+
+    const global_user_concurrency_limit = configMap["global_user_concurrency_limit"] ?? 2;
+    const agent_user_concurrency_limits = configMap["agent_user_concurrency_limits"] ?? {};
+
+    // Fetch in-progress tasks to build usage map
+    const { data: inProgressTasks, error: tasksErr } = await supabase
+      .from("agent_tasks")
+      .select("assigned_agent, created_by")
+      .eq("status", "in_progress");
+
+    if (tasksErr) {
+      console.error("[settings] concurrency tasks fetch error:", tasksErr.message);
+      return res.status(500).json({ error: tasksErr.message });
+    }
+
+    // Build: { "neo-worker": { "user_id": count } }
+    const agent_usage = {};
+    for (const task of inProgressTasks || []) {
+      const agent = task.assigned_agent;
+      const user = task.created_by;
+      if (!agent || !user) continue;
+      if (!agent_usage[agent]) agent_usage[agent] = {};
+      agent_usage[agent][user] = (agent_usage[agent][user] || 0) + 1;
+    }
+
+    const is_admin = req.user?.email === "dante.perea@unifounder.ai";
+
+    res.json({
+      global_user_concurrency_limit,
+      agent_user_concurrency_limits,
+      agent_usage,
+      is_admin,
+    });
+  } catch (e) {
+    console.error("[settings] concurrency GET error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT /api/settings/concurrency
+// Update concurrency limits (admin only)
+router.put("/concurrency", async (req, res) => {
+  try {
+    if (!req.user || req.user.email !== "dante.perea@unifounder.ai") {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const { global_user_concurrency_limit, agent_user_concurrency_limits } = req.body;
+
+    const upserts = [];
+
+    if (global_user_concurrency_limit !== undefined) {
+      upserts.push({
+        key: "global_user_concurrency_limit",
+        value: Number(global_user_concurrency_limit),
+        updated_at: new Date().toISOString(),
+        updated_by: req.user.email,
+      });
+    }
+
+    if (agent_user_concurrency_limits !== undefined) {
+      upserts.push({
+        key: "agent_user_concurrency_limits",
+        value: agent_user_concurrency_limits,
+        updated_at: new Date().toISOString(),
+        updated_by: req.user.email,
+      });
+    }
+
+    if (upserts.length === 0) {
+      return res.status(400).json({ error: "Nothing to update" });
+    }
+
+    const { error: upsertErr } = await supabase
+      .from("dispatcher_config")
+      .upsert(upserts, { onConflict: "key" });
+
+    if (upsertErr) {
+      console.error("[settings] concurrency upsert error:", upsertErr.message);
+      return res.status(500).json({ error: upsertErr.message });
+    }
+
+    console.log(`[settings] Concurrency limits updated by ${req.user.email}`);
+    res.json({ success: true, message: "Concurrency limits updated" });
+  } catch (e) {
+    console.error("[settings] concurrency PUT error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
