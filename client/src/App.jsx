@@ -12,6 +12,7 @@ import TaskCard from "./components/TaskCard";
 import NewTaskChat from "./components/NewTaskChat";
 import TaskDetailModal from "./components/TaskDetailModal";
 import BatchDeployModal from "./components/BatchDeployModal";
+import AgentHealthCheckModal from "./components/AgentHealthCheckModal";
 import Pingboard from "./pages/Pingboard";
 import HealthDashboard from "./pages/HealthDashboard";
 import AppsPage from "./pages/AppsPage";
@@ -163,6 +164,15 @@ function AppMain() {
   // Batch deploy modal
   const [showBatchDeploy, setShowBatchDeploy] = useState(false);
 
+  // Agent health check modal — show once per session
+  const [showHealthModal, setShowHealthModal] = useState(() => {
+    try { return !sessionStorage.getItem("healthcheck-done"); } catch { return true; }
+  });
+  const handleHealthModalDismiss = useCallback(() => {
+    try { sessionStorage.setItem("healthcheck-done", "1"); } catch {}
+    setShowHealthModal(false);
+  }, []);
+
   // All columns are collapsible
   const COLLAPSIBLE_COLUMNS = ["todo", "in_progress", "blocked", "qa_testing", "completed", "deploying", "deployed", "deploy_failed", "failed"];
   const [collapsedCols, setCollapsedCols] = useState(() => {
@@ -216,11 +226,27 @@ function AppMain() {
               {t.label}
             </button>
           ))}
+          <button
+            onClick={() => setShowHealthModal(true)}
+            title="Run agent health check"
+            style={{
+              display: "flex", alignItems: "center", gap: 5,
+              padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+              border: "1px solid var(--md-surface-variant)",
+              background: "var(--md-surface)", color: "var(--md-on-surface-variant)",
+              cursor: "pointer",
+              fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+              marginLeft: "auto",
+            }}
+          >
+            <HeartPulse size={13} /> Health Check
+          </button>
           <LogoutButton />
         </div>
         <div style={{ paddingTop: 42 }}>
           {view === "pingboard" ? <Pingboard /> : view === "apps" ? <AppsPage /> : view === "settings" ? <SettingsPage /> : <HealthDashboard />}
         </div>
+        {showHealthModal && <AgentHealthCheckModal onDismiss={handleHealthModalDismiss} />}
       </div>
     );
   }
@@ -482,6 +508,20 @@ function AppMain() {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <StatsBar stats={stats} isTablet={isTablet} />
+            <button
+              onClick={() => setShowHealthModal(true)}
+              title="Run agent health check"
+              style={{
+                display: "flex", alignItems: "center", gap: 5,
+                padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                border: "1px solid var(--md-surface-variant)",
+                background: "var(--md-surface)", color: "var(--md-on-surface-variant)",
+                cursor: "pointer",
+                fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+              }}
+            >
+              <HeartPulse size={13} /> Health Check
+            </button>
             <LogoutButton />
           </div>
         </div>
@@ -646,5 +686,6 @@ function AppMain() {
       )}
     </div>
       {showBatchDeploy && <BatchDeployModal tasks={filterByType(completed)} onDeploy={() => { setShowBatchDeploy(false); }} onClose={() => setShowBatchDeploy(false)} />}
+      {showHealthModal && <AgentHealthCheckModal onDismiss={handleHealthModalDismiss} />}
   </>);
 }
