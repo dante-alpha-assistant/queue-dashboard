@@ -177,7 +177,7 @@ const styles = {
     padding: "40px 36px",
     width: "100%",
     maxWidth: 400,
-    boxShadow: "0 4px 32px rgba(0,0,0,0.4)",
+    boxShadow: "0 4px 32px rgba(0,0,0,0.08)",
   },
   logoRow: {
     display: "flex",
